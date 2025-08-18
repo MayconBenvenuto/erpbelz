@@ -30,13 +30,14 @@ emergent-crm-adm/
 ```
 
 ### 🔧 Stack Tecnológica
-- **Frontend**: Next.js 14.2.3 + React 18
-- **UI**: Shadcn/UI + TailwindCSS + Lucide Icons
-- **Backend**: Next.js API Routes
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: JWT + bcryptjs
-- **Styling**: TailwindCSS + CSS Variables
-- **Fonts**: Montserrat (Google Fonts)
+- Frontend: Next.js 14.2.3 + React 18 (App Router)
+- UI: Shadcn/UI + TailwindCSS + Lucide Icons
+- Backend: Rotas de API do Next.js (app/api)
+- Database: Supabase (PostgreSQL)
+- Auth: JWT + bcryptjs
+- E-mail: Nodemailer (SMTP)
+- Styling: TailwindCSS + CSS Variables
+- Fonts: Montserrat (Google Fonts)
 
 ---
 
@@ -138,64 +139,66 @@ const gestorPermissions = {
 
 ---
 
-## 🗄️ Estrutura do Banco de Dados
+## 🗄️ Estrutura do Banco de Dados (Supabase)
 
-### 📊 Tabelas Principais
+Os esquemas abaixo refletem o arquivo `database_setup.sql` usado no projeto (UUIDs, metas e gatilhos):
 
-#### **usuarios**
+### Tabela usuarios
 ```sql
 CREATE TABLE usuarios (
-  id SERIAL PRIMARY KEY,
-  nome VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  senha_hash VARCHAR(255) NOT NULL,
-  tipo_usuario VARCHAR(50) NOT NULL CHECK (tipo_usuario IN ('analista', 'gestor')),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  senha TEXT NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor', 'analista')) NOT NULL,
+  "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-#### **propostas**
+### Tabela propostas
 ```sql
 CREATE TABLE propostas (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cnpj VARCHAR(18) NOT NULL,
-  consultor VARCHAR(255) NOT NULL,
-  operadora VARCHAR(100) NOT NULL,
-  quantidade_vidas INTEGER NOT NULL,
-  valor DECIMAL(10,2) NOT NULL,
-  previsao_implantacao DATE,
-  status VARCHAR(50) DEFAULT 'em análise',
-  criado_por INTEGER REFERENCES usuarios(id),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  consultor TEXT NOT NULL,
+  operadora TEXT CHECK (operadora IN (
+    'unimed recife','unimed seguros','bradesco','amil','ampla','fox','hapvida',
+    'medsenior','sulamerica','select'
+  )) NOT NULL,
+  "quantidade_vidas" INT NOT NULL,
+  valor NUMERIC(12,2) NOT NULL,
+  "previsao_implantacao" DATE,
+  status TEXT CHECK (status IN (
+    'em análise','pendencias seguradora','boleto liberado','implantando',
+    'pendente cliente','pleito seguradora','negado','implantado'
+  )) NOT NULL,
+  "criado_por" UUID REFERENCES usuarios(id),
+  "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-#### **sessoes**
+### Tabela sessoes
 ```sql
 CREATE TABLE sessoes (
-  id SERIAL PRIMARY KEY,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  session_id VARCHAR(255) NOT NULL,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  inicio_sessao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ultima_atividade TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ativa BOOLEAN DEFAULT true
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "usuario_id" UUID REFERENCES usuarios(id),
+  "data_login" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  "data_logout" TIMESTAMP WITH TIME ZONE,
+  "tempo_total" INTERVAL
 );
 ```
 
-#### **metas_usuario**
+### Tabela metas e funções
 ```sql
-CREATE TABLE metas_usuario (
-  id SERIAL PRIMARY KEY,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  meta_propostas INTEGER NOT NULL,
-  propostas_fechadas INTEGER DEFAULT 0,
-  mes_ano VARCHAR(7) NOT NULL, -- YYYY-MM
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE metas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "usuario_id" UUID REFERENCES usuarios(id),
+  "valor_meta" NUMERIC(12,2) DEFAULT 150000,
+  "valor_alcancado" NUMERIC(12,2) DEFAULT 0,
+  "atualizado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUMERIC) ...;
 ```
 
 ---
@@ -211,32 +214,27 @@ Body: { email: string, password: string }
 Response: { user: object, sessionId: string, token: string }
 ```
 
-#### **Propostas**
-```javascript
-// Listar propostas
+#### Propostas
+```http
 GET /api/proposals
-Response: [{ id, cnpj, consultor, operadora, quantidade_vidas, valor, status, ... }]
+  -> Lista propostas (gestor vê todas; analista vê apenas as próprias)
 
-// Criar proposta (apenas analistas)
 POST /api/proposals
-Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao }
+  Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
+  -> Cria proposta (analista tem o criado_por forçado para o próprio id)
 
-// Atualizar proposta (gestor: qualquer; analista: apenas as próprias para alterar status)
 PUT /api/proposals/:id
-Body: { status?: string, ...outros_campos }
+  Body: { status }
+  -> Atualiza status; quando "implantado" atualiza metas (RPC atualizar_meta_usuario)
 
-// Deletar proposta (apenas gestores)
 DELETE /api/proposals/:id
+  -> Apenas gestores
 ```
 
-#### **Usuários** (apenas gestores)
-```javascript
-// Listar usuários
+#### Usuários (gestores)
+```http
 GET /api/users
-
-// Criar usuário
-POST /api/users
-Body: { nome, email, senha, tipo_usuario }
+POST /api/users  Body: { nome, email, senha, tipo_usuario? }
 ```
 
 #### **Validação CNPJ**
@@ -441,57 +439,57 @@ try {
 
 ## 🌍 Variáveis de Ambiente
 
-### 📄 .env (Configuração Local)
-```bash
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+### 📄 Variáveis de Ambiente
 
-# Security Configuration
-JWT_SECRET=secure_32_character_secret_key_here
+Use o arquivo `.env.example` como base. Principais variáveis:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Segurança
+JWT_SECRET=
 BCRYPT_ROUNDS=12
 SESSION_TIMEOUT=86400000
-
-# CORS Configuration
-CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
-
-# Rate Limiting
 RATE_LIMIT_WINDOW=900000
 RATE_LIMIT_MAX_REQUESTS=100
-```
 
-### 📄 .env.example (Template)
-```bash
-# ⚠️ CONFIGURE COM SUAS PRÓPRIAS CHAVES
-
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-
-# Security Configuration
-JWT_SECRET=uma_chave_super_secreta_com_no_minimo_32_caracteres
-BCRYPT_ROUNDS=12
-SESSION_TIMEOUT=86400000
-
-# CORS Configuration  
+# CORS
 CORS_ORIGINS=http://localhost:3000
 
-# Rate Limiting
-RATE_LIMIT_WINDOW=900000
-RATE_LIMIT_MAX_REQUESTS=100
+# SMTP / E-mail
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_SECURE=false
+SMTP_DEBUG=false
+EMAIL_FROM=comunicacao@belzseguros.com.br
+EMAIL_FROM_NAME=CRM Belz
+
+# Apps
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+CRM_APP_URL=http://localhost:3000
+
+# Integrações
+CNPJA_API_KEY=
 ```
 
 ---
 
 ## 🚀 Scripts de Desenvolvimento
 
-### 📦 package.json Scripts
+### 📦 Scripts (package.json)
 ```json
 {
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   }
 }
 ```
@@ -604,11 +602,22 @@ git push origin main
 7. **Dados não sanitizados**
 
 ### 🎯 Prioridades
-1. **Segurança** sempre em primeiro lugar
-2. **UX consistente** com o design system
-3. **Performance** e otimização
-4. **Manutenibilidade** do código
-5. **Documentação** clara
+1. Segurança sempre em primeiro lugar
+2. UX consistente com o design system
+3. Performance e otimização
+4. Manutenibilidade do código
+5. Documentação clara
+
+### 🔧 Convenções para novas rotas API
+- Sempre use `requireAuth(request)` de `lib/api-helpers` para autenticação.
+- Para restringir a gestores, use `ensureGestor(user)`.
+- Aplique CORS e headers de segurança via `handleCORS(NextResponse.json(...), origin)`.
+- Valide payloads com `zod`.
+- Nunca exponha dados sensíveis nos logs. Use `sanitizeForLog`.
+
+### ✉️ Notificações por e-mail
+- Para status de proposta: ver `app/api/proposals/[id]/route.js` (usa `sendEmail` e `renderBrandedEmail`).
+- Configure SMTP no `.env`. Em dev, `SMTP_DEBUG=true` ajuda na verificação.
 
 ---
 
@@ -626,5 +635,5 @@ Este CRM da Belz é um sistema robusto e seguro para gestão de propostas de pla
 ---
 
 *Última atualização: 18 de agosto de 2025*
-*Versão: 1.0.0*
-*Autor: GitHub Copilot Assistant*
+*Versão: 1.1.0*
+*Autor: GitHub Copilot*

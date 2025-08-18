@@ -1,50 +1,52 @@
-# � CRM Belz - Sistema de Gestão de Propostas
+# CRM Belz – Sistema de Gestão de Propostas
 
-## � Sobre o Projeto
+Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. O projeto usa Next.js (App Router), Supabase (Postgres) e Shadcn/UI, com segurança robusta e controle de acesso por perfis (analista/gestor).
 
-Sistema de CRM desenvolvido para a **Belz** focado na gestão de propostas de planos de saúde. Implementa controle de acesso baseado em roles, interface moderna com sidebar lateral e medidas robustas de segurança.
-
-## 🎯 Funcionalidades Principais
+## 🎯 Funcionalidades
 
 ### 👥 Sistema de Usuários
+
 - **Analistas**: Criam e visualizam propostas
 - **Gestores**: Monitoram, alteram status e excluem propostas
 - **Autenticação**: JWT + bcrypt com rate limiting
 
 ### 📊 Gestão de Propostas
+
 - Validação automática de CNPJ (3 APIs em cascata)
 - Status personalizados para pipeline de vendas
 - Múltiplas operadoras de saúde suportadas
 - Dashboard com métricas e gráficos
 
 ### 🔒 Segurança
+
 - Headers de segurança implementados
 - Sanitização de inputs contra XSS
 - Rate limiting anti-bruteforce
 - Logs sanitizados sem dados sensíveis
 
-## 🔧 Instalação
+## 🔧 Como rodar
 
-### 1. Clone o repositório
-```bash
+1. Clone o repositório
+
+```powershell
 git clone https://github.com/MayconBenvenuto/emergent-crm-adm.git
-cd emergent-crm-adm
+Set-Location emergent-crm-adm
 ```
 
-### 2. Instale as dependências
-```bash
+1. Instale as dependências
+
+```powershell
 npm install
-# ou
-yarn install
 ```
 
-### 3. Configure as variáveis de ambiente
+1. Configure as variáveis de ambiente
 
-**⚠️ CRÍTICO: Nunca commite arquivos .env**
+Aviso: nunca commite arquivos .env.
 
-Copie o arquivo de exemplo:
-```bash
-cp .env.example .env
+Copie o arquivo de exemplo e preencha os valores:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
 Configure as seguintes variáveis no arquivo `.env`:
@@ -58,6 +60,7 @@ SUPABASE_SERVICE_ROLE_KEY=sua_chave_de_servico
 # Segurança (obrigatório)
 JWT_SECRET=uma_chave_super_secreta_com_no_minimo_32_caracteres
 BCRYPT_ROUNDS=12
+SESSION_TIMEOUT=86400000
 
 # CORS (ajuste para seu domínio)
 CORS_ORIGINS=http://localhost:3000,https://seudominio.com
@@ -65,18 +68,35 @@ CORS_ORIGINS=http://localhost:3000,https://seudominio.com
 # Rate Limiting
 RATE_LIMIT_WINDOW=900000
 RATE_LIMIT_MAX_REQUESTS=100
+
+# E-mail (SMTP)
+SMTP_HOST=smtp.seudominio.com
+SMTP_PORT=587
+SMTP_USER=usuario
+SMTP_PASS=senha
+SMTP_SECURE=false
+EMAIL_FROM=comunicacao@belzseguros.com.br
+EMAIL_FROM_NAME=CRM Belz
+
+# Integrações
+CNPJA_API_KEY=
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+CRM_APP_URL=http://localhost:3000
 ```
 
-### 4. Execute o projeto
-```bash
+1. Execute o projeto
+
+```powershell
 npm run dev
-# ou
-yarn dev
 ```
 
-## 🔐 Recursos de Segurança
+Aplicação padrão: <http://localhost:3000>
+
+## 🔐 Segurança
 
 ### ✅ Implementados
+
+
 - **Autenticação JWT** com expiração configurável
 - **Hash de senhas** com bcrypt (12 rounds)
 - **Rate limiting** por IP para login
@@ -88,6 +108,8 @@ yarn dev
 - **Timeouts de API** para evitar DoS
 
 ### 🔒 Headers de Segurança
+
+
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
@@ -95,15 +117,18 @@ yarn dev
 - `Referrer-Policy: strict-origin-when-cross-origin`
 
 ### 🛡️ Proteções Implementadas
+
+
 - **SQL Injection**: Queries parametrizadas via Supabase
 - **XSS**: Sanitização de entrada e headers CSP
 - **CSRF**: Tokens de sessão e CORS restritivo
 - **Brute Force**: Rate limiting progressivo
 - **Session Hijacking**: JWT com expiração
 
-## 📊 Estrutura de Dados
+## 📊 Modelos de Dados
 
 ### Usuários
+
 ```sql
 CREATE TABLE usuarios (
   id UUID PRIMARY KEY,
@@ -115,6 +140,7 @@ CREATE TABLE usuarios (
 ```
 
 ### Propostas
+
 ```sql
 CREATE TABLE propostas (
   id UUID PRIMARY KEY,
@@ -132,6 +158,7 @@ CREATE TABLE propostas (
 ## 🚨 Alertas de Segurança
 
 ### ❌ NÃO FAÇA
+
 - Commitar arquivos `.env`
 - Usar senhas fracas
 - Expor APIs sem autenticação
@@ -139,15 +166,16 @@ CREATE TABLE propostas (
 - Usar CORS `*` em produção
 
 ### ✅ SEMPRE FAÇA
+
 - Use senhas fortes (mín. 12 caracteres)
 - Configure CORS para domínios específicos
 - Monitore logs de segurança
 - Atualize dependências regularmente
 - Use HTTPS em produção
 
-## 🔧 Scripts Disponíveis
+## 🔧 Scripts
 
-```bash
+```powershell
 # Desenvolvimento
 npm run dev
 
@@ -157,29 +185,44 @@ npm run build
 # Iniciar produção
 npm start
 
-# Instalar dependências de segurança
-npm install bcryptjs jsonwebtoken
+# Lint e formatação
+npm run lint
+npm run format
+
+# Testes utilitários (e.g., validação de CNPJ, e-mails)
+node .\tests\test_email_api.js
+node .\tests\test_email_send.js
+node .\test_cnpj_validation.js
+
+# Windows: preparar/remover cache do Next.js
+npm run windows:next-cache:setup
+npm run windows:next-cache:remove
 ```
 
-## 🌐 Deploy Seguro
+## 🌐 Deploy
 
 ### Vercel (Recomendado)
+
 ```bash
 # 1. Configure as variáveis de ambiente no painel da Vercel
 # 2. Deploy
 vercel --prod
 ```
 
-### Variáveis de Ambiente para Produção
+### Variáveis de ambiente para produção
+
 ```env
 NODE_ENV=production
 CORS_ORIGINS=https://seudominio.com
 JWT_SECRET=chave_ainda_mais_forte_para_producao
+NEXT_PUBLIC_BASE_URL=https://seudominio.com
+CRM_APP_URL=https://seudominio.com
 ```
 
 ## 📈 Monitoramento
 
 O sistema inclui:
+
 - **Logs de acesso** com IP e timestamp
 - **Métricas de sessão** por usuário
 - **Alertas de rate limiting**
@@ -193,10 +236,11 @@ O sistema inclui:
 4. Push para a branch (`git push origin feature/nova-funcionalidade`)
 5. Abra um Pull Request
 
-### 📘 Guia do Copilot e Convenções
+### 📘 Guias
 
-- Guia complementar para o uso do GitHub Copilot e visão da arquitetura: veja `.github/COPILOT_GUIDE.md`.
-- Instruções principais para o Copilot e padrões do projeto: veja `COPILOT_INSTRUCTIONS.md`.
+- Guia do Copilot detalhado: `COPILOT_GUIDE.md`
+- Instruções para o Copilot e padrões do projeto: `COPILOT_INSTRUCTIONS.md`
+- Processos de contribuição: `CONTRIBUTING.md`
 
 ## 📄 Licença
 
@@ -206,6 +250,7 @@ Este projeto é privado e proprietário da Belz.
 
 Em caso de problemas de segurança, entre em contato imediatamente com a equipe de desenvolvimento.
 
----
+—
+Atualizado em: 18/08/2025
 
-**⚠️ LEMBRETE DE SEGURANÇA**: Este sistema contém dados sensíveis. Sempre siga as melhores práticas de segurança e nunca exponha credenciais ou chaves de API.
+Observação: Este sistema contém dados sensíveis. Siga as melhores práticas de segurança e nunca exponha credenciais ou chaves de API.
