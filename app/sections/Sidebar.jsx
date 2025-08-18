@@ -1,0 +1,106 @@
+'use client'
+
+/**
+ * Sidebar
+ * @param {{
+ *  currentUser: { id: string, nome: string, tipo_usuario: 'gestor'|'analista' },
+ *  activeTab: 'propostas'|'dashboard'|'usuarios'|'relatorios',
+ *  setActiveTab: (tab: string) => void,
+ *  onRefresh: () => void,
+ *  onLogout: () => void,
+ * }} props
+ */
+
+import Image from 'next/image'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User } from 'lucide-react'
+
+export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
+  return (
+    <aside className="w-64 bg-card border-r shadow-lg flex flex-col">
+      <div className="p-6 border-b">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10">
+            <Image src="/logo-belz.jpg" alt="Logo Belz" width={40} height={40} className="rounded-lg object-cover" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-primary font-montserrat">ADM Belz</h1>
+            <p className="text-xs text-muted-foreground">Sistema de Propostas</p>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 p-4">
+        <div className="space-y-2">
+          <button
+            onClick={() => setActiveTab('propostas')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'propostas' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="font-medium">Propostas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="font-medium">Dashboard</span>
+          </button>
+
+          {currentUser.tipo_usuario === 'gestor' && (
+            <>
+              <button
+                onClick={() => setActiveTab('usuarios')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                  activeTab === 'usuarios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                <span className="font-medium">Usuários</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('relatorios')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                  activeTab === 'relatorios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span className="font-medium">Relatórios</span>
+              </button>
+            </>
+          )}
+        </div>
+      </nav>
+
+      <div className="p-4 border-t">
+        <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
+          <User className="w-8 h-8 p-2 bg-primary/10 rounded-full text-primary" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{currentUser.nome}</p>
+            <Badge variant={currentUser.tipo_usuario === 'gestor' ? 'default' : 'secondary'} className="text-xs">
+              {currentUser.tipo_usuario}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <Button variant="outline" size="sm" onClick={onRefresh} className="w-full">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={onLogout} className="w-full">
+            <LogOut className="w-4 h-4 mr-2" />
+            Sair
+          </Button>
+        </div>
+      </div>
+    </aside>
+  )
+}
