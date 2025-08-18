@@ -225,7 +225,7 @@ export default function ProposalsSection({
                 <TableHead>Vidas</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                {currentUser.tipo_usuario === 'gestor' && <TableHead>Alterar Status</TableHead>}
+                <TableHead>Alterar Status</TableHead>
                 {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
               </TableRow>
             </TableHeader>
@@ -243,18 +243,16 @@ export default function ProposalsSection({
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(proposal.status)}>{proposal.status}</Badge>
                   </TableCell>
-                  {currentUser.tipo_usuario === 'gestor' && (
-                    <TableCell>
-                      <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   {/* {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
                       <Button variant="destructive" size="sm" onClick={() => onDeleteProposal(proposal.id)}>Excluir</Button>

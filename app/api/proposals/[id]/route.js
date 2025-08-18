@@ -51,6 +51,21 @@ export async function PUT(request, { params }) {
 
   const { status, criado_por, valor } = parsed.data
 
+  // Busca a proposta para checar autorização do usuário
+  const { data: currentProposal, error: fetchError } = await supabase
+    .from('propostas')
+    .select('id, criado_por, valor, status')
+    .eq('id', id)
+    .single()
+  if (fetchError || !currentProposal) {
+    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+  }
+
+  // Regra: gestor pode alterar qualquer; analista só altera a própria
+  if (auth.user.tipo_usuario !== 'gestor' && currentProposal.criado_por !== auth.user.id) {
+    return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
+  }
+
   const { data, error } = await supabase
     .from('propostas')
     .update({ status })
