@@ -14,7 +14,7 @@
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User } from 'lucide-react'
+import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat } from 'lucide-react'
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
@@ -52,6 +52,18 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <BarChart3 className="w-5 h-5" />
             <span className="font-medium">Dashboard</span>
           </button>
+
+          {currentUser.tipo_usuario !== 'gestor' && (
+            <button
+              onClick={() => setActiveTab('movimentacao')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                activeTab === 'movimentacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Repeat className="w-5 h-5" />
+              <span className="font-medium">Movimentação</span>
+            </button>
+          )}
 
           {currentUser.tipo_usuario === 'gestor' && (
             <>

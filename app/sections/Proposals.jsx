@@ -225,7 +225,7 @@ export default function ProposalsSection({
                 <TableHead>Vidas</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                {currentUser.tipo_usuario === 'gestor' && <TableHead>Alterar Status</TableHead>}
+                <TableHead>Alterar Status</TableHead>
                 {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
               </TableRow>
             </TableHeader>
@@ -245,8 +245,8 @@ export default function ProposalsSection({
                       {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
                     </Badge>
                   </TableCell>
-                  {currentUser.tipo_usuario === 'gestor' && (
-                    <TableCell>
+                  <TableCell>
+                    {(currentUser.tipo_usuario === 'gestor' || proposal.criado_por === currentUser.id) ? (
                       <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
                         <SelectTrigger className="w-40">
                           <SelectValue />
@@ -255,8 +255,10 @@ export default function ProposalsSection({
                           {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                  )}
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   {/* {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
                       <Button variant="destructive" size="sm" onClick={() => onDeleteProposal(proposal.id)}>Excluir</Button>

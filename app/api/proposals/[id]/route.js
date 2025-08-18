@@ -55,15 +55,24 @@ export async function PUT(request, { params }) {
 
   const { status, criado_por, valor } = parsed.data
 
-  const { data: updated, error } = await supabase
+  // Gestor pode atualizar qualquer proposta; analista apenas as próprias
+  let updateQuery = supabase
     .from('propostas')
     .update({ status })
     .eq('id', id)
-    .select()
-    .single()
+
+  if (auth.user.tipo_usuario !== 'gestor') {
+    updateQuery = updateQuery.eq('criado_por', auth.user.id)
+  }
+
+  const { data: updated, error } = await updateQuery.select().single()
 
   if (error) {
     return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
+  }
+  if (!updated) {
+    // Se não encontrou/atualizou, pode ser falta de permissão (analista tentando outra proposta)
+    return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
   }
 
   // Atualiza meta quando implantado
