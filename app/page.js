@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,13 +13,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { BarChart3, Users, Target, Clock, PlusCircle, LogOut, Building2, User, FileText, TrendingUp } from 'lucide-react'
+import { BarChart3, Users, Target, Clock, PlusCircle, LogOut, Building2, User, FileText, TrendingUp, RefreshCw } from 'lucide-react'
+import Image from 'next/image'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('propostas')
   const [sessionId, setSessionId] = useState(null)
+  const [lastActivity, setLastActivity] = useState(Date.now())
   
   // Login form state
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
@@ -81,8 +83,9 @@ export default function App() {
       if (response.ok) {
         setCurrentUser(result.user)
         setSessionId(result.sessionId)
+        setLastActivity(Date.now())
+        saveSessionToStorage(result.user, result.sessionId)
         toast.success('Login realizado com sucesso!')
-        loadData()
       } else {
         toast.error(result.error || 'Erro no login')
       }
@@ -105,6 +108,8 @@ export default function App() {
       
       setCurrentUser(null)
       setSessionId(null)
+      setLastActivity(Date.now())
+      clearSessionFromStorage()
       toast.success('Logout realizado com sucesso!')
     } catch (error) {
       toast.error('Erro no logout')
@@ -243,6 +248,30 @@ export default function App() {
     }
   }
 
+  const handleUpdateProposalStatus = async (proposalId, newStatus, proposal) => {
+    try {
+      const response = await fetch(`/api/proposals/${proposalId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: newStatus,
+          criado_por: proposal.criado_por,
+          valor: proposal.valor
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Status da proposta atualizado com sucesso!')
+        loadData()
+      } else {
+        const result = await response.json()
+        toast.error(result.error || 'Erro ao atualizar status')
+      }
+    } catch (error) {
+      toast.error('Erro ao conectar com o servidor')
+    }
+  }
+
   const getStatusBadgeVariant = (status) => {
     const variants = {
       'em análise': 'secondary',
@@ -268,6 +297,104 @@ export default function App() {
     return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
   }
 
+  // Função para persistir sessão no localStorage
+  const saveSessionToStorage = (user, sessionId) => {
+    localStorage.setItem('crm_user', JSON.stringify(user))
+    localStorage.setItem('crm_session', sessionId)
+    localStorage.setItem('crm_last_activity', Date.now().toString())
+  }
+
+  const clearSessionFromStorage = () => {
+    localStorage.removeItem('crm_user')
+    localStorage.removeItem('crm_session')
+    localStorage.removeItem('crm_last_activity')
+  }
+
+  const loadSessionFromStorage = () => {
+    const user = localStorage.getItem('crm_user')
+    const session = localStorage.getItem('crm_session')
+    const lastActivity = localStorage.getItem('crm_last_activity')
+    
+    if (user && session && lastActivity) {
+      const timeSinceLastActivity = Date.now() - parseInt(lastActivity)
+      // Session válida por 24 horas ao invés de 3 minutos
+      if (timeSinceLastActivity < 24 * 60 * 60 * 1000) {
+        setCurrentUser(JSON.parse(user))
+        setSessionId(session)
+        setLastActivity(parseInt(lastActivity))
+        return true
+      }
+    }
+    return false
+  }
+
+  // Update last activity
+  const updateActivity = useCallback(() => {
+    const now = Date.now()
+    setLastActivity(now)
+    if (currentUser) {
+      localStorage.setItem('crm_last_activity', now.toString())
+    }
+  }, [currentUser])
+
+  // Auto-refresh data callback
+  const autoRefreshData = useCallback(async () => {
+    if (currentUser) {
+      await loadData()
+    }
+  }, [currentUser])
+
+  // Effects
+  useEffect(() => {
+    // Tentar carregar sessão do localStorage na inicialização
+    if (!currentUser) {
+      loadSessionFromStorage()
+    }
+  }, [])
+
+  useEffect(() => {
+    // Carregar dados quando usuário faz login
+    if (currentUser) {
+      loadData()
+    }
+  }, [currentUser])
+
+  useEffect(() => {
+    // Auto-refresh dos dados a cada 30 segundos
+    if (currentUser) {
+      const interval = setInterval(autoRefreshData, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [currentUser, autoRefreshData])
+
+  useEffect(() => {
+    // Detectar atividade do usuário para manter sessão viva
+    if (currentUser) {
+      const handleActivity = () => updateActivity()
+      
+      // Eventos que indicam atividade
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+      events.forEach(event => {
+        document.addEventListener(event, handleActivity, true)
+      })
+
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleActivity, true)
+        })
+      }
+    }
+  }, [currentUser, updateActivity])
+
+  useEffect(() => {
+    // Salvar mudanças de usuário e sessão no localStorage
+    if (currentUser && sessionId) {
+      saveSessionToStorage(currentUser, sessionId)
+    } else if (!currentUser) {
+      clearSessionFromStorage()
+    }
+  }, [currentUser, sessionId])
+
   // Analytics data
   const totalProposals = proposals.length
   const implantedProposals = proposals.filter(p => p.status === 'implantado').length
@@ -277,15 +404,22 @@ export default function App() {
   // Login screen
   if (!currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10 p-4">
         <Toaster />
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
-            {/* Logo placeholder */}
-            <div className="mx-auto mb-4 w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Building2 className="w-8 h-8 text-white" />
+            {/* Logo da Belz */}
+            <div className="mx-auto mb-4">
+              <Image
+                src="/logo-belz.jpg"
+                alt="Logo Belz"
+                width={120}
+                height={60}
+                className="mx-auto rounded-lg"
+                priority
+              />
             </div>
-            <CardTitle className="text-2xl">CRM Propostas</CardTitle>
+            <CardTitle className="text-2xl text-primary font-montserrat">CRM Belz</CardTitle>
             <CardDescription>
               Faça login para acessar o sistema
             </CardDescription>
@@ -330,20 +464,35 @@ export default function App() {
       <Toaster />
       
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-card shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo area */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
+            <div className="w-12 h-12">
+              <Image
+                src="/logo-belz.jpg"
+                alt="Logo Belz"
+                width={48}
+                height={48}
+                className="rounded-lg object-cover"
+              />
             </div>
             <div>
-              <h1 className="text-xl font-bold">CRM Propostas</h1>
-              <p className="text-sm text-muted-foreground">Sistema de Gestão</p>
+              <h1 className="text-xl font-bold text-primary font-montserrat">CRM Belz</h1>
+              <p className="text-sm text-muted-foreground">Sistema de Gestão de Propostas</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={autoRefreshData}
+              className="hidden sm:flex"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Atualizar
+            </Button>
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4" />
               <span className="text-sm font-medium">{currentUser.nome}</span>
@@ -593,6 +742,7 @@ export default function App() {
                       <TableHead>Vidas</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Alterar Status</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -610,6 +760,23 @@ export default function App() {
                           <Badge variant={getStatusBadgeVariant(proposal.status)}>
                             {proposal.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={proposal.status}
+                            onValueChange={(newStatus) => handleUpdateProposalStatus(proposal.id, newStatus, proposal)}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statusOptions.map(status => (
+                                <SelectItem key={status} value={status}>
+                                  {status}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           {currentUser.tipo_usuario === 'gestor' && (
@@ -632,55 +799,145 @@ export default function App() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
-            <h2 className="text-2xl font-bold">Dashboard</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <RefreshCw className="w-4 h-4" />
+                <span>Atualização automática a cada 30s</span>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
+              <Card className="border-l-4 border-l-primary">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total de Propostas</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalProposals}</div>
+                  <div className="text-2xl font-bold text-primary">{totalProposals}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Total no sistema
+                  </p>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="border-l-4 border-l-green-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Propostas Implantadas</CardTitle>
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{implantedProposals}</div>
+                  <div className="text-2xl font-bold text-green-600">{implantedProposals}</div>
                   <p className="text-xs text-muted-foreground">
                     {totalProposals > 0 ? Math.round((implantedProposals / totalProposals) * 100) : 0}% de conversão
                   </p>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="border-l-4 border-l-blue-500">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalValue)}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Pipeline completo
+                  </p>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="border-l-4 border-l-accent">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Valor Implantado</CardTitle>
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(implantedValue)}</div>
+                  <div className="text-2xl font-bold text-accent">{formatCurrency(implantedValue)}</div>
                   <p className="text-xs text-muted-foreground">
                     {totalValue > 0 ? Math.round((implantedValue / totalValue) * 100) : 0}% do total
                   </p>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Dashboard adicional para gestores */}
+            {currentUser.tipo_usuario === 'gestor' && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Propostas por Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {['em análise', 'boleto liberado', 'implantando', 'pendente cliente', 'implantado', 'negado'].map((status) => {
+                        const count = proposals.filter(p => p.status === status).length
+                        const percentage = totalProposals > 0 ? (count / totalProposals) * 100 : 0
+                        return (
+                          <div key={status} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={getStatusBadgeVariant(status)} className="text-xs">
+                                {status}
+                              </Badge>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-medium">{count}</span>
+                              <span className="text-xs text-muted-foreground ml-2">({percentage.toFixed(1)}%)</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Top Operadoras</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(
+                        proposals.reduce((acc, p) => {
+                          acc[p.operadora] = (acc[p.operadora] || 0) + 1
+                          return acc
+                        }, {})
+                      )
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 5)
+                        .map(([operadora, count]) => (
+                          <div key={operadora} className="flex items-center justify-between">
+                            <span className="capitalize">{operadora}</span>
+                            <Badge variant="outline">{count}</Badge>
+                          </div>
+                        ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Usuários Ativos</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span>Total de Usuários</span>
+                        <Badge variant="outline">{users.length}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Gestores</span>
+                        <Badge variant="default">{users.filter(u => u.tipo_usuario === 'gestor').length}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Analistas</span>
+                        <Badge variant="secondary">{users.filter(u => u.tipo_usuario === 'analista').length}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Sessões Ativas</span>
+                        <Badge variant="destructive">{sessions.filter(s => !s.data_logout).length}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            )}
 
             {/* User Goals */}
             <Card>
@@ -812,7 +1069,19 @@ export default function App() {
                     <TableBody>
                       {users.map((user) => {
                         const userGoal = userGoals.find(g => g.usuario_id === user.id)
-                        const progress = userGoal ? (userGoal.valor_alcancado / userGoal.valor_meta) * 100 : 0
+                        
+                        // Calcular progresso baseado nas propostas implantadas do usuário
+                        const userImplantedProposals = proposals.filter(p => 
+                          p.criado_por === user.id && p.status === 'implantado'
+                        )
+                        const userImplantedValue = userImplantedProposals.reduce((sum, p) => 
+                          sum + parseFloat(p.valor || 0), 0
+                        )
+                        
+                        // Se há meta definida, usar a meta. Senão, calcular baseado em propostas
+                        const targetValue = userGoal?.valor_meta || 100000 // Meta padrão de R$ 100k
+                        const achievedValue = userGoal?.valor_alcancado || userImplantedValue
+                        const progress = targetValue > 0 ? (achievedValue / targetValue) * 100 : 0
                         
                         return (
                           <TableRow key={user.id}>
@@ -824,15 +1093,37 @@ export default function App() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {userGoal ? formatCurrency(userGoal.valor_meta) : '-'}
+                              {formatCurrency(targetValue)}
+                              {!userGoal && (
+                                <span className="text-xs text-muted-foreground block">
+                                  (meta padrão)
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
-                              {userGoal ? formatCurrency(userGoal.valor_alcancado) : '-'}
+                              <div>
+                                {formatCurrency(achievedValue)}
+                                <div className="text-xs text-muted-foreground">
+                                  {userImplantedProposals.length} propostas implantadas
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Progress value={Math.min(progress, 100)} className="h-2 w-20" />
-                                <span className="text-xs">{Math.round(progress)}%</span>
+                                <Progress 
+                                  value={Math.min(Math.max(progress, 0), 100)} 
+                                  className="h-3 w-24 bg-secondary"
+                                />
+                                <span className={`text-sm font-medium ${
+                                  progress >= 100 ? 'text-green-600' :
+                                  progress >= 75 ? 'text-blue-600' :
+                                  progress >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
+                                  {Math.round(progress)}%
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Faltam {formatCurrency(Math.max(0, targetValue - achievedValue))}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -848,48 +1139,284 @@ export default function App() {
           {/* Reports Tab (Gestor only) */}
           {currentUser.tipo_usuario === 'gestor' && (
             <TabsContent value="relatorios" className="space-y-6">
-              <h2 className="text-2xl font-bold">Relatórios de Sessão</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-primary">Relatórios e Monitoramento</h2>
+                <Button variant="outline" size="sm" onClick={autoRefreshData}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Atualizar Dados
+                </Button>
+              </div>
+
+              {/* Estatísticas gerais de acesso */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="border-l-4 border-l-green-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Usuários Online</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {sessions.filter(s => !s.data_logout).length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Sessões Hoje</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {sessions.filter(s => 
+                            new Date(s.data_login).toDateString() === new Date().toDateString()
+                          ).length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-yellow-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Target className="w-5 h-5 text-yellow-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Propostas Hoje</p>
+                        <p className="text-2xl font-bold text-yellow-600">
+                          {proposals.filter(p => 
+                            new Date(p.criado_em).toDateString() === new Date().toDateString()
+                          ).length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-purple-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <TrendingUp className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Tempo Médio Implantação</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {(() => {
+                            const implantedProps = proposals.filter(p => p.status === 'implantado' && p.criado_em)
+                            if (implantedProps.length === 0) return '0d'
+                            
+                            const avgDays = implantedProps.reduce((acc, p) => {
+                              const created = new Date(p.criado_em)
+                              const implanted = new Date(p.atualizado_em || p.criado_em)
+                              const diffDays = Math.ceil((implanted - created) / (1000 * 60 * 60 * 24))
+                              return acc + diffDays
+                            }, 0) / implantedProps.length
+                            
+                            return Math.round(avgDays) + 'd'
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Monitoramento detalhado de acesso */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Monitoramento de Acesso</CardTitle>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Users className="w-5 h-5" />
+                    <span>Monitoramento Detalhado de Acesso</span>
+                  </CardTitle>
                   <CardDescription>
-                    Controle de tempo online e acessos dos usuários
+                    Controle completo de sessões e atividades dos usuários
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {users.map((user) => {
+                      const userSessions = sessions.filter(s => s.usuario_id === user.id)
+                      const currentSession = userSessions.find(s => !s.data_logout)
+                      const todaySessions = userSessions.filter(s => 
+                        new Date(s.data_login).toDateString() === new Date().toDateString()
+                      )
+                      
+                      const calculateSessionTime = (session) => {
+                        const start = new Date(session.data_login)
+                        const end = session.data_logout ? new Date(session.data_logout) : new Date()
+                        const diffMs = end - start
+                        const hours = Math.floor(diffMs / (1000 * 60 * 60))
+                        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+                        return `${hours}h ${minutes}m`
+                      }
+
+                      const totalTimeToday = todaySessions.reduce((acc, session) => {
+                        const start = new Date(session.data_login)
+                        const end = session.data_logout ? new Date(session.data_logout) : new Date()
+                        return acc + (end - start)
+                      }, 0)
+
+                      const userProposals = proposals.filter(p => p.criado_por === user.id)
+                      
+                      return (
+                        <div key={user.id} className="border rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-3 h-3 rounded-full ${currentSession ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                              <div>
+                                <h3 className="font-semibold">{user.nome}</h3>
+                                <p className="text-sm text-muted-foreground">{user.email}</p>
+                              </div>
+                              <Badge variant={user.tipo_usuario === 'gestor' ? 'default' : 'secondary'}>
+                                {user.tipo_usuario}
+                              </Badge>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">
+                                {currentSession ? 'Online' : 'Offline'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Tempo hoje: {Math.floor(totalTimeToday / (1000 * 60 * 60))}h {Math.floor((totalTimeToday % (1000 * 60 * 60)) / (1000 * 60))}m
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="font-medium text-muted-foreground">Última Sessão</p>
+                              {userSessions.length > 0 ? (
+                                <div>
+                                  <p>{new Date(userSessions[userSessions.length - 1].data_login).toLocaleString('pt-BR')}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Duração: {calculateSessionTime(userSessions[userSessions.length - 1])}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-muted-foreground">Nunca logou</p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <p className="font-medium text-muted-foreground">Propostas Criadas</p>
+                              <p>{userProposals.length} total</p>
+                              <p className="text-xs text-muted-foreground">
+                                {userProposals.filter(p => p.status === 'implantado').length} implantadas
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="font-medium text-muted-foreground">Performance</p>
+                              <p>{userSessions.length} sessões totais</p>
+                              <p className="text-xs text-muted-foreground">
+                                {userProposals.length > 0 ? 
+                                  `${Math.round((userProposals.filter(p => p.status === 'implantado').length / userProposals.length) * 100)}% conversão` 
+                                  : 'Sem dados'
+                                }
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Histórico de sessões recentes */}
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">
+                              Ver últimas 5 sessões
+                            </summary>
+                            <div className="mt-2 space-y-1">
+                              {userSessions.slice(-5).reverse().map((session, index) => (
+                                <div key={session.id} className="text-xs bg-muted/50 p-2 rounded">
+                                  <div className="flex justify-between">
+                                    <span>
+                                      {new Date(session.data_login).toLocaleString('pt-BR')}
+                                    </span>
+                                    <span>
+                                      {session.data_logout ? 
+                                        new Date(session.data_logout).toLocaleString('pt-BR') : 
+                                        'Em andamento'
+                                      }
+                                    </span>
+                                    <span className="font-medium">
+                                      {calculateSessionTime(session)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análise de tempo de implantação por proposta */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Clock className="w-5 h-5" />
+                    <span>Tempo de Implantação por Proposta</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Análise detalhada do tempo desde criação até implantação
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead>Data Login</TableHead>
-                        <TableHead>Data Logout</TableHead>
-                        <TableHead>Tempo Online</TableHead>
+                        <TableHead>CNPJ</TableHead>
+                        <TableHead>Consultor</TableHead>
+                        <TableHead>Data Criação</TableHead>
+                        <TableHead>Status Atual</TableHead>
+                        <TableHead>Tempo Decorrido</TableHead>
+                        <TableHead>Valor</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sessions.map((session) => {
-                        const user = users.find(u => u.id === session.usuario_id)
-                        return (
-                          <TableRow key={session.id}>
-                            <TableCell>{user?.nome || 'Usuário não encontrado'}</TableCell>
-                            <TableCell>
-                              {new Date(session.data_login).toLocaleString('pt-BR')}
-                            </TableCell>
-                            <TableCell>
-                              {session.data_logout 
-                                ? new Date(session.data_logout).toLocaleString('pt-BR')
-                                : 'Online'
-                              }
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Clock className="w-4 h-4" />
-                                <span>{session.tempo_total || 'Em andamento'}</span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
+                      {proposals
+                        .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+                        .slice(0, 20)
+                        .map((proposal) => {
+                          const createdDate = new Date(proposal.criado_em)
+                          const currentDate = new Date()
+                          const diffDays = Math.ceil((currentDate - createdDate) / (1000 * 60 * 60 * 24))
+                          const diffHours = Math.ceil((currentDate - createdDate) / (1000 * 60 * 60))
+                          
+                          return (
+                            <TableRow key={proposal.id}>
+                              <TableCell className="font-mono text-sm">
+                                {formatCNPJ(proposal.cnpj)}
+                              </TableCell>
+                              <TableCell>{proposal.consultor}</TableCell>
+                              <TableCell>
+                                {createdDate.toLocaleString('pt-BR')}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={getStatusBadgeVariant(proposal.status)}>
+                                  {proposal.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <span className={`font-medium ${
+                                    proposal.status === 'implantado' ? 'text-green-600' :
+                                    diffDays > 30 ? 'text-red-600' :
+                                    diffDays > 15 ? 'text-yellow-600' : 'text-blue-600'
+                                  }`}>
+                                    {diffDays}d
+                                  </span>
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({diffHours}h)
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(proposal.valor)}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
                     </TableBody>
                   </Table>
                 </CardContent>

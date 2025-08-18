@@ -1,23 +1,63 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { 
+  hashPassword, 
+  verifyPassword, 
+  generateToken,
+  verifyToken,
+  checkRateLimit,
+  sanitizeInput,
+  validateEmail,
+  validateCNPJ,
+  sanitizeForLog,
+  addSecurityHeaders
+} from '@/lib/security'
 
-// Supabase client
+// Supabase client com configuração segura
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-// Helper function to handle CORS
-function handleCORS(response) {
-  response.headers.set('Access-Control-Allow-Origin', process.env.CORS_ORIGINS || '*')
+// CORS configuração restritiva
+const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000']
+
+function handleCORS(response, origin = '*') {
+  const isAllowedOrigin = allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development'
+  
+  if (isAllowedOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+  }
+  
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   response.headers.set('Access-Control-Allow-Credentials', 'true')
-  return response
+  response.headers.set('Access-Control-Max-Age', '86400')
+  
+  return addSecurityHeaders(response)
 }
 
-// OPTIONS handler for CORS
-export async function OPTIONS() {
-  return handleCORS(new NextResponse(null, { status: 200 }))
+// Middleware de autenticação para endpoints protegidos
+async function requireAuth(request) {
+  const authHeader = request.headers.get('authorization')
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Token de acesso requerido', status: 401 }
+  }
+  
+  const token = authHeader.substring(7)
+  const decoded = verifyToken(token)
+  
+  if (!decoded) {
+    return { error: 'Token inválido ou expirado', status: 401 }
+  }
+  
+  return { user: decoded }
+}
+
+// OPTIONS handler para CORS preflight
+export async function OPTIONS(request) {
+  const origin = request.headers.get('origin')
+  return handleCORS(new NextResponse(null, { status: 200 }), origin)
 }
 
 // CNPJ validation: ReceitaWS → BrasilAPI → CNPJA (cascata simples)
@@ -153,48 +193,107 @@ async function handleRoute(request, { params }) {
 
     // Auth endpoints
     if (route === '/auth/login' && method === 'POST') {
-      const body = await request.json()
-      const { email, password } = body
-
-      // Simple auth - in production use proper hashing
-      const { data: user, error } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('email', email)
-        .eq('senha', password)
-        .single()
-
-      if (error || !user) {
+      const origin = request.headers.get('origin')
+      const clientIP = request.headers.get('x-forwarded-for') || 'unknown'
+      
+      // Rate limiting
+      if (!checkRateLimit(`login:${clientIP}`)) {
         return handleCORS(NextResponse.json(
-          { error: "Credenciais inválidas" }, 
-          { status: 401 }
-        ))
+          { error: "Muitas tentativas de login. Tente novamente em 15 minutos." }, 
+          { status: 429 }
+        ), origin)
       }
 
-      // Create session
-      const { data: session, error: sessionError } = await supabase
-        .from('sessoes')
-        .insert([{
-          id: crypto.randomUUID(),
-          usuario_id: user.id,
-          data_login: new Date().toISOString()
-        }])
-        .select()
-        .single()
+      try {
+        const body = await request.json()
+        const email = sanitizeInput(body.email)
+        const password = body.password
 
-      if (sessionError) {
-        console.error('Session creation error:', sessionError)
+        // Validação de entrada
+        if (!validateEmail(email) || !password) {
+          return handleCORS(NextResponse.json(
+            { error: "Email e senha são obrigatórios" }, 
+            { status: 400 }
+          ), origin)
+        }
+
+        // Buscar usuário no banco
+        const { data: user, error } = await supabase
+          .from('usuarios')
+          .select('id, nome, email, senha, tipo_usuario')
+          .eq('email', email)
+          .single()
+
+        if (error || !user) {
+          return handleCORS(NextResponse.json(
+            { error: "Credenciais inválidas" }, 
+            { status: 401 }
+          ), origin)
+        }
+
+        // Verificar senha (suporte para senhas hash e texto plano durante migração)
+        let passwordValid = false
+        if (user.senha.startsWith('$2a$') || user.senha.startsWith('$2b$')) {
+          // Senha já está hashada
+          passwordValid = await verifyPassword(password, user.senha)
+        } else {
+          // Senha em texto plano (migração)
+          passwordValid = password === user.senha
+          
+          // Atualizar para hash na primeira validação bem-sucedida
+          if (passwordValid) {
+            const hashedPassword = await hashPassword(password)
+            await supabase
+              .from('usuarios')
+              .update({ senha: hashedPassword })
+              .eq('id', user.id)
+          }
+        }
+
+        if (!passwordValid) {
+          return handleCORS(NextResponse.json(
+            { error: "Credenciais inválidas" }, 
+            { status: 401 }
+          ), origin)
+        }
+
+        // Gerar JWT token
+        const token = generateToken(user)
+
+        // Criar sessão
+        const { data: session, error: sessionError } = await supabase
+          .from('sessoes')
+          .insert([{
+            id: crypto.randomUUID(),
+            usuario_id: user.id,
+            data_login: new Date().toISOString()
+          }])
+          .select()
+          .single()
+
+        if (sessionError) {
+          console.error('Session creation error:', sessionError)
+        }
+
+        return handleCORS(NextResponse.json({ 
+          user: { 
+            id: user.id, 
+            nome: user.nome, 
+            email: user.email, 
+            tipo_usuario: user.tipo_usuario 
+          },
+          token,
+          sessionId: session?.id,
+          expiresIn: '24h'
+        }), origin)
+
+      } catch (error) {
+        console.error('Login error:', sanitizeForLog(error))
+        return handleCORS(NextResponse.json(
+          { error: "Erro interno do servidor" }, 
+          { status: 500 }
+        ), origin)
       }
-
-      return handleCORS(NextResponse.json({ 
-        user: { 
-          id: user.id, 
-          nome: user.nome, 
-          email: user.email, 
-          tipo_usuario: user.tipo_usuario 
-        },
-        sessionId: session?.id
-      }))
     }
 
     if (route === '/auth/logout' && method === 'POST') {
@@ -312,6 +411,40 @@ async function handleRoute(request, { params }) {
       }
 
       return handleCORS(NextResponse.json({ success: true }))
+    }
+
+    // Update proposal status (All users can update status)
+    if (route.startsWith('/proposals/') && method === 'PUT') {
+      const proposalId = route.split('/')[2]
+      const body = await request.json()
+      
+      const updateData = {
+        status: body.status
+      }
+
+      const { data, error } = await supabase
+        .from('propostas')
+        .update(updateData)
+        .eq('id', proposalId)
+        .select()
+        .single()
+
+      if (error) {
+        return handleCORS(NextResponse.json(
+          { error: error.message }, 
+          { status: 500 }
+        ))
+      }
+
+      // If status changed to 'implantado', update user goals
+      if (body.status === 'implantado' && body.criado_por) {
+        await supabase.rpc('atualizar_meta_usuario', {
+          p_usuario_id: body.criado_por,
+          p_valor: parseFloat(body.valor || 0)
+        })
+      }
+
+      return handleCORS(NextResponse.json(data))
     }
 
     // Users endpoint
