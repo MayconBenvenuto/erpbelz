@@ -20,20 +20,122 @@ export async function OPTIONS() {
   return handleCORS(new NextResponse(null, { status: 200 }))
 }
 
-// CNPJ validation function using Brasil API
+// CNPJ validation: ReceitaWS → BrasilAPI → CNPJA (cascata simples)
 async function validateCNPJ(cnpj) {
+  // Helper: limpa e valida formato básico
+  const cleanCNPJ = (cnpj || '').replace(/[^\d]/g, '')
+  if (cleanCNPJ.length !== 14) {
+    return { valid: false, error: 'Formato de CNPJ inválido' }
+  }
+
+  // 1ª tentativa: ReceitaWS
   try {
-    const cleanCNPJ = cnpj.replace(/[^\d]/g, '')
-    const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`)
-    
-    if (!response.ok) {
-      throw new Error('CNPJ não encontrado')
+    console.log('🔍 Tentando ReceitaWS...')
+    const response = await fetch(`https://receitaws.com.br/v1/cnpj/${cleanCNPJ}`, {
+      headers: { 'User-Agent': 'CRM-Propostas/1.0' }
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      if (data.status === 'OK') {
+        console.log('✅ ReceitaWS: sucesso')
+        return { 
+          valid: true, 
+          data: {
+            cnpj: cleanCNPJ,
+            razao_social: data.nome,
+            nome_fantasia: data.fantasia || 'Não informado',
+            situacao_cadastral: data.situacao,
+            descricao_situacao_cadastral: data.situacao,
+            cnae_fiscal_descricao: data.atividade_principal?.[0]?.text,
+            logradouro: data.logradouro,
+            numero: data.numero,
+            bairro: data.bairro,
+            municipio: data.municipio,
+            uf: data.uf,
+            cep: data.cep,
+            telefone: data.telefone,
+            email: data.email,
+            source: 'ReceitaWS'
+          }
+        }
+      } else {
+        console.log('❌ ReceitaWS retornou erro:', data.message)
+      }
     }
-    
-    const data = await response.json()
-    return { valid: true, data }
   } catch (error) {
-    return { valid: false, error: error.message }
+    console.log('❌ ReceitaWS falhou:', error.message)
+  }
+
+  // 2ª tentativa: BrasilAPI
+  try {
+    console.log('🔍 Tentando BrasilAPI...')
+    const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`)
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ BrasilAPI: sucesso')
+      return { 
+        valid: true, 
+        data: {
+          ...data,
+          source: 'BrasilAPI'
+        }
+      }
+    } else if (response.status === 404) {
+      console.log('❌ BrasilAPI: CNPJ não encontrado (404)')
+      return { valid: false, error: 'CNPJ não encontrado' }
+    }
+  } catch (error) {
+    console.log('❌ BrasilAPI falhou:', error.message)
+  }
+
+  // 3ª tentativa: CNPJA API
+  try {
+    console.log('🔍 Tentando CNPJA...')
+    const response = await fetch(`https://api.cnpja.com/office/${cleanCNPJ}`, {
+      headers: { 
+        'User-Agent': 'CRM-Propostas/1.0',
+        'Accept': 'application/json'
+      }
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ CNPJA: sucesso')
+      return { 
+        valid: true, 
+        data: {
+          cnpj: cleanCNPJ,
+          razao_social: data.company?.name,
+          nome_fantasia: data.alias || 'Não informado',
+          situacao_cadastral: data.status?.text,
+          descricao_situacao_cadastral: data.status?.text,
+          cnae_fiscal_descricao: data.mainActivity?.text,
+          logradouro: data.address?.street,
+          numero: data.address?.number,
+          bairro: data.address?.district,
+          municipio: data.address?.city,
+          uf: data.address?.state,
+          cep: data.address?.zip,
+          telefone: data.phones?.[0]?.number,
+          email: data.emails?.[0]?.address,
+          source: 'CNPJA'
+        }
+      }
+    } else if (response.status === 404) {
+      console.log('❌ CNPJA: CNPJ não encontrado (404)')
+      return { valid: false, error: 'CNPJ não encontrado' }
+    }
+  } catch (error) {
+    console.log('❌ CNPJA falhou:', error.message)
+  }
+
+  // Todas as APIs falharam
+  console.log('❌ Todas as APIs de validação falharam')
+  return { 
+    valid: false, 
+    error: 'CNPJ não encontrado ou serviços de validação indisponíveis' 
   }
 }
 
@@ -227,6 +329,60 @@ async function handleRoute(request, { params }) {
       }
 
       return handleCORS(NextResponse.json(data || []))
+    }
+
+    // Create user endpoint (Gestor only)
+    if (route === '/users' && method === 'POST') {
+      const body = await request.json()
+      
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('email', body.email)
+        .single()
+
+      if (existingUser) {
+        return handleCORS(NextResponse.json(
+          { error: 'Email já cadastrado no sistema' }, 
+          { status: 400 }
+        ))
+      }
+
+      const userData = {
+        id: crypto.randomUUID(),
+        nome: body.nome,
+        email: body.email,
+        senha: body.senha, // In production, hash this password
+        tipo_usuario: body.tipo_usuario || 'analista',
+        criado_em: new Date().toISOString()
+      }
+
+      const { data, error } = await supabase
+        .from('usuarios')
+        .insert([userData])
+        .select('id, nome, email, tipo_usuario, criado_em')
+        .single()
+
+      if (error) {
+        return handleCORS(NextResponse.json(
+          { error: error.message }, 
+          { status: 500 }
+        ))
+      }
+
+      // Create default goal for new user (150k)
+      await supabase
+        .from('metas')
+        .insert([{
+          id: crypto.randomUUID(),
+          usuario_id: data.id,
+          valor_meta: 150000.00,
+          valor_alcancado: 0.00,
+          periodo: new Date().getFullYear().toString()
+        }])
+
+      return handleCORS(NextResponse.json(data))
     }
 
     // Goals endpoint

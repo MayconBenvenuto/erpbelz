@@ -34,6 +34,9 @@ export default function App() {
     previsao_implantacao: '',
     status: 'em análise'
   })
+
+  // CNPJ validation result for displaying company data (gestor only)
+  const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   
   // Data states
   const [proposals, setProposals] = useState([])
@@ -41,6 +44,7 @@ export default function App() {
   const [userGoals, setUserGoals] = useState([])
   const [sessions, setSessions] = useState([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
 
   const operadoras = [
     'unimed recife', 'unimed seguros', 'bradesco', 'amil', 'ampla', 
@@ -51,6 +55,14 @@ export default function App() {
     'em análise', 'pendencias seguradora', 'boleto liberado', 'implantando',
     'pendente cliente', 'pleito seguradora', 'negado', 'implantado'
   ]
+
+  // User creation form state
+  const [userForm, setUserForm] = useState({
+    nome: '',
+    email: '',
+    senha: '',
+    tipo_usuario: 'analista'
+  })
 
   // Auth functions
   const handleLogin = async (e) => {
@@ -139,6 +151,11 @@ export default function App() {
         return
       }
 
+      // Store CNPJ validation result for gestor to view
+      if (currentUser.tipo_usuario === 'gestor') {
+        setCnpjValidationResult(cnpjResult.data)
+      }
+
       // Create proposal
       const response = await fetch('/api/proposals', {
         method: 'POST',
@@ -157,6 +174,7 @@ export default function App() {
           cnpj: '', consultor: '', operadora: '', quantidade_vidas: '',
           valor: '', previsao_implantacao: '', status: 'em análise'
         })
+        setCnpjValidationResult(null)
         setIsDialogOpen(false)
         loadData()
       } else {
@@ -188,6 +206,40 @@ export default function App() {
       }
     } catch (error) {
       toast.error('Erro ao conectar com o servidor')
+    }
+  }
+
+  // User creation function (gestor only)
+  const handleCreateUser = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userForm)
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success('Usuário criado com sucesso!')
+        setUserForm({
+          nome: '',
+          email: '',
+          senha: '',
+          tipo_usuario: 'analista'
+        })
+        setIsUserDialogOpen(false)
+        loadData()
+      } else {
+        toast.error(result.error || 'Erro ao criar usuário')
+      }
+    } catch (error) {
+      toast.error('Erro ao conectar com o servidor')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -374,6 +426,75 @@ export default function App() {
                         />
                       </div>
                     </div>
+
+                    {/* CNPJ Company Data (Gestor only) */}
+                    {currentUser.tipo_usuario === 'gestor' && cnpjValidationResult && (
+                      <Card className="bg-blue-50 border-blue-200">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center justify-between">
+                            Dados da Empresa
+                            <Badge variant="outline" className="text-xs">
+                              {cnpjValidationResult.source || 'API Externa'}
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                          {cnpjValidationResult.razao_social && (
+                            <div>
+                              <strong>Razão Social:</strong> {cnpjValidationResult.razao_social}
+                            </div>
+                          )}
+                          {cnpjValidationResult.nome_fantasia && (
+                            <div>
+                              <strong>Nome Fantasia:</strong> {cnpjValidationResult.nome_fantasia}
+                            </div>
+                          )}
+                          {cnpjValidationResult.descricao_situacao_cadastral && (
+                            <div>
+                              <strong>Situação:</strong> {cnpjValidationResult.descricao_situacao_cadastral}
+                            </div>
+                          )}
+                          {cnpjValidationResult.cnae_fiscal_descricao && (
+                            <div>
+                              <strong>Atividade Principal:</strong> {cnpjValidationResult.cnae_fiscal_descricao}
+                            </div>
+                          )}
+                          {(cnpjValidationResult.logradouro || cnpjValidationResult.municipio) && (
+                            <div>
+                              <strong>Endereço:</strong> {[
+                                cnpjValidationResult.logradouro,
+                                cnpjValidationResult.numero,
+                                cnpjValidationResult.bairro,
+                                cnpjValidationResult.municipio,
+                                cnpjValidationResult.uf
+                              ].filter(Boolean).join(', ')}
+                              {cnpjValidationResult.cep && ` - CEP: ${cnpjValidationResult.cep}`}
+                            </div>
+                          )}
+                          {cnpjValidationResult.telefone && (
+                            <div>
+                              <strong>Telefone:</strong> {cnpjValidationResult.telefone}
+                            </div>
+                          )}
+                          {cnpjValidationResult.email && (
+                            <div>
+                              <strong>Email:</strong> {cnpjValidationResult.email}
+                            </div>
+                          )}
+                          {cnpjValidationResult.capital_social && parseFloat(cnpjValidationResult.capital_social) > 0 && (
+                            <div>
+                              <strong>Capital Social:</strong> {formatCurrency(parseFloat(cnpjValidationResult.capital_social))}
+                            </div>
+                          )}
+                          {cnpjValidationResult.note && (
+                            <div className="text-amber-600 mt-2 p-2 bg-amber-50 rounded">
+                              <strong>Aviso:</strong> {cnpjValidationResult.note}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="operadora">Operadora</Label>
@@ -593,7 +714,82 @@ export default function App() {
           {/* Users Tab (Gestor only) */}
           {currentUser.tipo_usuario === 'gestor' && (
             <TabsContent value="usuarios" className="space-y-6">
-              <h2 className="text-2xl font-bold">Gerenciar Usuários</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Gerenciar Usuários</h2>
+                <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <PlusCircle className="w-4 h-4 mr-2" />
+                      Novo Usuário
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Criar Novo Usuário</DialogTitle>
+                      <DialogDescription>
+                        Adicione um novo usuário analista ao sistema.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="user-nome">Nome Completo</Label>
+                        <Input
+                          id="user-nome"
+                          placeholder="Nome do usuário"
+                          value={userForm.nome}
+                          onChange={(e) => setUserForm(prev => ({ ...prev, nome: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-email">Email</Label>
+                        <Input
+                          id="user-email"
+                          type="email"
+                          placeholder="email@empresa.com"
+                          value={userForm.email}
+                          onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-senha">Senha</Label>
+                        <Input
+                          id="user-senha"
+                          type="password"
+                          placeholder="Senha do usuário"
+                          value={userForm.senha}
+                          onChange={(e) => setUserForm(prev => ({ ...prev, senha: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="user-tipo">Tipo de Usuário</Label>
+                        <Select
+                          value={userForm.tipo_usuario}
+                          onValueChange={(value) => setUserForm(prev => ({ ...prev, tipo_usuario: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="analista">Analista</SelectItem>
+                            <SelectItem value="gestor">Gestor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isLoading}>
+                          {isLoading ? 'Criando...' : 'Criar Usuário'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
               <Card>
                 <CardHeader>
                   <CardTitle>Lista de Usuários</CardTitle>

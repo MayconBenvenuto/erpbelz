@@ -128,7 +128,7 @@ INSERT INTO usuarios (id, nome, email, senha, tipo_usuario) VALUES
   (gen_random_uuid(), 'João Silva', 'joao@empresa.com', '123456', 'analista'),
   (gen_random_uuid(), 'Maria Santos', 'maria@empresa.com', '123456', 'analista');
 
--- Initialize metas for all users
+-- Initialize metas for all usersge
 INSERT INTO metas ("usuario_id", "valor_meta", "valor_alcancado")
 SELECT id, 150000, 0 FROM usuarios;
 
