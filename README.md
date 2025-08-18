@@ -193,6 +193,11 @@ O sistema inclui:
 4. Push para a branch (`git push origin feature/nova-funcionalidade`)
 5. Abra um Pull Request
 
+### 📘 Guia do Copilot e Convenções
+
+- Guia complementar para o uso do GitHub Copilot e visão da arquitetura: veja `.github/COPILOT_GUIDE.md`.
+- Instruções principais para o Copilot e padrões do projeto: veja `COPILOT_INSTRUCTIONS.md`.
+
 ## 📄 Licença
 
 Este projeto é privado e proprietário da Belz.

@@ -75,9 +75,9 @@ const analistaPermissions = {
   propostas: {
     create: true,    // ✅ Criar propostas
     read: true,      // ✅ Visualizar propostas
-    update: false,   // ❌ Editar propostas
-    delete: false,   // ❌ Excluir propostas
-    status: false    // ❌ Alterar status
+  update: false,   // ❌ Editar propostas (campos gerais)
+  delete: false,   // ❌ Excluir propostas
+  status: true     // ✅ Alterar status APENAS das próprias propostas
   },
   dashboard: true,   // ✅ Ver dashboard
   usuarios: false,   // ❌ Gerenciar usuários
@@ -221,9 +221,9 @@ Response: [{ id, cnpj, consultor, operadora, quantidade_vidas, valor, status, ..
 POST /api/proposals
 Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao }
 
-// Atualizar status (apenas gestores)
-PUT /api/proposals/:id/status
-Body: { status: string }
+// Atualizar proposta (gestor: qualquer; analista: apenas as próprias para alterar status)
+PUT /api/proposals/:id
+Body: { status?: string, ...outros_campos }
 
 // Deletar proposta (apenas gestores)
 DELETE /api/proposals/:id
