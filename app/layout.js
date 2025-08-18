@@ -1,14 +1,14 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Next.js MongoDB Template',
-  description: 'A simple template with App Router, MongoDB, and shadcn/ui',
+  title: 'CRM Propostas - Sistema de Gestão',
+  description: 'Sistema completo de gestão de propostas com controle de usuários e metas',
 }
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="pt-BR">
+      <body className="min-h-screen bg-background text-foreground">
         {children}
       </body>
     </html>
