@@ -10,8 +10,8 @@ import os
 import sys
 from datetime import datetime
 
-# Get base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://proposal-hub-2.preview.emergentagent.com')
+# Get base URL from environment - use localhost for testing
+BASE_URL = "http://localhost:3000"
 API_BASE = f"{BASE_URL}/api"
 
 # Test credentials from database setup
