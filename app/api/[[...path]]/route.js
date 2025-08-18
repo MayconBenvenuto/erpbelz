@@ -8,7 +8,7 @@ import {
   checkRateLimit,
   sanitizeInput,
   validateEmail,
-  validateCNPJ,
+  validateCNPJ as validateCNPJFormat,
   sanitizeForLog,
   addSecurityHeaders
 } from '@/lib/security'
@@ -61,7 +61,7 @@ export async function OPTIONS(request) {
 }
 
 // CNPJ validation: ReceitaWS → BrasilAPI → CNPJA (cascata simples)
-async function validateCNPJ(cnpj) {
+async function validateCNPJWithAPI(cnpj) {
   // Helper: limpa e valida formato básico
   const cleanCNPJ = (cnpj || '').replace(/[^\d]/g, '')
   if (cleanCNPJ.length !== 14) {
@@ -333,7 +333,7 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const { cnpj } = body
 
-      const result = await validateCNPJ(cnpj)
+      const result = await validateCNPJWithAPI(cnpj)
       return handleCORS(NextResponse.json(result))
     }
 

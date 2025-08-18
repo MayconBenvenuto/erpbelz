@@ -597,66 +597,23 @@ export default function App() {
 
         {/* Content */}
         <main className="flex-1 p-6 overflow-auto">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div style={{display: 'none'}}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="propostas" className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Propostas
-              </TabsTrigger>
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-              Dashboard
-            </TabsTrigger>
-            {currentUser.tipo_usuario === 'gestor' && (
+          <div className="space-y-6">
+            
+            {/* Proposals Tab */}
+            {activeTab === 'propostas' && (
               <>
-                <TabsTrigger value="usuarios" className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Usuários
-                </TabsTrigger>
-                <TabsTrigger value="relatorios" className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Relatórios
-                </TabsTrigger>
-              </>
-            )}
-          </TabsList>
-          </div>
-
-          {/* Proposals Tab */}
-          <TabsContent value="propostas" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Gerenciar Propostas</h2>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <PlusCircle className="w-4 h-4 mr-2" />
-                    Nova Proposta
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Criar Nova Proposta</DialogTitle>
-                    <DialogDescription>
-                      Preencha os dados da nova proposta. O CNPJ será validado automaticamente.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateProposal} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="cnpj">CNPJ</Label>
-                        <Input
-                          id="cnpj"
-                          placeholder="00.000.000/0000-00"
-                          value={proposalForm.cnpj}
-                          onChange={(e) => setProposalForm(prev => ({ ...prev, cnpj: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="consultor">Consultor</Label>
-                        <Input
-                          id="consultor"
+                <div className="flex justify-between items-center">
+                  <div></div>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <PlusCircle className="w-4 h-4 mr-2" />
+                        Nova Proposta
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Criar Nova Proposta</DialogTitle>
                           placeholder="Nome do consultor"
                           value={proposalForm.consultor}
                           onChange={(e) => setProposalForm(prev => ({ ...prev, consultor: e.target.value }))}
@@ -1513,8 +1470,7 @@ export default function App() {
             </TabsContent>
           )}
         </Tabs>
-        </main>
-      </div>
+      </main>
     </div>
   )
 }
