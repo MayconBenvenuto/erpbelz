@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PlusCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeVariant } from '@/lib/utils'
 
 export default function ProposalsSection({
@@ -34,10 +35,29 @@ export default function ProposalsSection({
     status: 'em análise'
   })
 
+  const formatMoneyBR = (value) => {
+    const digits = String(value || '').replace(/\D/g, '')
+    if (!digits) return ''
+    const number = parseInt(digits, 10) / 100
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
+  }
+
+  const parseMoneyToNumber = (masked) => {
+    const digits = String(masked || '').replace(/\D/g, '')
+    if (!digits) return 0
+    return parseInt(digits, 10) / 100
+  }
+
   const handleSubmit = async (e) => {
     // Validação de CNPJ antes de criar proposta (mantém comportamento)
     e.preventDefault()
     if (!currentUser) return
+
+    const valorNumber = parseMoneyToNumber(proposalForm.valor)
+    if (!valorNumber || valorNumber <= 0) {
+      toast.error('Informe um valor válido maior que zero')
+      return
+    }
 
     const cnpjResponse = await fetch('/api/validate-cnpj', {
       method: 'POST',
@@ -54,6 +74,7 @@ export default function ProposalsSection({
 
     await onCreateProposal({
       ...proposalForm,
+      valor: valorNumber,
       criado_por: currentUser.id,
       cnpjValidationData: cnpjResult.data,
       afterSuccess: () => {
@@ -150,7 +171,15 @@ export default function ProposalsSection({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="valor">Valor do Plano</Label>
-                    <Input id="valor" type="number" step="0.01" placeholder="0.00" value={proposalForm.valor} onChange={(e) => setProposalForm(prev => ({ ...prev, valor: e.target.value }))} required />
+                    <Input
+                      id="valor"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ex.: 1.500,00"
+                      value={proposalForm.valor}
+                      onChange={(e) => setProposalForm(prev => ({ ...prev, valor: formatMoneyBR(e.target.value) }))}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="previsao_implantacao">Previsão de Implantação</Label>
