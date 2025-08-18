@@ -1,18 +1,27 @@
-# 🔐 CRM Belz - Sistema Seguro de Gestão de Propostas
+# � CRM Belz - Sistema de Gestão de Propostas
 
-## 🚀 Visão Geral
+## � Sobre o Projeto
 
-Sistema CRM completo para gestão de propostas com foco em segurança e performance. Inclui validação de CNPJ, dashboard em tempo real, e controle de acesso por níveis.
+Sistema de CRM desenvolvido para a **Belz** focado na gestão de propostas de planos de saúde. Implementa controle de acesso baseado em roles, interface moderna com sidebar lateral e medidas robustas de segurança.
 
-## ✨ Funcionalidades
+## 🎯 Funcionalidades Principais
 
-- **Autenticação segura** com JWT e bcrypt
-- **Validação robusta de CNPJ** (3 APIs em cascata)
-- **Dashboard em tempo real** com auto-refresh
-- **Controle de acesso** por perfis (Gestor/Analista)
-- **Monitoramento de sessões** detalhado
-- **Rate limiting** anti-bruteforce
-- **Logs sanitizados** para segurança
+### 👥 Sistema de Usuários
+- **Analistas**: Criam e visualizam propostas
+- **Gestores**: Monitoram, alteram status e excluem propostas
+- **Autenticação**: JWT + bcrypt com rate limiting
+
+### 📊 Gestão de Propostas
+- Validação automática de CNPJ (3 APIs em cascata)
+- Status personalizados para pipeline de vendas
+- Múltiplas operadoras de saúde suportadas
+- Dashboard com métricas e gráficos
+
+### 🔒 Segurança
+- Headers de segurança implementados
+- Sanitização de inputs contra XSS
+- Rate limiting anti-bruteforce
+- Logs sanitizados sem dados sensíveis
 
 ## 🔧 Instalação
 

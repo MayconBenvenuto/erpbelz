@@ -478,8 +478,8 @@ export default function App() {
               />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-primary font-montserrat">CRM Belz</h1>
-              <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
+              <h1 className="text-lg font-bold text-primary font-montserrat">ADM Belz</h1>
+              <p className="text-xs text-muted-foreground">Sistema de Propostas</p>
             </div>
           </div>
         </div>
@@ -579,13 +579,15 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {activeTab === 'propostas' && 'Gerenciar Propostas'}
+                  {activeTab === 'propostas' && (currentUser.tipo_usuario === 'gestor' ? 'Monitorar Propostas' : 'Gerenciar Propostas')}
                   {activeTab === 'dashboard' && 'Dashboard'}
                   {activeTab === 'usuarios' && 'Gerenciar Usuários'}
                   {activeTab === 'relatorios' && 'Relatórios e Monitoramento'}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {activeTab === 'propostas' && 'Gerencie todas as propostas do sistema'}
+                  {activeTab === 'propostas' && (currentUser.tipo_usuario === 'gestor' 
+                    ? 'Monitore e gerencie o status de todas as propostas' 
+                    : 'Crie e visualize suas propostas')}
                   {activeTab === 'dashboard' && 'Visão geral das métricas e indicadores'}
                   {activeTab === 'usuarios' && 'Controle de usuários e permissões'}
                   {activeTab === 'relatorios' && 'Análise de sessões e atividades'}
@@ -597,23 +599,77 @@ export default function App() {
 
         {/* Content */}
         <main className="flex-1 p-6 overflow-auto">
-          <div className="space-y-6">
-            
-            {/* Proposals Tab */}
-            {activeTab === 'propostas' && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div style={{display: 'none'}}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="propostas" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Propostas
+              </TabsTrigger>
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+              Dashboard
+            </TabsTrigger>
+            {currentUser.tipo_usuario === 'gestor' && (
               <>
-                <div className="flex justify-between items-center">
-                  <div></div>
-                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Nova Proposta
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Criar Nova Proposta</DialogTitle>
+                <TabsTrigger value="usuarios" className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Usuários
+                </TabsTrigger>
+                <TabsTrigger value="relatorios" className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Relatórios
+                </TabsTrigger>
+              </>
+            )}
+          </TabsList>
+          </div>
+
+          {/* Proposals Tab */}
+          <TabsContent value="propostas" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {currentUser.tipo_usuario === 'gestor' ? 'Monitorar Propostas' : 'Gerenciar Propostas'}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {currentUser.tipo_usuario === 'gestor' 
+                    ? 'Visualize e monitore todas as propostas do sistema' 
+                    : 'Crie, edite e gerencie suas propostas'
+                  }
+                </p>
+              </div>
+              {currentUser.tipo_usuario !== 'gestor' && (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <PlusCircle className="w-4 h-4 mr-2" />
+                      Nova Proposta
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Criar Nova Proposta</DialogTitle>
+                    <DialogDescription>
+                      Preencha os dados da nova proposta. O CNPJ será validado automaticamente.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateProposal} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cnpj">CNPJ</Label>
+                        <Input
+                          id="cnpj"
+                          placeholder="00.000.000/0000-00"
+                          value={proposalForm.cnpj}
+                          onChange={(e) => setProposalForm(prev => ({ ...prev, cnpj: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="consultor">Consultor</Label>
+                        <Input
+                          id="consultor"
                           placeholder="Nome do consultor"
                           value={proposalForm.consultor}
                           onChange={(e) => setProposalForm(prev => ({ ...prev, consultor: e.target.value }))}
@@ -769,6 +825,7 @@ export default function App() {
                   </form>
                 </DialogContent>
               </Dialog>
+              )}
             </div>
 
             <Card>
@@ -788,8 +845,8 @@ export default function App() {
                       <TableHead>Vidas</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Alterar Status</TableHead>
-                      <TableHead>Ações</TableHead>
+                      {currentUser.tipo_usuario === 'gestor' && <TableHead>Alterar Status</TableHead>}
+                      {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -807,25 +864,27 @@ export default function App() {
                             {proposal.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Select
-                            value={proposal.status}
-                            onValueChange={(newStatus) => handleUpdateProposalStatus(proposal.id, newStatus, proposal)}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.map(status => (
-                                <SelectItem key={status} value={status}>
-                                  {status}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          {currentUser.tipo_usuario === 'gestor' && (
+                        {currentUser.tipo_usuario === 'gestor' && (
+                          <TableCell>
+                            <Select
+                              value={proposal.status}
+                              onValueChange={(newStatus) => handleUpdateProposalStatus(proposal.id, newStatus, proposal)}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusOptions.map(status => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        )}
+                        {currentUser.tipo_usuario === 'gestor' && (
+                          <TableCell>
                             <Button
                               variant="destructive"
                               size="sm"
@@ -833,8 +892,8 @@ export default function App() {
                             >
                               Excluir
                             </Button>
-                          )}
-                        </TableCell>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1470,7 +1529,8 @@ export default function App() {
             </TabsContent>
           )}
         </Tabs>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
