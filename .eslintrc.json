@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/eslintrc",
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "plugins": [],
+  "rules": {
+    "no-console": ["warn", { "allow": ["error", "warn"] }],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
+  }
+}
