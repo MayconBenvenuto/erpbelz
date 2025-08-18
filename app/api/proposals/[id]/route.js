@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabase, handleCORS, requireAuth, ensureGestor } from '@/lib/api-helpers'
+import { sendEmail } from '@/lib/email'
+import { sanitizeForLog } from '@/lib/security'
+import { renderBrandedEmail } from '@/lib/email-template'
+import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { z } from 'zod'
 
 const updateStatusSchema = z.object({
@@ -51,7 +55,7 @@ export async function PUT(request, { params }) {
 
   const { status, criado_por, valor } = parsed.data
 
-  const { data, error } = await supabase
+  const { data: updated, error } = await supabase
     .from('propostas')
     .update({ status })
     .eq('id', id)
@@ -62,12 +66,73 @@ export async function PUT(request, { params }) {
     return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
   }
 
-  if (status === 'implantado' && (criado_por || data.criado_por)) {
+  // Atualiza meta quando implantado
+  if (status === 'implantado' && (criado_por || updated.criado_por)) {
     await supabase.rpc('atualizar_meta_usuario', {
-      p_usuario_id: criado_por || data.criado_por,
-      p_valor: Number(valor || data.valor || 0),
+      p_usuario_id: criado_por || updated.criado_por,
+      p_valor: Number(valor || updated.valor || 0),
     })
   }
 
-  return handleCORS(NextResponse.json(data), origin)
+  // Envia e-mail ao analista informando a alteração de status
+  try {
+    const { data: analyst, error: userErr } = await supabase
+      .from('usuarios')
+      .select('email, nome')
+      .eq('id', updated.criado_por)
+      .single()
+    if (!userErr && analyst?.email) {
+      const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
+
+      // Monta dados da proposta
+  const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
+  let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
+  const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+
+      // Tenta obter razão social via endpoint de validação de CNPJ
+      if (updated.cnpj) {
+        try {
+          const resp = await fetch(`${apiBase}/api/validate-cnpj`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cnpj: updated.cnpj })
+          })
+          if (resp.ok) {
+            const data = await resp.json()
+            const rs = data?.data?.razao_social
+            if (data?.valid && rs) {
+              empresaLabel = `${rs} (CNPJ ${empresaCNPJ || updated.cnpj})`
+            }
+          }
+        } catch (_) { /* ignora falhas de enriquecimento */ }
+      }
+
+      const valorFmt = formatCurrency(updated.valor || 0)
+      const operadora = updated.operadora || 'Não informado'
+  const subject = `[CRM Belz] Proposta ${updated.id} atualizada: ${humanStatus}`
+  const linkCRM = appUrl
+      const text = `Olá ${analyst.nome || ''},\n\nA proposta ${updated.id} foi atualizada.\n\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM para mais detalhes: ${linkCRM}\n\n— CRM Belz`
+      const html = renderBrandedEmail({
+        title: 'Atualização de status da proposta',
+        ctaText: 'Abrir CRM',
+        ctaUrl: linkCRM,
+        contentHtml: `
+          <p>Olá ${analyst.nome || ''},</p>
+          <p>A proposta <strong>${updated.id}</strong> foi atualizada com as seguintes informações:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">
+            <tr><td style="padding:6px 0;"><strong>Empresa:</strong> ${empresaLabel}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Operadora:</strong> ${operadora}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Valor:</strong> ${valorFmt}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Status atual:</strong> ${humanStatus}</td></tr>
+          </table>
+        `,
+      })
+      await sendEmail({ to: analyst.email, subject, text, html })
+    }
+  } catch (err) {
+    console.error('Email notify error:', sanitizeForLog({ message: err?.message }))
+  }
+
+  return handleCORS(NextResponse.json(updated), origin)
 }

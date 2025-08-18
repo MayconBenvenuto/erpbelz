@@ -85,7 +85,7 @@ export async function POST(request) {
     {
       id: crypto.randomUUID(),
       usuario_id: data.id,
-      valor_meta: 150000.0,
+  valor_meta: 200000.0,
       valor_alcancado: 0.0,
       periodo: new Date().getFullYear().toString(),
     },

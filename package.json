@@ -9,6 +9,9 @@
         "build": "next build",
         "start": "next start",
         "test:utils": "node ./scripts/test-utils.mjs",
+    "test:email": "node ./tests/test_email_api.js",
+    "windows:next-cache:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/setup-next-cache.ps1",
+    "windows:next-cache:remove": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/remove-next-cache.ps1",
         "lint": "eslint .",
         "format": "prettier --write ."
     },
@@ -56,6 +59,7 @@
         "mongodb": "^6.6.0",
         "next": "14.2.3",
         "next-themes": "^0.4.6",
+        "nodemailer": "^7.0.5",
         "react": "^18",
         "react-day-picker": "^9.7.0",
         "react-dom": "^18",
@@ -73,9 +77,9 @@
         "autoprefixer": "^10.4.19",
         "eslint": "^8.57.0",
         "eslint-config-next": "14.2.3",
-        "prettier": "^3.3.3",
         "globals": "^16.2.0",
         "postcss": "^8",
+        "prettier": "^3.3.3",
         "tailwindcss": "^3.4.1"
     },
     "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"

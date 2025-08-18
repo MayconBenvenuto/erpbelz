@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PlusCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatCurrency, formatCNPJ, getStatusBadgeVariant } from '@/lib/utils'
+import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 export default function ProposalsSection({
   currentUser,
@@ -241,7 +241,9 @@ export default function ProposalsSection({
                   <TableCell>{proposal.quantidade_vidas}</TableCell>
                   <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(proposal.status)}>{proposal.status}</Badge>
+                    <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
+                      {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
+                    </Badge>
                   </TableCell>
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>

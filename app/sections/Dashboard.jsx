@@ -4,16 +4,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { FileText, Target, TrendingUp, RefreshCw } from 'lucide-react'
-import { formatCurrency, getStatusBadgeVariant } from '@/lib/utils'
+import { formatCurrency, getStatusBadgeClasses } from '@/lib/utils'
+import { STATUS_OPTIONS } from '@/lib/constants'
 
 export default function DashboardSection({ currentUser, proposals, users, sessions, userGoals }) {
   const totalProposals = proposals.length
   const implantedProposals = proposals.filter(p => p.status === 'implantado').length
   const totalValue = proposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
   const implantedValue = proposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+  const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Meta - 200k</CardTitle>
+          <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {userGoals.map((goal) => {
+            if (goal.usuario_id === currentUser.id) {
+              const target = Number(goal.valor_meta || 200000)
+              const achieved = Number(goal.valor_alcancado || 0)
+              const progress = (achieved / target) * 100
+              return (
+                <div key={goal.id} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progresso</span>
+                    <span>{formatCurrency(achieved)} / {formatCurrency(target)}</span>
+                  </div>
+                  <Progress value={Math.min(progress, 100)} className="h-3" />
+                  <p className="text-xs text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(target - achieved)} para atingir a meta`}
+                  </p>
+                </div>
+              )
+            }
+            return null
+          })}
+        </CardContent>
+      </Card>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -47,7 +77,7 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
 
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Valor Tota das Propostal</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -75,13 +105,18 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
               <CardTitle className="text-lg">Propostas por Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {['em análise', 'boleto liberado', 'implantando', 'pendente cliente', 'implantado', 'negado'].map((status) => {
-                const count = proposals.filter(p => p.status === status).length
+              {STATUS_OPTIONS.map((status) => {
+                const count = proposals.filter(p => normalize(p.status) === normalize(status)).length
                 const percentage = totalProposals > 0 ? (count / totalProposals) * 100 : 0
                 return (
                   <div key={status} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Badge variant={getStatusBadgeVariant(status)} className="text-xs">{status}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${getStatusBadgeClasses(status)}`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </Badge>
                     </div>
                     <div className="text-right">
                       <span className="font-medium">{count}</span>
@@ -124,32 +159,7 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Minha Meta - 150k</CardTitle>
-          <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {userGoals.map((goal) => {
-            if (goal.usuario_id === currentUser.id) {
-              const progress = (goal.valor_alcancado / goal.valor_meta) * 100
-              return (
-                <div key={goal.id} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progresso</span>
-                    <span>{formatCurrency(goal.valor_alcancado)} / {formatCurrency(goal.valor_meta)}</span>
-                  </div>
-                  <Progress value={Math.min(progress, 100)} className="h-3" />
-                  <p className="text-xs text-muted-foreground">
-                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(goal.valor_meta - goal.valor_alcancado)} para atingir a meta`}
-                  </p>
-                </div>
-              )
-            }
-            return null
-          })}
-        </CardContent>
-      </Card>
+  {/* Meta movida para o topo */}
     </div>
   )
 }

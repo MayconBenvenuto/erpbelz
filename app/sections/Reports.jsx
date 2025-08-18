@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
-import { formatCurrency, formatCNPJ, getStatusBadgeVariant } from '@/lib/utils'
+import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh }) {
   return (
@@ -209,7 +209,11 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
                       <TableCell className="font-mono text-sm">{formatCNPJ(proposal.cnpj)}</TableCell>
                       <TableCell>{proposal.consultor}</TableCell>
                       <TableCell>{createdDate.toLocaleString('pt-BR')}</TableCell>
-                      <TableCell><Badge variant={getStatusBadgeVariant(proposal.status)}>{proposal.status}</Badge></TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
+                          {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div>
                           <span className={`font-medium ${proposal.status === 'implantado' ? 'text-green-600' : diffDays > 30 ? 'text-red-600' : diffDays > 15 ? 'text-yellow-600' : 'text-blue-600'}`}>{diffDays}d</span>
