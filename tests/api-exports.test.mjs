@@ -52,3 +52,5 @@ describe('API routes exports', () => {
     expect(typeof validate.POST).toBe('function')
   })
 })
+
+// [REMOVIDO] Teste legado do backend Next.js. Sem efeito após migração para Nest.js.

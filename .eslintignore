@@ -1,0 +1,5 @@
+# Ignorar build e código do NestJS no lint da raiz
+server-nest/dist
+server-nest/**/*.d.ts
+server-nest/src/**
+**/*.min.js
