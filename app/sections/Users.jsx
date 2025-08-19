@@ -75,61 +75,67 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
           <CardDescription>{users.length} usuário(s) cadastrado(s)</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Meta</TableHead>
-                <TableHead>Alcançado</TableHead>
-                <TableHead>Progresso</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => {
-                const userGoal = userGoals.find(g => g.usuario_id === user.id)
-                const userImplantedProposals = proposals.filter(p => p.criado_por === user.id && p.status === 'implantado')
-                const userImplantedValue = userImplantedProposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
-                const targetValue = userGoal?.valor_meta || 100000
-                const achievedValue = userGoal?.valor_alcancado || userImplantedValue
-                const progress = targetValue > 0 ? (achievedValue / targetValue) * 100 : 0
+          {users.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Nenhum usuário cadastrado ainda. Clique em &quot;Novo Usuário&quot; para adicionar o primeiro.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Meta</TableHead>
+                  <TableHead>Alcançado</TableHead>
+                  <TableHead>Progresso</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => {
+                  const userGoal = userGoals.find(g => g.usuario_id === user.id)
+                  const userImplantedProposals = proposals.filter(p => p.criado_por === user.id && p.status === 'implantado')
+                  const userImplantedValue = userImplantedProposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+                  const targetValue = userGoal?.valor_meta || 100000
+                  const achievedValue = userGoal?.valor_alcancado || userImplantedValue
+                  const progress = targetValue > 0 ? (achievedValue / targetValue) * 100 : 0
 
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.nome}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.tipo_usuario === 'gestor' ? 'default' : 'secondary'}>{user.tipo_usuario}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(targetValue)}
-                      {!userGoal && (<span className="text-xs text-muted-foreground block">(meta padrão)</span>)}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        {formatCurrency(achievedValue)}
-                        <div className="text-xs text-muted-foreground">{userImplantedProposals.length} propostas implantadas</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3 w-24 bg-secondary" />
-                        <span className={`text-sm font-medium ${
-                          progress >= 100 ? 'text-green-600' :
-                          progress >= 75 ? 'text-blue-600' :
-                          progress >= 50 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                          {Math.round(progress)}%
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">Faltam {formatCurrency(Math.max(0, targetValue - achievedValue))}</div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.nome}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.tipo_usuario === 'gestor' ? 'default' : 'secondary'}>{user.tipo_usuario}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(targetValue)}
+                        {!userGoal && (<span className="text-xs text-muted-foreground block">(meta padrão)</span>)}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          {formatCurrency(achievedValue)}
+                          <div className="text-xs text-muted-foreground">{userImplantedProposals.length} propostas implantadas</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3 w-24 bg-secondary" />
+                          <span className={`text-sm font-medium ${
+                            progress >= 100 ? 'text-green-600' :
+                            progress >= 75 ? 'text-blue-600' :
+                            progress >= 50 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {Math.round(progress)}%
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Faltam {formatCurrency(Math.max(0, targetValue - achievedValue))}</div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

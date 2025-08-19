@@ -3,16 +3,16 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "dev:front": "next dev --hostname 0.0.0.0 --port 3000",
-    "dev:back": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"cd server-nest; yarn dev\"",
-    "dev:all": "concurrently \"yarn dev:front\" \"yarn dev:back\"",
+        "dev": "next dev --hostname 0.0.0.0 --port 3000",
+        "dev:front": "next dev --hostname 0.0.0.0 --port 3000",
+        "dev:back": "yarn --cwd server-nest dev",
+        "dev:all": "concurrently -k -n FRONT,BACK -c green,blue \"yarn dev:front\" \"yarn dev:back\"",
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
         "build": "next build",
         "start": "next start",
         "test:utils": "node ./scripts/test-utils.mjs",
-    "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
+        "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
         "windows:next-cache:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/setup-next-cache.ps1",
         "windows:next-cache:remove": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/remove-next-cache.ps1",
         "lint": "eslint .",
@@ -78,15 +78,15 @@
     },
     "devDependencies": {
         "autoprefixer": "^10.4.19",
+        "concurrently": "^9.2.0",
+        "dotenv": "^16.4.5",
         "eslint": "^8.57.0",
         "eslint-config-next": "14.2.3",
         "globals": "^16.2.0",
         "postcss": "^8",
         "prettier": "^3.3.3",
         "tailwindcss": "^3.4.1",
-    "typescript": "5.6.2",
-    "dotenv": "^16.4.5",
-    "concurrently": "^9.0.1"
+        "typescript": "5.6.2"
     },
     "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

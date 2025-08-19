@@ -262,6 +262,13 @@ export default function App() {
     if (currentUser) loadData()
   }, [currentUser, loadData])
 
+  // Recarrega assim que o token estiver disponível após login
+  useEffect(() => {
+    if (currentUser && token) {
+      loadData()
+    }
+  }, [currentUser, token, loadData])
+
   useEffect(() => {
     if (currentUser) {
       const interval = setInterval(autoRefreshData, 30000)

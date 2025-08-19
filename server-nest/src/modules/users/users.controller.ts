@@ -11,6 +11,7 @@ export class UsersController {
   constructor(@Inject('SUPABASE') private supabase: any) {}
 
   @Get()
+  @UseGuards(GestorGuard)
   async list() {
     const { data, error } = await this.supabase
       .from('usuarios')
