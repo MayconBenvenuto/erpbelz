@@ -104,7 +104,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals }) 
         <CardContent>
           {userGoals.map((goal) => {
             if (goal.usuario_id === currentUser.id) {
-              const target = Number(goal.valor_meta || 200000)
+              const target = 200000
               const achieved = Number(goal.valor_alcancado || 0)
               const progress = (achieved / target) * 100
               return (
