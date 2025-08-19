@@ -80,7 +80,7 @@ export async function POST(request) {
   const items = await Promise.all(proposals.map(async (p) => {
     const empresa = await enrichEmpresaLabel(p)
     return {
-      id: p.id,
+      codigo: p.codigo || p.id,
       empresa,
       operadora: p.operadora || 'Não informado',
       valor: formatCurrency(p.valor || 0),
@@ -90,12 +90,12 @@ export async function POST(request) {
 
   const subject = `[CRM Belz] Propostas sem ação há 48h (${items.length})`
   const listText = items.map((i) => (
-    `- Proposta ${i.id}\n  Empresa: ${i.empresa}\n  Operadora: ${i.operadora}\n  Valor: ${i.valor}\n  Criada em: ${new Date(i.criado_em).toLocaleString('pt-BR')}`
+    `- Proposta ${i.codigo}\n  Empresa: ${i.empresa}\n  Operadora: ${i.operadora}\n  Valor: ${i.valor}\n  Criada em: ${new Date(i.criado_em).toLocaleString('pt-BR')}`
   )).join('\n\n')
 
   const text = `Olá,\n\nAs seguintes propostas estão há 48h sem alteração de status (em análise):\n\n${listText}\n\nAcesse o CRM para direcionar as ações: ${baseUrl}\n\n— CRM Belz`
   const listHtml = items.map((i) => (
-    `<li><p><strong>Proposta:</strong> ${i.id}<br/><strong>Empresa:</strong> ${i.empresa}<br/><strong>Operadora:</strong> ${i.operadora}<br/><strong>Valor:</strong> ${i.valor}<br/><strong>Criada em:</strong> ${new Date(i.criado_em).toLocaleString('pt-BR')}</p></li>`
+    `<li><p><strong>Proposta:</strong> ${i.codigo}<br/><strong>Empresa:</strong> ${i.empresa}<br/><strong>Operadora:</strong> ${i.operadora}<br/><strong>Valor:</strong> ${i.valor}<br/><strong>Criada em:</strong> ${new Date(i.criado_em).toLocaleString('pt-BR')}</p></li>`
   )).join('')
   const html = renderBrandedEmail({
     title: 'Propostas sem ação há 48h',

@@ -81,11 +81,13 @@ export default function ProposalsSection({
       const consultor = normalize(p.consultor)
       const matchText = !qn || normalize(cnpjFmt).includes(qn) || cnpjDigits.includes(filters.q.replace(/\D/g, '')) || consultor.includes(qn)
 
-      const matchStatus = filters.status === 'todos' || normalize(p.status) === normalize(filters.status)
+  const matchStatus = filters.status === 'todos' || normalize(p.status) === normalize(filters.status)
       const matchOperadora = filters.operadora === 'todas' || normalize(p.operadora) === normalize(filters.operadora)
   const matchAnalista = currentUser.tipo_usuario !== 'gestor' || filters.analista === 'todos' || String(p.criado_por) === String(filters.analista)
   const matchConsultor = currentUser.tipo_usuario !== 'gestor' || filters.consultor === 'todos' || normalize(p.consultor) === normalize(filters.consultor)
-  return matchText && matchStatus && matchOperadora && matchAnalista && matchConsultor
+  // Permitir busca por código (PRP0001 etc.) como extra útil
+  const matchCodigo = !qn || (p.codigo && String(p.codigo).toLowerCase().includes(qn))
+  return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor
     })
   }, [proposals, filters, currentUser.tipo_usuario])
 
@@ -352,7 +354,7 @@ export default function ProposalsSection({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
             <div>
               <Input
-                placeholder="Buscar por CNPJ"
+                placeholder="Buscar por CNPJ ou código (PRP0000)"
                 value={filters.q}
                 onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value }))}
               />
@@ -428,7 +430,6 @@ export default function ProposalsSection({
                 <TableHead>Vidas</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Alterar Status</TableHead>
                 {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
               </TableRow>
             </TableHeader>
@@ -466,14 +467,9 @@ export default function ProposalsSection({
                   <TableCell>{proposal.quantidade_vidas}</TableCell>
                   <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
-                      {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
                     {(currentUser.tipo_usuario === 'gestor' || proposal.criado_por === currentUser.id) ? (
                       <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-48">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -481,7 +477,9 @@ export default function ProposalsSection({
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
+                        {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
+                      </Badge>
                     )}
                   </TableCell>
                   {/* {currentUser.tipo_usuario === 'gestor' && (
