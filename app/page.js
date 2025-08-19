@@ -349,6 +349,7 @@ export default function App() {
                     onUpdateProposalStatus={handleUpdateProposalStatus}
                     isLoading={isLoading}
           users={users}
+                    userGoals={userGoals}
                   />
                 )
               })()}

@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, X } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { PlusCircle, X, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -23,10 +24,12 @@ export default function ProposalsSection({
   onUpdateProposalStatus,
   isLoading,
   users = [],
+  userGoals = [],
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
+  const [updatingStatus, setUpdatingStatus] = useState({}) // { [proposalId]: boolean }
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   const [filters, setFilters] = useState(defaultFilters)
   const [proposalForm, setProposalForm] = useState({
@@ -74,7 +77,7 @@ export default function ProposalsSection({
 
   const filteredProposals = useMemo(() => {
     const qn = normalize(filters.q)
-    return proposals.filter((p) => {
+    const list = proposals.filter((p) => {
       // texto: cnpj (formatado ou dígitos) ou consultor
       const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
       const cnpjFmt = formatCNPJ(p.cnpj)
@@ -86,6 +89,18 @@ export default function ProposalsSection({
   const matchAnalista = currentUser.tipo_usuario !== 'gestor' || filters.analista === 'todos' || String(p.criado_por) === String(filters.analista)
   const matchConsultor = currentUser.tipo_usuario !== 'gestor' || filters.consultor === 'todos' || normalize(p.consultor) === normalize(filters.consultor)
   return matchText && matchStatus && matchOperadora && matchAnalista && matchConsultor
+    })
+    // Ordenação crescente por codigo (PRP0000, PRP0001, ...)
+    return list.slice().sort((a, b) => {
+      const ca = a?.codigo || ''
+      const cb = b?.codigo || ''
+      if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
+      if (ca) return -1
+      if (cb) return 1
+      // Fallback: sem codigo, ordena por criado_em asc se disponível
+      const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
+      const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
+      return da - db
     })
   }, [proposals, filters, currentUser.tipo_usuario])
 
@@ -325,6 +340,39 @@ export default function ProposalsSection({
         )}
       </div>
 
+      {currentUser.tipo_usuario !== 'gestor' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Meta</CardTitle>
+            <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const DEFAULT_TARGET = 200000
+              const goal = userGoals.find(g => g.usuario_id === currentUser.id)
+              const target = Number(goal?.valor_meta ?? DEFAULT_TARGET)
+              const achievedFallback = proposals
+                .filter(p => String(p.criado_por) === String(currentUser.id) && p.status === 'implantado')
+                .reduce((sum, p) => sum + Number(p.valor || 0), 0)
+              const achieved = Number(goal?.valor_alcancado ?? achievedFallback)
+              const progress = target > 0 ? (achieved / target) * 100 : 0
+              return (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Seu progresso</span>
+                    <span>{formatCurrency(achieved)} / {formatCurrency(target)}</span>
+                  </div>
+                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3" />
+                  <p className="text-xs text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, target - achieved))} para atingir a meta`}
+                  </p>
+                </div>
+              )
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Lista de Propostas</CardTitle>
@@ -420,6 +468,7 @@ export default function ProposalsSection({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Consultor</TableHead>
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
@@ -428,13 +477,13 @@ export default function ProposalsSection({
                 <TableHead>Vidas</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Alterar Status</TableHead>
                 {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProposals.map((proposal) => (
                 <TableRow key={proposal.id}>
+                  <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
                   <TableCell className="font-mono text-sm">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -466,23 +515,47 @@ export default function ProposalsSection({
                   <TableCell>{proposal.quantidade_vidas}</TableCell>
                   <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
-                      {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(currentUser.tipo_usuario === 'gestor' || proposal.criado_por === currentUser.id) ? (
-                      <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    {(() => {
+                      const canEdit = (
+                        currentUser.tipo_usuario === 'gestor' ||
+                        String(proposal.criado_por) === String(currentUser.id) ||
+                        (proposal.consultor_email && String(proposal.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                      )
+                      const isUpdating = !!updatingStatus[proposal.id]
+                      if (!canEdit) {
+                        return (
+                          <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
+                            {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
+                          </Badge>
+                        )
+                      }
+                      return (
+                        <Select
+                          value={proposal.status}
+                          onValueChange={async (newStatus) => {
+                            try {
+                              setUpdatingStatus(prev => ({ ...prev, [proposal.id]: true }))
+                              await onUpdateProposalStatus(proposal.id, newStatus, proposal)
+                            } finally {
+                              setUpdatingStatus(prev => ({ ...prev, [proposal.id]: false }))
+                            }
+                          }}
+                          disabled={isUpdating}
+                        >
+                          <SelectTrigger className={`w-56 capitalize ${getStatusBadgeClasses(proposal.status)} ${isUpdating ? 'opacity-80 cursor-wait' : ''}`}>
+                            <div className="flex items-center w-full justify-between">
+                              <SelectValue />
+                              {isUpdating && <RefreshCw className="h-4 w-4 ml-2 animate-spin" />}
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map(status => (
+                              <SelectItem key={status} value={status} className="capitalize">{status}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )
+                    })()}
                   </TableCell>
                   {/* {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
