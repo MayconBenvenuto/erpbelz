@@ -3,22 +3,189 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { FileText, Target, TrendingUp, RefreshCw } from 'lucide-react'
-import { formatCurrency, getStatusBadgeVariant } from '@/lib/utils'
+import { FileText, Target, TrendingUp, RefreshCw, ArrowUpDown, X } from 'lucide-react'
+import { formatCurrency, getStatusBadgeClasses } from '@/lib/utils'
+import { STATUS_OPTIONS } from '@/lib/constants'
+import { useEffect, useMemo, useState } from 'react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-export default function DashboardSection({ currentUser, proposals, users, sessions, userGoals }) {
-  const totalProposals = proposals.length
-  const implantedProposals = proposals.filter(p => p.status === 'implantado').length
-  const totalValue = proposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
-  const implantedValue = proposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+export default function DashboardSection({ currentUser, proposals, userGoals }) {
+  const [statusSortAsc, setStatusSortAsc] = useState(false)
+  const [operadorasSortAsc, setOperadorasSortAsc] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('todos')
+  const [consultorFilter, setConsultorFilter] = useState('todos')
+  const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+  // Persistência do filtro de status por usuário
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:statusFilter:${currentUser?.id || 'anon'}`
+      const saved = localStorage.getItem(key)
+      if (saved) setStatusFilter(saved)
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:statusFilter:${currentUser?.id || 'anon'}`
+      localStorage.setItem(key, statusFilter)
+    } catch (_) {}
+  }, [statusFilter, currentUser?.id])
+
+  // Persistência do filtro de consultor por usuário
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
+      const saved = localStorage.getItem(key)
+      if (saved) setConsultorFilter(saved)
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
+      localStorage.setItem(key, consultorFilter)
+    } catch (_) {}
+  }, [consultorFilter, currentUser?.id])
+
+  // Lista de filtros ativos (preparado para futuros filtros)
+  const activeFilters = useMemo(() => {
+    const items = []
+    if (statusFilter !== 'todos') {
+      items.push({ key: 'status', label: `status: ${statusFilter}`, onClear: () => setStatusFilter('todos') })
+    }
+    if (consultorFilter !== 'todos') {
+      items.push({ key: 'consultor', label: `consultor: ${consultorFilter}`, onClear: () => setConsultorFilter('todos') })
+    }
+    return items
+  }, [statusFilter, consultorFilter])
+
+  const filteredProposals = useMemo(() => {
+    let list = proposals
+    if (statusFilter !== 'todos') list = list.filter(p => normalize(p.status) === normalize(statusFilter))
+    if (consultorFilter !== 'todos') list = list.filter(p => normalize(p.consultor) === normalize(consultorFilter))
+    return list
+  }, [proposals, statusFilter, consultorFilter])
+
+  const totalProposals = filteredProposals.length
+  const implantedProposals = filteredProposals.filter(p => p.status === 'implantado').length
+  const totalValue = filteredProposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+  const implantedValue = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+
+  const statusCounts = useMemo(() =>
+    STATUS_OPTIONS.map((status) => {
+      const count = filteredProposals.filter(p => normalize(p.status) === normalize(status)).length
+      return { status, count }
+    }).sort((a, b) => statusSortAsc ? a.count - b.count : b.count - a.count)
+  , [filteredProposals, statusSortAsc])
+
+  const topOperadoras = useMemo(() => {
+    const counts = Object.entries(filteredProposals.reduce((acc, p) => { acc[p.operadora] = (acc[p.operadora] || 0) + 1; return acc }, {}))
+      .map(([operadora, count]) => ({ operadora, count }))
+      .sort((a, b) => operadorasSortAsc ? a.count - b.count : b.count - a.count)
+      .slice(0, 5)
+    return counts
+  }, [filteredProposals, operadorasSortAsc])
+
+  // Consultores únicos para dropdown
+  const consultores = useMemo(() => {
+    return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
+  }, [proposals])
 
   return (
     <div className="space-y-6">
+    <Card>
+        <CardHeader>
+      <CardTitle>Meta - R$ 200.000,00</CardTitle>
+          <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {userGoals.map((goal) => {
+            if (goal.usuario_id === currentUser.id) {
+              const target = Number(goal.valor_meta || 200000)
+              const achieved = Number(goal.valor_alcancado || 0)
+              const progress = (achieved / target) * 100
+              return (
+                <div key={goal.id} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progresso</span>
+                    <span>{formatCurrency(achieved)} / {formatCurrency(target)}</span>
+                  </div>
+                  <Progress value={Math.min(progress, 100)} className="h-3" />
+                  <p className="text-xs text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(target - achieved)} para atingir a meta`}
+                  </p>
+                </div>
+              )
+            }
+            return null
+          })}
+        </CardContent>
+      </Card>
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <RefreshCw className="w-4 h-4" />
-          <span>Atualização automática a cada 30s</span>
+        <div className="flex items-center space-x-3">
+          {currentUser.tipo_usuario === 'gestor' && (
+            <div className="flex items-center space-x-2">
+              <div className="w-48">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Filtrar status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-56">
+                <Select value={consultorFilter} onValueChange={setConsultorFilter}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Filtrar consultor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os consultores</SelectItem>
+                    {consultores.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setStatusFilter('todos'); setConsultorFilter('todos') }}
+                className="text-xs px-2 py-1 border rounded-md hover:bg-muted"
+                title="Limpar filtro"
+              >
+                Limpar
+              </button>
+              {activeFilters.length > 0 && (
+                <div className="flex items-center flex-wrap gap-2">
+                  {activeFilters.map(f => (
+                    <Badge key={f.key} variant="secondary" className="text-xs gap-1">
+                      <span>{f.label}</span>
+                      <button
+                        type="button"
+                        aria-label={`Remover filtro ${f.key}`}
+                        className="ml-1 opacity-80 hover:opacity-100"
+                        onClick={f.onClear}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <RefreshCw className="w-4 h-4" />
+            <span>Atualização automática a cada 30s</span>
+          </div>
         </div>
       </div>
 
@@ -47,7 +214,7 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
 
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Valor Total das Propostas</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -69,19 +236,34 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
       </div>
 
       {currentUser.tipo_usuario === 'gestor' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Propostas por Status</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Propostas por Status</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setStatusSortAsc(v => !v)}
+                  className="inline-flex items-center text-xs px-2 py-1 border rounded-md hover:bg-muted"
+                  title={statusSortAsc ? 'Ordenar por maior' : 'Ordenar por menor'}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
+                  {statusSortAsc ? 'Crescente' : 'Decrescente'}
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {['em análise', 'boleto liberado', 'implantando', 'pendente cliente', 'implantado', 'negado'].map((status) => {
-                const count = proposals.filter(p => p.status === status).length
+              {statusCounts.map(({ status, count }) => {
                 const percentage = totalProposals > 0 ? (count / totalProposals) * 100 : 0
                 return (
                   <div key={status} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <Badge variant={getStatusBadgeVariant(status)} className="text-xs">{status}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${getStatusBadgeClasses(status)}`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </Badge>
                     </div>
                     <div className="text-right">
                       <span className="font-medium">{count}</span>
@@ -95,61 +277,32 @@ export default function DashboardSection({ currentUser, proposals, users, sessio
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Top Operadoras</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Top Operadoras</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setOperadorasSortAsc(v => !v)}
+                  className="inline-flex items-center text-xs px-2 py-1 border rounded-md hover:bg-muted"
+                  title={operadorasSortAsc ? 'Ordenar por maior' : 'Ordenar por menor'}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
+                  {operadorasSortAsc ? 'Crescente' : 'Decrescente'}
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {Object.entries(proposals.reduce((acc, p) => { acc[p.operadora] = (acc[p.operadora] || 0) + 1; return acc }, {}))
-                .sort(([,a], [,b]) => b - a)
-                .slice(0, 5)
-                .map(([operadora, count]) => (
-                  <div key={operadora} className="flex items-center justify-between">
-                    <span className="capitalize">{operadora}</span>
-                    <Badge variant="outline">{count}</Badge>
-                  </div>
-                ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Usuários Ativos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between"><span>Total de Usuários</span><Badge variant="outline">{users.length}</Badge></div>
-              <div className="flex items-center justify-between"><span>Gestores</span><Badge variant="default">{users.filter(u => u.tipo_usuario === 'gestor').length}</Badge></div>
-              <div className="flex items-center justify-between"><span>Analistas</span><Badge variant="secondary">{users.filter(u => u.tipo_usuario === 'analista').length}</Badge></div>
-              <div className="flex items-center justify-between"><span>Sessões Ativas</span><Badge variant="destructive">{sessions.filter(s => !s.data_logout).length}</Badge></div>
+              {topOperadoras.map(({ operadora, count }) => (
+                <div key={operadora} className="flex items-center justify-between">
+                  <span className="capitalize">{operadora}</span>
+                  <Badge variant="outline">{count}</Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Minha Meta - 150k</CardTitle>
-          <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {userGoals.map((goal) => {
-            if (goal.usuario_id === currentUser.id) {
-              const progress = (goal.valor_alcancado / goal.valor_meta) * 100
-              return (
-                <div key={goal.id} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progresso</span>
-                    <span>{formatCurrency(goal.valor_alcancado)} / {formatCurrency(goal.valor_meta)}</span>
-                  </div>
-                  <Progress value={Math.min(progress, 100)} className="h-3" />
-                  <p className="text-xs text-muted-foreground">
-                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(goal.valor_meta - goal.valor_alcancado)} para atingir a meta`}
-                  </p>
-                </div>
-              )
-            }
-            return null
-          })}
-        </CardContent>
-      </Card>
+  {/* Meta movida para o topo */}
     </div>
   )
 }

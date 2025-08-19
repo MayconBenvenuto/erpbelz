@@ -2,21 +2,24 @@
 
 ## ✅ Funcionalidades Implementadas
 
-### 1. Backend - Endpoint PUT /api/proposals/:id
-- **Rota**: `PUT /api/proposals/{proposal_id}`
-- **Permissão**: Todos os usuários (analistas e gestores)
-- **Funcionalidade**: Atualiza o status de uma proposta
-- **Atualização automática de metas**: Quando status muda para "implantado", atualiza automaticamente as metas do usuário
+### 1. Backend - Endpoint PATCH /api/proposals/:id
+
+- **Rota**: `PATCH /api/proposals/{proposal_id}`
+- **Permissão**: Gestores (qualquer proposta) e Analistas (apenas propostas criadas por eles)
+- **Funcionalidade**: Atualização parcial do recurso (status da proposta)
+- **Atualização automática de metas**: Quando o status muda para "implantado", atualiza automaticamente as metas do usuário (RPC `atualizar_meta_usuario`)
 
 ### 2. Frontend - Interface de Alteração
+
 - **Localização**: Aba "Propostas" -> Tabela de propostas -> Coluna "Alterar Status"
 - **Componente**: Dropdown (Select) com todos os status disponíveis
 - **Interação**: Mudança imediata ao selecionar novo status
 - **Feedback**: Toast de sucesso/erro após alteração
 
 ### 3. Status Disponíveis
+
 - em análise
-- pendencias seguradora  
+- pendencias seguradora
 - boleto liberado
 - implantando
 - pendente cliente
@@ -27,16 +30,18 @@
 ## 🧪 Testes Realizados
 
 ### ✅ Testes de Backend
-1. **Atualização de status**: `PUT /api/proposals/540985ce-9ec8-4329-bcb6-0afdbf5c4c97`
+
+1. **Atualização de status**: `PATCH /api/proposals/540985ce-9ec8-4329-bcb6-0afdbf5c4c97`
    - Status alterado de "em análise" → "boleto liberado" ✅
-   
-2. **Atualização para implantado**: `PUT /api/proposals/4e2ed59c-a5c6-48e9-9572-a765a366476e`
+
+2. **Atualização para implantado**: `PATCH /api/proposals/4e2ed59c-a5c6-48e9-9572-a765a366476e`
    - Status alterado para "implantado" ✅
    - Meta do usuário atualizada automaticamente ✅
 
 3. **Criação de nova proposta**: Proposta criada com sucesso ✅
 
 ### ✅ Testes de Frontend
+
 - Interface carregando no navegador ✅
 - Dropdown de status adicionado à tabela ✅
 - Coluna "Alterar Status" visível para todos os usuários ✅
@@ -44,15 +49,17 @@
 ## 🔧 Arquivos Modificados
 
 ### Backend
-- `app/api/[[...path]]/route.js`:
-  - Adicionado endpoint PUT para atualizar status
-  - Lógica de atualização de metas quando status = "implantado"
 
-### Frontend  
+- `app/api/proposals/[id]/route.js`:
+       - Endpoint PATCH para atualizar status
+       - Lógica de atualização de metas quando status = "implantado"
+
+### Frontend
+
 - `app/page.js`:
-  - Função `handleUpdateProposalStatus()` 
-  - Nova coluna na tabela com dropdown de status
-  - Componente Select para alteração imediata
+       - Função `handleUpdateProposalStatus()`
+       - Nova coluna na tabela com dropdown de status
+       - Componente Select para alteração imediata
 
 ## 📊 Estrutura da Tabela
 
@@ -78,10 +85,10 @@
 
 ## 🔄 Fluxo de Atualização
 
-```
+```text
 Usuário seleciona novo status
        ↓
-Frontend chama PUT /api/proposals/:id  
+Frontend chama PATCH /api/proposals/:id  
        ↓
 Backend atualiza status na base
        ↓

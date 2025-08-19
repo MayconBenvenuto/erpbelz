@@ -5,14 +5,30 @@
 Este é um **CRM (Customer Relationship Management)** desenvolvido para a **Belz**, focado em gestão de propostas de planos de saúde. O sistema implementa controle de acesso baseado em roles, segurança robusta e interface moderna.
 
 ### 🎯 Objetivo Principal
+
 Gerenciar propostas de planos de saúde com diferentes níveis de acesso para analistas (criadores) e gestores (monitores).
 
 ---
 
-## 🏗️ Arquitetura do Projeto
+## � Atualizações recentes (18/08/2025)
+
+- API padronizada para PATCH nas atualizações; PUT removido. CORS ajustado para permitir PATCH.
+- Analista pode alterar o status apenas das próprias propostas (enforced no backend e respeitado na UI).
+- Nova seção “Movimentação” para analista.
+- Propostas: tooltip no CNPJ mostra a Razão Social via `POST /api/validate-cnpj` (cache local no componente para reduzir chamadas).
+- Filtros persistentes com chips clicáveis:
+  - Propostas: busca, status, operadora, analista e, para gestores, consultor.
+  - Dashboard (gestor): status e consultor.
+  - Persistência por usuário via `localStorage` e botão “Limpar filtros”.
+- Dashboard (gestor): ordenação asc/desc em “Propostas por Status” e “Top Operadoras”; card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
+- Novo campo obrigatório em propostas: `consultor_email` (validação no frontend e no backend via Zod; coluna adicionada no DB; migration: `scripts/migrations/2025-08-18-add-consultor-email.sql`).
+- Listagem de propostas: gestores visualizam a coluna “Email do Consultor”.
+
+## �🏗️ Arquitetura do Projeto
 
 ### 📁 Estrutura de Pastas
-```
+
+```text
 emergent-crm-adm/
 ├── app/                          # Next.js App Router
 │   ├── api/[[...path]]/          # API routes centralizadas
@@ -30,19 +46,22 @@ emergent-crm-adm/
 ```
 
 ### 🔧 Stack Tecnológica
-- **Frontend**: Next.js 14.2.3 + React 18
-- **UI**: Shadcn/UI + TailwindCSS + Lucide Icons
-- **Backend**: Next.js API Routes
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: JWT + bcryptjs
-- **Styling**: TailwindCSS + CSS Variables
-- **Fonts**: Montserrat (Google Fonts)
+
+- Frontend: Next.js 14.2.3 + React 18 (App Router)
+- UI: Shadcn/UI + TailwindCSS + Lucide Icons
+- Backend: Rotas de API do Next.js (app/api)
+- Database: Supabase (PostgreSQL)
+- Auth: JWT + bcryptjs
+- E-mail: Nodemailer (SMTP)
+- Styling: TailwindCSS + CSS Variables
+- Fonts: Montserrat (Google Fonts)
 
 ---
 
 ## 🎨 Design System
 
 ### 🎨 Paleta de Cores (Belz)
+
 ```css
 /* Cores principais da Belz */
 --primary: #130E54;        /* Azul escuro Belz */
@@ -53,11 +72,13 @@ emergent-crm-adm/
 ```
 
 ### 📝 Tipografia
+
 - **Font Primary**: Montserrat (Google Fonts)
 - **Font Class**: `.font-montserrat`
 - **Weights**: 400 (Regular), 500 (Medium), 600 (SemiBold), 700 (Bold)
 
 ### 🖼️ Layout
+
 - **Sidebar**: Fixa à esquerda, 256px de largura
 - **Header**: Dinâmico baseado na seção ativa
 - **Content**: Área principal flexível com scroll independente
@@ -69,15 +90,16 @@ emergent-crm-adm/
 ### 🔐 Tipos de Usuário
 
 #### **Analista** (Criador de Propostas)
+
 ```javascript
 // Permissões do analista
 const analistaPermissions = {
   propostas: {
     create: true,    // ✅ Criar propostas
     read: true,      // ✅ Visualizar propostas
-    update: false,   // ❌ Editar propostas
-    delete: false,   // ❌ Excluir propostas
-    status: false    // ❌ Alterar status
+  update: false,   // ❌ Editar propostas (campos gerais)
+  delete: false,   // ❌ Excluir propostas
+  status: true     // ✅ Alterar status APENAS das próprias propostas
   },
   dashboard: true,   // ✅ Ver dashboard
   usuarios: false,   // ❌ Gerenciar usuários
@@ -86,6 +108,7 @@ const analistaPermissions = {
 ```
 
 #### **Gestor** (Monitor e Aprovador)
+
 ```javascript
 // Permissões do gestor
 const gestorPermissions = {
@@ -107,6 +130,7 @@ const gestorPermissions = {
 ## 🛡️ Segurança e Autenticação
 
 ### 🔒 Implementações de Segurança
+
 ```javascript
 // lib/security.js - Funções principais
 - hashPassword()           // Hash bcrypt com 12 rounds
@@ -121,6 +145,7 @@ const gestorPermissions = {
 ```
 
 ### 🛡️ Headers de Segurança
+
 ```javascript
 // Headers implementados
 'X-Content-Type-Options': 'nosniff'
@@ -132,70 +157,79 @@ const gestorPermissions = {
 ```
 
 ### 🔐 Rate Limiting
+
 - **Login**: Máximo 100 tentativas por 15 minutos por IP
 - **APIs**: Limitação configurável via ENV
 - **Storage**: Map em memória (usar Redis em produção)
 
 ---
 
-## 🗄️ Estrutura do Banco de Dados
+## 🗄️ Estrutura do Banco de Dados (Supabase)
 
-### 📊 Tabelas Principais
+Os esquemas abaixo refletem o arquivo `database_setup.sql` usado no projeto (UUIDs, metas e gatilhos):
 
-#### **usuarios**
+### Tabela usuarios
+
 ```sql
 CREATE TABLE usuarios (
-  id SERIAL PRIMARY KEY,
-  nome VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  senha_hash VARCHAR(255) NOT NULL,
-  tipo_usuario VARCHAR(50) NOT NULL CHECK (tipo_usuario IN ('analista', 'gestor')),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  senha TEXT NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor', 'analista')) NOT NULL,
+  "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-#### **propostas**
+### Tabela propostas
+
 ```sql
 CREATE TABLE propostas (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cnpj VARCHAR(18) NOT NULL,
-  consultor VARCHAR(255) NOT NULL,
-  operadora VARCHAR(100) NOT NULL,
-  quantidade_vidas INTEGER NOT NULL,
-  valor DECIMAL(10,2) NOT NULL,
-  previsao_implantacao DATE,
-  status VARCHAR(50) DEFAULT 'em análise',
-  criado_por INTEGER REFERENCES usuarios(id),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  consultor TEXT NOT NULL,
+  consultor_email TEXT NOT NULL,
+  operadora TEXT CHECK (operadora IN (
+    'unimed recife','unimed seguros','bradesco','amil','ampla','fox','hapvida',
+    'medsenior','sulamerica','select'
+  )) NOT NULL,
+  "quantidade_vidas" INT NOT NULL,
+  valor NUMERIC(12,2) NOT NULL,
+  "previsao_implantacao" DATE,
+  status TEXT CHECK (status IN (
+    'em análise','pendencias seguradora','boleto liberado','implantando',
+    'pendente cliente','pleito seguradora','negado','implantado'
+  )) NOT NULL,
+  "criado_por" UUID REFERENCES usuarios(id),
+  "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+-- Para bases existentes, aplicar a migration: scripts/migrations/2025-08-18-add-consultor-email.sql
 ```
 
-#### **sessoes**
+### Tabela sessoes
+
 ```sql
 CREATE TABLE sessoes (
-  id SERIAL PRIMARY KEY,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  session_id VARCHAR(255) NOT NULL,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  inicio_sessao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ultima_atividade TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ativa BOOLEAN DEFAULT true
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "usuario_id" UUID REFERENCES usuarios(id),
+  "data_login" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  "data_logout" TIMESTAMP WITH TIME ZONE,
+  "tempo_total" INTERVAL
 );
 ```
 
-#### **metas_usuario**
+### Tabela metas e funções
+
 ```sql
-CREATE TABLE metas_usuario (
-  id SERIAL PRIMARY KEY,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  meta_propostas INTEGER NOT NULL,
-  propostas_fechadas INTEGER DEFAULT 0,
-  mes_ano VARCHAR(7) NOT NULL, -- YYYY-MM
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE metas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "usuario_id" UUID REFERENCES usuarios(id),
+  "valor_meta" NUMERIC(12,2) DEFAULT 150000,
+  "valor_alcancado" NUMERIC(12,2) DEFAULT 0,
+  "atualizado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUMERIC) ...;
 ```
 
 ---
@@ -205,41 +239,40 @@ CREATE TABLE metas_usuario (
 ### 🛣️ Rotas Principais (`/api/[[...path]]`)
 
 #### **Autenticação**
+
 ```javascript
 POST /api/auth/login
 Body: { email: string, password: string }
 Response: { user: object, sessionId: string, token: string }
 ```
 
-#### **Propostas**
-```javascript
-// Listar propostas
+#### Propostas
+
+```http
 GET /api/proposals
-Response: [{ id, cnpj, consultor, operadora, quantidade_vidas, valor, status, ... }]
+  -> Lista propostas (gestor vê todas; analista vê apenas as próprias)
 
-// Criar proposta (apenas analistas)
 POST /api/proposals
-Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao }
+  Body: { cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
+  -> Cria proposta (analista tem o criado_por forçado para o próprio id)
 
-// Atualizar status (apenas gestores)
-PUT /api/proposals/:id/status
-Body: { status: string }
+PATCH /api/proposals/:id
+  Body: { status }
+  -> Atualiza parcialmente (status). Quando "implantado" atualiza metas (RPC atualizar_meta_usuario)
 
-// Deletar proposta (apenas gestores)
 DELETE /api/proposals/:id
+  -> Apenas gestores
 ```
 
-#### **Usuários** (apenas gestores)
-```javascript
-// Listar usuários
-GET /api/users
+#### Usuários (gestores)
 
-// Criar usuário
-POST /api/users
-Body: { nome, email, senha, tipo_usuario }
+```http
+GET /api/users
+POST /api/users  Body: { nome, email, senha, tipo_usuario? }
 ```
 
 #### **Validação CNPJ**
+
 ```javascript
 POST /api/validate-cnpj
 Body: { cnpj: string }
@@ -247,6 +280,7 @@ Response: { valid: boolean, data?: object, error?: string }
 ```
 
 #### **Sessões e Relatórios**
+
 ```javascript
 GET /api/sessions      // Listar sessões ativas
 GET /api/goals         // Metas e progresso dos usuários
@@ -259,6 +293,7 @@ GET /api/goals         // Metas e progresso dos usuários
 ### 📝 Gestão de Propostas
 
 #### **Status Disponíveis**
+
 ```javascript
 const statusOptions = [
   'em análise',
@@ -273,6 +308,7 @@ const statusOptions = [
 ```
 
 #### **Operadoras Suportadas**
+
 ```javascript
 const operadoras = [
   'unimed recife',
@@ -289,6 +325,7 @@ const operadoras = [
 ```
 
 ### 🔍 Validação de CNPJ (Cascata)
+
 ```javascript
 // Ordem de tentativa das APIs
 1. ReceitaWS      (https://receitaws.com.br/v1/cnpj/{cnpj})
@@ -317,18 +354,31 @@ const operadoras = [
 }
 ```
 
+Notas de UI:
+
+- Na listagem de propostas, o CNPJ exibe tooltip com Razão Social (dados obtidos de `/api/validate-cnpj`).
+- Gestores visualizam a coluna “Email do Consultor”.
+- Edição de status via Select: analistas apenas nas próprias propostas; gestores em todas.
+
 ### 📈 Dashboard e Métricas
+
 - **Cards de resumo**: Total de propostas, por status, valores
 - **Gráficos**: Distribuição por operadora e status
 - **Progresso**: Metas individuais vs atingido
 - **Auto-refresh**: Atualização automática dos dados
 
+- **Ordenação**: Alternar asc/desc em “Propostas por Status” e “Top Operadoras”.
+- **Filtros persistentes**: Status e Consultor com chips removíveis e botão “Limpar filtros”.
+- **UI**: Card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
+
 ### 👥 Gestão de Usuários (Gestor)
+
 - **Criação**: Novos analistas e gestores
 - **Listagem**: Todos os usuários do sistema
 - **Tipos**: Analista (criador) / Gestor (monitor)
 
 ### 📊 Relatórios e Monitoramento (Gestor)
+
 - **Sessões ativas**: Usuários online e última atividade
 - **Logs de acesso**: Histórico de logins e IPs
 - **Metas**: Progresso individual e da equipe
@@ -340,6 +390,7 @@ const operadoras = [
 ### ⚛️ React Patterns
 
 #### **Hooks Customizados**
+
 ```javascript
 // Exemplo: useAutoRefresh
 const useAutoRefresh = (callback, interval = 30000) => {
@@ -351,6 +402,7 @@ const useAutoRefresh = (callback, interval = 30000) => {
 ```
 
 #### **State Management**
+
 ```javascript
 // Estados principais do CRM
 const [currentUser, setCurrentUser] = useState(null);
@@ -362,6 +414,7 @@ const [userGoals, setUserGoals] = useState([]);
 ```
 
 #### **Conditional Rendering**
+
 ```javascript
 // Baseado em permissões
 {currentUser.tipo_usuario === 'gestor' && (
@@ -376,6 +429,7 @@ const [userGoals, setUserGoals] = useState([]);
 ### 🎨 CSS Patterns
 
 #### **Layout Classes**
+
 ```css
 /* Sidebar fixo */
 .sidebar {
@@ -394,6 +448,7 @@ const [userGoals, setUserGoals] = useState([]);
 ```
 
 #### **Responsive Design**
+
 ```css
 /* Mobile first approach */
 .responsive-grid {
@@ -404,6 +459,7 @@ const [userGoals, setUserGoals] = useState([]);
 ### 🔒 Security Patterns
 
 #### **Input Sanitization**
+
 ```javascript
 // Sempre sanitizar inputs
 const sanitizedInput = sanitizeInput(userInput);
@@ -412,6 +468,7 @@ const isValidCNPJ = validateCNPJFormat(cnpj);
 ```
 
 #### **API Error Handling**
+
 ```javascript
 try {
   const response = await fetch('/api/endpoint', {
@@ -441,62 +498,64 @@ try {
 
 ## 🌍 Variáveis de Ambiente
 
-### 📄 .env (Configuração Local)
-```bash
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+### 📄 Variáveis de Ambiente
 
-# Security Configuration
-JWT_SECRET=secure_32_character_secret_key_here
+Use o arquivo `.env.example` como base. Principais variáveis:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Segurança
+JWT_SECRET=
 BCRYPT_ROUNDS=12
 SESSION_TIMEOUT=86400000
-
-# CORS Configuration
-CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
-
-# Rate Limiting
 RATE_LIMIT_WINDOW=900000
 RATE_LIMIT_MAX_REQUESTS=100
-```
 
-### 📄 .env.example (Template)
-```bash
-# ⚠️ CONFIGURE COM SUAS PRÓPRIAS CHAVES
-
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-
-# Security Configuration
-JWT_SECRET=uma_chave_super_secreta_com_no_minimo_32_caracteres
-BCRYPT_ROUNDS=12
-SESSION_TIMEOUT=86400000
-
-# CORS Configuration  
+# CORS
 CORS_ORIGINS=http://localhost:3000
 
-# Rate Limiting
-RATE_LIMIT_WINDOW=900000
-RATE_LIMIT_MAX_REQUESTS=100
+# SMTP / E-mail
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_SECURE=false
+SMTP_DEBUG=false
+EMAIL_FROM=comunicacao@belzseguros.com.br
+EMAIL_FROM_NAME=CRM Belz
+
+# Apps
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+CRM_APP_URL=http://localhost:3000
+
+# Integrações
+CNPJA_API_KEY=
 ```
 
 ---
 
 ## 🚀 Scripts de Desenvolvimento
 
-### 📦 package.json Scripts
+### 📦 Scripts (package.json)
+
 ```json
 {
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   }
 }
 ```
 
 ### 🛠️ Comandos Úteis
+
 ```bash
 # Desenvolvimento
 npm run dev
@@ -516,6 +575,7 @@ npm install
 ## 🧪 Testing Patterns
 
 ### 🔍 Validação Manual
+
 ```javascript
 // Testar permissões
 // 1. Login como analista - verificar se pode criar propostas
@@ -526,6 +586,7 @@ npm install
 ```
 
 ### 🐛 Debug Patterns
+
 ```javascript
 // Logs seguros (sem dados sensíveis)
 console.log('Operação:', sanitizeForLog(operation));
@@ -542,6 +603,7 @@ toast.info('ℹ️ Informação importante');
 ## 🔄 Deployment
 
 ### 🌐 GitHub Deployment
+
 ```bash
 # Verificar arquivos sensíveis
 git status
@@ -554,6 +616,7 @@ git push origin main
 ```
 
 ### ⚠️ Checklist de Segurança
+
 - [ ] Arquivo .env não commitado
 - [ ] Credenciais rotacionadas se expostas
 - [ ] Headers de segurança configurados
@@ -566,26 +629,30 @@ git push origin main
 ## 📚 Recursos e Referências
 
 ### 📖 Documentação
-- **Next.js**: https://nextjs.org/docs
-- **Shadcn/UI**: https://ui.shadcn.com
-- **TailwindCSS**: https://tailwindcss.com/docs
-- **Supabase**: https://supabase.com/docs
+
+- **Next.js**: <https://nextjs.org/docs>
+- **Shadcn/UI**: <https://ui.shadcn.com>
+- **TailwindCSS**: <https://tailwindcss.com/docs>
+- **Supabase**: <https://supabase.com/docs>
 
 ### 🎨 Design Resources
-- **Lucide Icons**: https://lucide.dev
-- **Montserrat Font**: https://fonts.google.com/specimen/Montserrat
+
+- **Lucide Icons**: <https://lucide.dev>
+- **Montserrat Font**: <https://fonts.google.com/specimen/Montserrat>
 - **Color Palette**: Belz brand colors (#130E54, #021d79, #f6f6f6)
 
 ### 🔒 Security Resources
-- **JWT**: https://jwt.io
-- **bcrypt**: https://github.com/kelektiv/node.bcrypt.js
-- **OWASP**: https://owasp.org/www-project-top-ten/
+
+- **JWT**: <https://jwt.io>
+- **bcrypt**: <https://github.com/kelektiv/node.bcrypt.js>
+- **OWASP**: <https://owasp.org/www-project-top-ten/>
 
 ---
 
 ## 🤖 GitHub Copilot Guidelines
 
 ### ✅ Quando Sugerir Código
+
 1. **Seguir padrões estabelecidos** no projeto
 2. **Implementar segurança** por padrão
 3. **Usar componentes Shadcn/UI** existentes
@@ -595,6 +662,7 @@ git push origin main
 7. **Implementar loading states** em operações assíncronas
 
 ### ❌ Evitar
+
 1. **Hardcoded credentials** ou secrets
 2. **SQL direto** (usar Supabase client)
 3. **Inline styles** (usar TailwindCSS)
@@ -604,11 +672,25 @@ git push origin main
 7. **Dados não sanitizados**
 
 ### 🎯 Prioridades
-1. **Segurança** sempre em primeiro lugar
-2. **UX consistente** com o design system
-3. **Performance** e otimização
-4. **Manutenibilidade** do código
-5. **Documentação** clara
+
+1. Segurança sempre em primeiro lugar
+2. UX consistente com o design system
+3. Performance e otimização
+4. Manutenibilidade do código
+5. Documentação clara
+
+### 🔧 Convenções para novas rotas API
+
+- Sempre use `requireAuth(request)` de `lib/api-helpers` para autenticação.
+- Para restringir a gestores, use `ensureGestor(user)`.
+- Aplique CORS e headers de segurança via `handleCORS(NextResponse.json(...), origin)`.
+- Valide payloads com `zod`.
+- Nunca exponha dados sensíveis nos logs. Use `sanitizeForLog`.
+
+### ✉️ Notificações por e-mail
+
+- Para status de proposta: ver `app/api/proposals/[id]/route.js` (usa `sendEmail` e `renderBrandedEmail`).
+- Configure SMTP no `.env`. Em dev, `SMTP_DEBUG=true` ajuda na verificação.
 
 ---
 
@@ -626,5 +708,5 @@ Este CRM da Belz é um sistema robusto e seguro para gestão de propostas de pla
 ---
 
 *Última atualização: 18 de agosto de 2025*
-*Versão: 1.0.0*
-*Autor: GitHub Copilot Assistant*
+*Versão: 1.1.0*
+*Autor: GitHub Copilot*

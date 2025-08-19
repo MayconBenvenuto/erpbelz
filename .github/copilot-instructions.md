@@ -16,7 +16,7 @@ This is a CRM system for Belz company focused on health insurance proposal manag
 ### Analyst (analista)
 - ✅ Create proposals
 - ✅ View proposals
-- ❌ Edit proposal status
+- ✅ Edit proposal status (only their own proposals)
 - ❌ Delete proposals
 - ❌ Manage users
 

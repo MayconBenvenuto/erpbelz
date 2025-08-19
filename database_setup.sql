@@ -26,6 +26,7 @@ CREATE TABLE propostas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cnpj VARCHAR(18) NOT NULL,
   consultor TEXT NOT NULL,
+  consultor_email TEXT NOT NULL,
   operadora TEXT CHECK (operadora IN (
     'unimed recife','unimed seguros','bradesco','amil','ampla','fox','hapvida',
     'medsenior','sulamerica','select'
@@ -141,6 +142,7 @@ sample_proposals AS (
     gen_random_uuid() as id,
     '12345678000195' as cnpj,
     'João Silva' as consultor,
+  'joao.silva@empresa.com' as consultor_email,
     'unimed recife' as operadora,
     50 as quantidade_vidas,
     25000.00 as valor,
@@ -152,6 +154,7 @@ sample_proposals AS (
     gen_random_uuid() as id,
     '98765432000187' as cnpj,
     'Maria Santos' as consultor,
+  'maria.santos@empresa.com' as consultor_email,
     'bradesco' as operadora,
     30 as quantidade_vidas,
     18000.00 as valor,
@@ -159,7 +162,7 @@ sample_proposals AS (
     'em análise' as status,
     (SELECT id FROM sample_users OFFSET 1 LIMIT 1) as criado_por
 )
-INSERT INTO propostas (id, cnpj, consultor, operadora, "quantidade_vidas", valor, "previsao_implantacao", status, "criado_por")
+INSERT INTO propostas (id, cnpj, consultor, consultor_email, operadora, "quantidade_vidas", valor, "previsao_implantacao", status, "criado_por")
 SELECT * FROM sample_proposals;
 
 -- Verify data

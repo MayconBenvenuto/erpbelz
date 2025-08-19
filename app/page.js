@@ -17,6 +17,7 @@ import ProposalsSection from '@/app/sections/Proposals'
 import DashboardSection from '@/app/sections/Dashboard'
 import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
+import MovimentacaoSection from '@/app/sections/Movimentacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
 
 export default function App() {
@@ -143,6 +144,8 @@ export default function App() {
     setIsLoading(true)
     try {
       const { afterSuccess, cnpjValidationData: _ignore, ...body } = payload || {}
+      // Segurança mínima: sanitizar email no cliente
+      if (body.consultor_email) body.consultor_email = String(body.consultor_email).trim()
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const response = await fetch('/api/proposals', {
@@ -192,7 +195,7 @@ export default function App() {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const response = await fetch(`/api/proposals/${proposalId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers,
         body: JSON.stringify({ status: newStatus, criado_por: proposal.criado_por, valor: proposal.valor })
       })
@@ -200,8 +203,12 @@ export default function App() {
         toast.success('Status da proposta atualizado com sucesso!')
         await loadData()
       } else {
-        const result = await response.json()
-        toast.error(result.error || 'Erro ao atualizar status')
+        if (response.status === 403) {
+          toast.error('Ação não permitida para esta proposta')
+        } else {
+          const result = await response.json().catch(() => ({}))
+          toast.error(result.error || 'Erro ao atualizar status')
+        }
       }
     } catch {
       toast.error('Erro ao conectar com o servidor')
@@ -353,6 +360,12 @@ export default function App() {
                 )
               })()}
             </TabsContent>
+
+            {currentUser.tipo_usuario !== 'gestor' && (
+              <TabsContent value="movimentacao" className="space-y-6">
+                <MovimentacaoSection />
+              </TabsContent>
+            )}
 
             {currentUser.tipo_usuario === 'gestor' && (
               <TabsContent value="usuarios" className="space-y-6">

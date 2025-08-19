@@ -5,6 +5,7 @@ import { z } from 'zod'
 const createProposalSchema = z.object({
   cnpj: z.string().min(14),
   consultor: z.string().min(2),
+  consultor_email: z.string().email(),
   operadora: z.string().min(2),
   quantidade_vidas: z.coerce.number().int().min(1),
   valor: z.coerce.number().min(0),
