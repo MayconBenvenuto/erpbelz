@@ -8,6 +8,11 @@ import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh }) {
+  // Filtrar gestores do monitoramento
+  const analystUsers = Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []
+  const analystIds = new Set(analystUsers.map(u => u.id))
+  const filteredSessions = Array.isArray(sessions) ? sessions.filter(s => analystIds.has(s.usuario_id)) : []
+  const filteredProposals = Array.isArray(proposals) ? proposals.filter(p => analystIds.has(p.criado_por)) : []
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -25,7 +30,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Users className="w-5 h-5 text-green-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Usuários Online</p>
-                <p className="text-2xl font-bold text-green-600">{sessions.filter(s => !s.data_logout).length}</p>
+                <p className="text-2xl font-bold text-green-600">{filteredSessions.filter(s => !s.data_logout).length}</p>
               </div>
             </div>
           </CardContent>
@@ -37,7 +42,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Clock className="w-5 h-5 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Sessões Hoje</p>
-                <p className="text-2xl font-bold text-blue-600">{sessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString()).length}</p>
+                <p className="text-2xl font-bold text-blue-600">{filteredSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString()).length}</p>
               </div>
             </div>
           </CardContent>
@@ -49,7 +54,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Target className="w-5 h-5 text-yellow-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Propostas Hoje</p>
-                <p className="text-2xl font-bold text-yellow-600">{proposals.filter(p => new Date(p.criado_em).toDateString() === new Date().toDateString()).length}</p>
+                <p className="text-2xl font-bold text-yellow-600">{filteredProposals.filter(p => new Date(p.criado_em).toDateString() === new Date().toDateString()).length}</p>
               </div>
             </div>
           </CardContent>
@@ -88,7 +93,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {users.map((user) => {
+            {analystUsers.map((user) => {
               const userSessions = sessions.filter(s => s.usuario_id === user.id)
               const currentSession = userSessions.find(s => !s.data_logout)
               const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())

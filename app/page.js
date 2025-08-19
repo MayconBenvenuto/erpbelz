@@ -367,7 +367,6 @@ export default function App() {
                     currentUser={currentUser}
                     proposals={proposalsForView}
                     users={users}
-                    sessions={sessions}
                     userGoals={userGoals}
                   />
                 )
