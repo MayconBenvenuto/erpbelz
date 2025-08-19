@@ -136,7 +136,11 @@ export class ProposalsController {
           `,
         })
         const mail = new EmailService()
-        await mail.send({ to: analyst.email, subject, text, html })
+        // Envia para o analista e também para o corretor (consultor_email), com deduplicação
+        const consultorEmail = String((updated as any).consultor_email || '').toLowerCase()
+        const analystEmail = String(analyst.email || '').toLowerCase()
+        const recipients = Array.from(new Set([analystEmail, consultorEmail].filter(Boolean)))
+        await mail.send({ to: recipients.join(', '), subject, text, html })
       }
     } catch {}
 

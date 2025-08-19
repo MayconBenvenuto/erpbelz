@@ -5,9 +5,9 @@
 .vscode/
 
 # ARQUIVOS CRÍTICOS DE SEGURANÇA - NUNCA COMMITAR
-#.env
+.env
 .envlocal
-#.env.local
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local

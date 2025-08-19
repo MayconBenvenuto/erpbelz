@@ -10,19 +10,19 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## � Atualizações recentes (18/08/2025)
+## � Atualizações recentes (19/08/2025)
 
-- API padronizada para PATCH nas atualizações; PUT removido. CORS ajustado para permitir PATCH.
-- Analista pode alterar o status apenas das próprias propostas (enforced no backend e respeitado na UI).
-- Nova seção “Movimentação” para analista.
-- Propostas: tooltip no CNPJ mostra a Razão Social via `POST /api/validate-cnpj` (cache local no componente para reduzir chamadas).
-- Filtros persistentes com chips clicáveis:
-  - Propostas: busca, status, operadora, analista e, para gestores, consultor.
-  - Dashboard (gestor): status e consultor.
-  - Persistência por usuário via `localStorage` e botão “Limpar filtros”.
-- Dashboard (gestor): ordenação asc/desc em “Propostas por Status” e “Top Operadoras”; card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
-- Novo campo obrigatório em propostas: `consultor_email` (validação no frontend e no backend via Zod; coluna adicionada no DB; migration: `scripts/migrations/2025-08-18-add-consultor-email.sql`).
-- Listagem de propostas: gestores visualizam a coluna “Email do Consultor”.
+- Backend separado em NestJS (server-nest/) com Next.js proxyando todas as rotas `/api/*` para o servidor Nest (ver `next.config.js` e `middleware.js`).
+- Propostas com Código sequencial no formato `PRP0000`:
+  - Nova coluna `codigo` com sequência `prp_codigo_seq`, `UNIQUE`, `CHECK '^PRP[0-9]{4,}$'` e índice dedicado.
+  - Migration: `scripts/migrations/2025-08-19-add-proposta-codigo.sql` (backfill automático e `DEFAULT` para novos registros).
+  - UI: coluna “ID” (primeira à esquerda) exibe `codigo`; listagens ordenam por `codigo` crescente; fallback para data de criação quando a coluna não existir.
+- Edição de status inline na própria célula (Select) com spinner por linha e bloqueio de interação durante atualizações.
+- Tela Propostas (analista): card de “Meta” com progresso e valor faltante, usando metas do backend com fallback para somatório de propostas implantadas.
+- Relatórios/Monitoramento: gestor não aparece nos indicadores; botão “Atualizar Dados” com spinner e disabled durante refresh.
+- E-mails de notificação de mudança de status incluem apenas o Código da proposta (PRP...), nunca o UUID.
+- Mantido: API padronizada para PATCH; analista só altera status das próprias propostas; tooltip de Razão Social no CNPJ via `/api/validate-cnpj`; filtros persistentes por usuário.
+- Migration anterior: `scripts/migrations/2025-08-18-add-consultor-email.sql` adiciona `consultor_email` obrigatório às propostas.
 
 ## �🏗️ Arquitetura do Projeto
 
@@ -49,7 +49,7 @@ emergent-crm-adm/
 
 - Frontend: Next.js 14.2.3 + React 18 (App Router)
 - UI: Shadcn/UI + TailwindCSS + Lucide Icons
-- Backend: Rotas de API do Next.js (app/api)
+- Backend: NestJS 10 (server-nest/) com proxy do Next.js para `/api/*`
 - Database: Supabase (PostgreSQL)
 - Auth: JWT + bcryptjs
 - E-mail: Nodemailer (SMTP)
@@ -206,6 +206,12 @@ CREATE TABLE propostas (
 -- Para bases existentes, aplicar a migration: scripts/migrations/2025-08-18-add-consultor-email.sql
 ```
 
+Notas adicionais (Código PRP):
+
+- Coluna `codigo` (ex.: PRP0000) adicionada via migration `scripts/migrations/2025-08-19-add-proposta-codigo.sql`.
+- Geração automática com sequência `prp_codigo_seq` e default: `('PRP' || lpad(nextval('prp_codigo_seq')::text, 4, '0'))`.
+- Restrições: `NOT NULL`, `UNIQUE`, `CHECK` para padrão `^PRP[0-9]{4,}$` e índice dedicado.
+
 ### Tabela sessoes
 
 ```sql
@@ -250,7 +256,7 @@ Response: { user: object, sessionId: string, token: string }
 
 ```http
 GET /api/proposals
-  -> Lista propostas (gestor vê todas; analista vê apenas as próprias)
+  -> Lista propostas (gestor vê todas; analista vê apenas as próprias). Ordenadas por `codigo` asc (fallback: `criado_em`).
 
 POST /api/proposals
   Body: { cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
@@ -258,7 +264,7 @@ POST /api/proposals
 
 PATCH /api/proposals/:id
   Body: { status }
-  -> Atualiza parcialmente (status). Quando "implantado" atualiza metas (RPC atualizar_meta_usuario)
+  -> Atualiza parcialmente (status). Quando "implantado" atualiza metas (RPC atualizar_meta_usuario). Dispara e-mail que referencia apenas o `codigo` (PRP...), nunca o UUID.
 
 DELETE /api/proposals/:id
   -> Apenas gestores
@@ -358,7 +364,8 @@ Notas de UI:
 
 - Na listagem de propostas, o CNPJ exibe tooltip com Razão Social (dados obtidos de `/api/validate-cnpj`).
 - Gestores visualizam a coluna “Email do Consultor”.
-- Edição de status via Select: analistas apenas nas próprias propostas; gestores em todas.
+- Edição de status inline via Select na própria célula com spinner por linha: analistas apenas nas próprias propostas; gestores em todas.
+- Tela Propostas (analista): exibe card de “Meta” com progresso e valor faltante.
 
 ### 📈 Dashboard e Métricas
 
@@ -382,6 +389,8 @@ Notas de UI:
 - **Sessões ativas**: Usuários online e última atividade
 - **Logs de acesso**: Histórico de logins e IPs
 - **Metas**: Progresso individual e da equipe
+- **Gestor excluído** do monitoramento
+- **Botão "Atualizar Dados"** com spinner/disable durante refresh
 
 ---
 
@@ -689,7 +698,8 @@ git push origin main
 
 ### ✉️ Notificações por e-mail
 
-- Para status de proposta: ver `app/api/proposals/[id]/route.js` (usa `sendEmail` e `renderBrandedEmail`).
+- Envio disparado no backend NestJS ao atualizar status.
+- Assunto/corpo mostram apenas o Código PRP (nunca o UUID).
 - Configure SMTP no `.env`. Em dev, `SMTP_DEBUG=true` ajuda na verificação.
 
 ---
@@ -707,6 +717,6 @@ Este CRM da Belz é um sistema robusto e seguro para gestão de propostas de pla
 
 ---
 
-*Última atualização: 18 de agosto de 2025*
-*Versão: 1.1.0*
+*Última atualização: 19 de agosto de 2025*
+*Versão: 1.2.0*
 *Autor: GitHub Copilot*

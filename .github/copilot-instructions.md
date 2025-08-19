@@ -8,6 +8,12 @@ Current architecture:
 - Backend: NestJS server (server-nest) at port 3001
 - Next proxies all /api/* routes to the Nest server (see next.config.js & middleware.js)
 
+Recent updates (2025-08-19):
+- Proposals have a sequential code (codigo) like PRP0000 (unique, validated, indexed). UI shows this as the first column and lists are ordered by codigo ascending. Emails reference only the codigo (never the UUID).
+- Status editing is inline in the table cell (Select) with per-row loading/disable during updates.
+- Analyst Proposals screen shows a “Meta” progress card (backend metas with fallback to implanted proposals sum).
+- Reports exclude gestor from monitoring; the refresh button shows spinner/disable.
+
 ## Tech Stack
 - **Frontend**: Next.js 14.2.3 with App Router
 - **Backend**: NestJS 10 (server-nest/)
@@ -150,6 +156,10 @@ toast.info('ℹ️ Informação importante');
 ## API Patterns
 
 Important: All client calls go to /api/* and are proxied to the NestJS backend.
+
+Key endpoints:
+- GET /api/proposals → ordered by codigo asc when available; gestor sees all; analyst sees own only.
+- PATCH /api/proposals/:id → updates status; when to “implantado” updates metas; sends email showing only the PRP codigo.
 
 ### Standard API Call
 ```javascript
