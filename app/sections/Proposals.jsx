@@ -423,6 +423,7 @@ export default function ProposalsSection({
             <TableHeader>
               <TableRow>
                 <TableHead>CNPJ</TableHead>
+                <TableHead>Código</TableHead>
                 <TableHead>Consultor</TableHead>
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Analista</TableHead>}
@@ -456,6 +457,7 @@ export default function ProposalsSection({
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
+                  <TableCell className="font-mono text-xs">{proposal.codigo || '—'}</TableCell>
                   <TableCell>{proposal.consultor}</TableCell>
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell className="font-mono text-xs">{proposal.consultor_email || '-'}</TableCell>
@@ -468,8 +470,8 @@ export default function ProposalsSection({
                   <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
                     {(currentUser.tipo_usuario === 'gestor' || proposal.criado_por === currentUser.id) ? (
-                      <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
-                        <SelectTrigger className="w-48">
+                        <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
+                          <SelectTrigger className={`w-48 ${getStatusBadgeClasses(proposal.status)} capitalize`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
