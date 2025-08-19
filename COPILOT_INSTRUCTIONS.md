@@ -5,6 +5,7 @@
 Este é um **CRM (Customer Relationship Management)** desenvolvido para a **Belz**, focado em gestão de propostas de planos de saúde. O sistema implementa controle de acesso baseado em roles, segurança robusta e interface moderna.
 
 ### 🎯 Objetivo Principal
+
 Gerenciar propostas de planos de saúde com diferentes níveis de acesso para analistas (criadores) e gestores (monitores).
 
 ---
@@ -12,7 +13,8 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 ## 🏗️ Arquitetura do Projeto
 
 ### 📁 Estrutura de Pastas
-```
+
+```text
 emergent-crm-adm/
 ├── app/                          # Next.js App Router
 │   ├── api/[[...path]]/          # API routes centralizadas
@@ -30,6 +32,7 @@ emergent-crm-adm/
 ```
 
 ### 🔧 Stack Tecnológica
+
 - Frontend: Next.js 14.2.3 + React 18 (App Router)
 - UI: Shadcn/UI + TailwindCSS + Lucide Icons
 - Backend: Rotas de API do Next.js (app/api)
@@ -44,6 +47,7 @@ emergent-crm-adm/
 ## 🎨 Design System
 
 ### 🎨 Paleta de Cores (Belz)
+
 ```css
 /* Cores principais da Belz */
 --primary: #130E54;        /* Azul escuro Belz */
@@ -54,11 +58,13 @@ emergent-crm-adm/
 ```
 
 ### 📝 Tipografia
+
 - **Font Primary**: Montserrat (Google Fonts)
 - **Font Class**: `.font-montserrat`
 - **Weights**: 400 (Regular), 500 (Medium), 600 (SemiBold), 700 (Bold)
 
 ### 🖼️ Layout
+
 - **Sidebar**: Fixa à esquerda, 256px de largura
 - **Header**: Dinâmico baseado na seção ativa
 - **Content**: Área principal flexível com scroll independente
@@ -70,6 +76,7 @@ emergent-crm-adm/
 ### 🔐 Tipos de Usuário
 
 #### **Analista** (Criador de Propostas)
+
 ```javascript
 // Permissões do analista
 const analistaPermissions = {
@@ -87,6 +94,7 @@ const analistaPermissions = {
 ```
 
 #### **Gestor** (Monitor e Aprovador)
+
 ```javascript
 // Permissões do gestor
 const gestorPermissions = {
@@ -108,6 +116,7 @@ const gestorPermissions = {
 ## 🛡️ Segurança e Autenticação
 
 ### 🔒 Implementações de Segurança
+
 ```javascript
 // lib/security.js - Funções principais
 - hashPassword()           // Hash bcrypt com 12 rounds
@@ -122,6 +131,7 @@ const gestorPermissions = {
 ```
 
 ### 🛡️ Headers de Segurança
+
 ```javascript
 // Headers implementados
 'X-Content-Type-Options': 'nosniff'
@@ -133,6 +143,7 @@ const gestorPermissions = {
 ```
 
 ### 🔐 Rate Limiting
+
 - **Login**: Máximo 100 tentativas por 15 minutos por IP
 - **APIs**: Limitação configurável via ENV
 - **Storage**: Map em memória (usar Redis em produção)
@@ -144,6 +155,7 @@ const gestorPermissions = {
 Os esquemas abaixo refletem o arquivo `database_setup.sql` usado no projeto (UUIDs, metas e gatilhos):
 
 ### Tabela usuarios
+
 ```sql
 CREATE TABLE usuarios (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -156,6 +168,7 @@ CREATE TABLE usuarios (
 ```
 
 ### Tabela propostas
+
 ```sql
 CREATE TABLE propostas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -178,6 +191,7 @@ CREATE TABLE propostas (
 ```
 
 ### Tabela sessoes
+
 ```sql
 CREATE TABLE sessoes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -189,6 +203,7 @@ CREATE TABLE sessoes (
 ```
 
 ### Tabela metas e funções
+
 ```sql
 CREATE TABLE metas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -208,6 +223,7 @@ CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUM
 ### 🛣️ Rotas Principais (`/api/[[...path]]`)
 
 #### **Autenticação**
+
 ```javascript
 POST /api/auth/login
 Body: { email: string, password: string }
@@ -215,6 +231,7 @@ Response: { user: object, sessionId: string, token: string }
 ```
 
 #### Propostas
+
 ```http
 GET /api/proposals
   -> Lista propostas (gestor vê todas; analista vê apenas as próprias)
@@ -223,21 +240,23 @@ POST /api/proposals
   Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
   -> Cria proposta (analista tem o criado_por forçado para o próprio id)
 
-PUT /api/proposals/:id
+PATCH /api/proposals/:id
   Body: { status }
-  -> Atualiza status; quando "implantado" atualiza metas (RPC atualizar_meta_usuario)
+  -> Atualiza parcialmente (status). Quando "implantado" atualiza metas (RPC atualizar_meta_usuario)
 
 DELETE /api/proposals/:id
   -> Apenas gestores
 ```
 
 #### Usuários (gestores)
+
 ```http
 GET /api/users
 POST /api/users  Body: { nome, email, senha, tipo_usuario? }
 ```
 
 #### **Validação CNPJ**
+
 ```javascript
 POST /api/validate-cnpj
 Body: { cnpj: string }
@@ -245,6 +264,7 @@ Response: { valid: boolean, data?: object, error?: string }
 ```
 
 #### **Sessões e Relatórios**
+
 ```javascript
 GET /api/sessions      // Listar sessões ativas
 GET /api/goals         // Metas e progresso dos usuários
@@ -257,6 +277,7 @@ GET /api/goals         // Metas e progresso dos usuários
 ### 📝 Gestão de Propostas
 
 #### **Status Disponíveis**
+
 ```javascript
 const statusOptions = [
   'em análise',
@@ -271,6 +292,7 @@ const statusOptions = [
 ```
 
 #### **Operadoras Suportadas**
+
 ```javascript
 const operadoras = [
   'unimed recife',
@@ -287,6 +309,7 @@ const operadoras = [
 ```
 
 ### 🔍 Validação de CNPJ (Cascata)
+
 ```javascript
 // Ordem de tentativa das APIs
 1. ReceitaWS      (https://receitaws.com.br/v1/cnpj/{cnpj})
@@ -316,17 +339,20 @@ const operadoras = [
 ```
 
 ### 📈 Dashboard e Métricas
+
 - **Cards de resumo**: Total de propostas, por status, valores
 - **Gráficos**: Distribuição por operadora e status
 - **Progresso**: Metas individuais vs atingido
 - **Auto-refresh**: Atualização automática dos dados
 
 ### 👥 Gestão de Usuários (Gestor)
+
 - **Criação**: Novos analistas e gestores
 - **Listagem**: Todos os usuários do sistema
 - **Tipos**: Analista (criador) / Gestor (monitor)
 
 ### 📊 Relatórios e Monitoramento (Gestor)
+
 - **Sessões ativas**: Usuários online e última atividade
 - **Logs de acesso**: Histórico de logins e IPs
 - **Metas**: Progresso individual e da equipe
@@ -338,6 +364,7 @@ const operadoras = [
 ### ⚛️ React Patterns
 
 #### **Hooks Customizados**
+
 ```javascript
 // Exemplo: useAutoRefresh
 const useAutoRefresh = (callback, interval = 30000) => {
@@ -349,6 +376,7 @@ const useAutoRefresh = (callback, interval = 30000) => {
 ```
 
 #### **State Management**
+
 ```javascript
 // Estados principais do CRM
 const [currentUser, setCurrentUser] = useState(null);
@@ -360,6 +388,7 @@ const [userGoals, setUserGoals] = useState([]);
 ```
 
 #### **Conditional Rendering**
+
 ```javascript
 // Baseado em permissões
 {currentUser.tipo_usuario === 'gestor' && (
@@ -374,6 +403,7 @@ const [userGoals, setUserGoals] = useState([]);
 ### 🎨 CSS Patterns
 
 #### **Layout Classes**
+
 ```css
 /* Sidebar fixo */
 .sidebar {
@@ -392,6 +422,7 @@ const [userGoals, setUserGoals] = useState([]);
 ```
 
 #### **Responsive Design**
+
 ```css
 /* Mobile first approach */
 .responsive-grid {
@@ -402,6 +433,7 @@ const [userGoals, setUserGoals] = useState([]);
 ### 🔒 Security Patterns
 
 #### **Input Sanitization**
+
 ```javascript
 // Sempre sanitizar inputs
 const sanitizedInput = sanitizeInput(userInput);
@@ -410,6 +442,7 @@ const isValidCNPJ = validateCNPJFormat(cnpj);
 ```
 
 #### **API Error Handling**
+
 ```javascript
 try {
   const response = await fetch('/api/endpoint', {
@@ -482,6 +515,7 @@ CNPJA_API_KEY=
 ## 🚀 Scripts de Desenvolvimento
 
 ### 📦 Scripts (package.json)
+
 ```json
 {
   "scripts": {
@@ -495,6 +529,7 @@ CNPJA_API_KEY=
 ```
 
 ### 🛠️ Comandos Úteis
+
 ```bash
 # Desenvolvimento
 npm run dev
@@ -514,6 +549,7 @@ npm install
 ## 🧪 Testing Patterns
 
 ### 🔍 Validação Manual
+
 ```javascript
 // Testar permissões
 // 1. Login como analista - verificar se pode criar propostas
@@ -524,6 +560,7 @@ npm install
 ```
 
 ### 🐛 Debug Patterns
+
 ```javascript
 // Logs seguros (sem dados sensíveis)
 console.log('Operação:', sanitizeForLog(operation));
@@ -540,6 +577,7 @@ toast.info('ℹ️ Informação importante');
 ## 🔄 Deployment
 
 ### 🌐 GitHub Deployment
+
 ```bash
 # Verificar arquivos sensíveis
 git status
@@ -552,6 +590,7 @@ git push origin main
 ```
 
 ### ⚠️ Checklist de Segurança
+
 - [ ] Arquivo .env não commitado
 - [ ] Credenciais rotacionadas se expostas
 - [ ] Headers de segurança configurados
@@ -564,26 +603,30 @@ git push origin main
 ## 📚 Recursos e Referências
 
 ### 📖 Documentação
-- **Next.js**: https://nextjs.org/docs
-- **Shadcn/UI**: https://ui.shadcn.com
-- **TailwindCSS**: https://tailwindcss.com/docs
-- **Supabase**: https://supabase.com/docs
+
+- **Next.js**: <https://nextjs.org/docs>
+- **Shadcn/UI**: <https://ui.shadcn.com>
+- **TailwindCSS**: <https://tailwindcss.com/docs>
+- **Supabase**: <https://supabase.com/docs>
 
 ### 🎨 Design Resources
-- **Lucide Icons**: https://lucide.dev
-- **Montserrat Font**: https://fonts.google.com/specimen/Montserrat
+
+- **Lucide Icons**: <https://lucide.dev>
+- **Montserrat Font**: <https://fonts.google.com/specimen/Montserrat>
 - **Color Palette**: Belz brand colors (#130E54, #021d79, #f6f6f6)
 
 ### 🔒 Security Resources
-- **JWT**: https://jwt.io
-- **bcrypt**: https://github.com/kelektiv/node.bcrypt.js
-- **OWASP**: https://owasp.org/www-project-top-ten/
+
+- **JWT**: <https://jwt.io>
+- **bcrypt**: <https://github.com/kelektiv/node.bcrypt.js>
+- **OWASP**: <https://owasp.org/www-project-top-ten/>
 
 ---
 
 ## 🤖 GitHub Copilot Guidelines
 
 ### ✅ Quando Sugerir Código
+
 1. **Seguir padrões estabelecidos** no projeto
 2. **Implementar segurança** por padrão
 3. **Usar componentes Shadcn/UI** existentes
@@ -593,6 +636,7 @@ git push origin main
 7. **Implementar loading states** em operações assíncronas
 
 ### ❌ Evitar
+
 1. **Hardcoded credentials** ou secrets
 2. **SQL direto** (usar Supabase client)
 3. **Inline styles** (usar TailwindCSS)
@@ -602,6 +646,7 @@ git push origin main
 7. **Dados não sanitizados**
 
 ### 🎯 Prioridades
+
 1. Segurança sempre em primeiro lugar
 2. UX consistente com o design system
 3. Performance e otimização
@@ -609,6 +654,7 @@ git push origin main
 5. Documentação clara
 
 ### 🔧 Convenções para novas rotas API
+
 - Sempre use `requireAuth(request)` de `lib/api-helpers` para autenticação.
 - Para restringir a gestores, use `ensureGestor(user)`.
 - Aplique CORS e headers de segurança via `handleCORS(NextResponse.json(...), origin)`.
@@ -616,6 +662,7 @@ git push origin main
 - Nunca exponha dados sensíveis nos logs. Use `sanitizeForLog`.
 
 ### ✉️ Notificações por e-mail
+
 - Para status de proposta: ver `app/api/proposals/[id]/route.js` (usa `sendEmail` e `renderBrandedEmail`).
 - Configure SMTP no `.env`. Em dev, `SMTP_DEBUG=true` ajuda na verificação.
 

@@ -1,6 +1,6 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle } from 'lucide-react'
+import { PlusCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export default function ProposalsSection({
   currentUser,
@@ -25,9 +26,13 @@ export default function ProposalsSection({
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
+  const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
+  const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
+  const [filters, setFilters] = useState(defaultFilters)
   const [proposalForm, setProposalForm] = useState({
     cnpj: '',
     consultor: '',
+  consultor_email: '',
     operadora: '',
     quantidade_vidas: '',
     valor: '',
@@ -42,16 +47,120 @@ export default function ProposalsSection({
     return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
   }
 
+  const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+  // Persistência de filtros por usuário
+  useEffect(() => {
+    try {
+      const key = `crm:proposals:filters:${currentUser?.id || 'anon'}`
+      const saved = localStorage.getItem(key)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // valida chaves básicas
+        if (parsed && typeof parsed === 'object') {
+          setFilters({ ...defaultFilters, ...parsed })
+        }
+      }
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    try {
+      const key = `crm:proposals:filters:${currentUser?.id || 'anon'}`
+      localStorage.setItem(key, JSON.stringify(filters))
+    } catch (_) {}
+  }, [filters, currentUser?.id])
+
+  const filteredProposals = useMemo(() => {
+    const qn = normalize(filters.q)
+    return proposals.filter((p) => {
+      // texto: cnpj (formatado ou dígitos) ou consultor
+      const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
+      const cnpjFmt = formatCNPJ(p.cnpj)
+      const consultor = normalize(p.consultor)
+      const matchText = !qn || normalize(cnpjFmt).includes(qn) || cnpjDigits.includes(filters.q.replace(/\D/g, '')) || consultor.includes(qn)
+
+      const matchStatus = filters.status === 'todos' || normalize(p.status) === normalize(filters.status)
+      const matchOperadora = filters.operadora === 'todas' || normalize(p.operadora) === normalize(filters.operadora)
+  const matchAnalista = currentUser.tipo_usuario !== 'gestor' || filters.analista === 'todos' || String(p.criado_por) === String(filters.analista)
+  const matchConsultor = currentUser.tipo_usuario !== 'gestor' || filters.consultor === 'todos' || normalize(p.consultor) === normalize(filters.consultor)
+  return matchText && matchStatus && matchOperadora && matchAnalista && matchConsultor
+    })
+  }, [proposals, filters, currentUser.tipo_usuario])
+
+  const activeFilters = useMemo(() => {
+    const items = []
+    if (filters.status !== 'todos') items.push({ key: 'status', label: `status: ${filters.status}` })
+    if (filters.operadora !== 'todas') items.push({ key: 'operadora', label: `operadora: ${filters.operadora}` })
+    if (currentUser.tipo_usuario === 'gestor' && filters.analista !== 'todos') {
+      const analistaNome = users.find(u => String(u.id) === String(filters.analista))?.nome || filters.analista
+      items.push({ key: 'analista', label: `analista: ${analistaNome}` })
+    }
+    if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos') {
+      items.push({ key: 'consultor', label: `consultor: ${filters.consultor}` })
+    }
+    if (filters.q && filters.q.trim()) items.push({ key: 'q', label: `busca: "${filters.q.trim()}"` })
+    return items
+  }, [filters, currentUser.tipo_usuario, users])
+
+  const clearFilter = (key) => {
+    setFilters(prev => {
+      if (key === 'status') return { ...prev, status: 'todos' }
+      if (key === 'operadora') return { ...prev, operadora: 'todas' }
+      if (key === 'analista') return { ...prev, analista: 'todos' }
+      if (key === 'consultor') return { ...prev, consultor: 'todos' }
+      if (key === 'q') return { ...prev, q: '' }
+      return prev
+    })
+  }
+
+  const consultores = useMemo(() => {
+    return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
+  }, [proposals])
+
   const parseMoneyToNumber = (masked) => {
     const digits = String(masked || '').replace(/\D/g, '')
     if (!digits) return 0
     return parseInt(digits, 10) / 100
   }
 
+  const fetchCnpjInfo = async (cnpjRaw) => {
+    const cnpj = String(cnpjRaw || '').replace(/\D/g, '')
+    if (!cnpj || cnpjInfoCache[cnpj]?.loading || cnpjInfoCache[cnpj]?.fetched) return
+    setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { ...(prev[cnpj] || {}), loading: true } }))
+    try {
+      const res = await fetch('/api/validate-cnpj', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cnpj })
+      })
+      const data = await res.json()
+      if (data?.valid && data?.data) {
+        setCnpjInfoCache(prev => ({
+          ...prev,
+          [cnpj]: { loading: false, fetched: true, razao_social: data.data.razao_social, nome_fantasia: data.data.nome_fantasia }
+        }))
+      } else {
+        setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { loading: false, fetched: true, error: data?.error || 'Não encontrado' } }))
+      }
+    } catch (e) {
+      setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { loading: false, fetched: true, error: 'Erro ao consultar' } }))
+    }
+  }
+
   const handleSubmit = async (e) => {
     // Validação de CNPJ antes de criar proposta (mantém comportamento)
     e.preventDefault()
     if (!currentUser) return
+
+    // Validação de email do consultor
+    const email = String(proposalForm.consultor_email || '').trim()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast.error('Informe um email de consultor válido')
+      return
+    }
 
     const valorNumber = parseMoneyToNumber(proposalForm.valor)
     if (!valorNumber || valorNumber <= 0) {
@@ -78,7 +187,7 @@ export default function ProposalsSection({
       criado_por: currentUser.id,
       cnpjValidationData: cnpjResult.data,
       afterSuccess: () => {
-        setProposalForm({ cnpj: '', consultor: '', operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', status: 'em análise' })
+  setProposalForm({ cnpj: '', consultor: '', consultor_email: '', operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', status: 'em análise' })
         setCnpjValidationResult(null)
         setIsDialogOpen(false)
       }
@@ -118,6 +227,13 @@ export default function ProposalsSection({
                   <div className="space-y-2">
                     <Label htmlFor="consultor">Consultor</Label>
                     <Input id="consultor" placeholder="Nome do consultor" value={proposalForm.consultor} onChange={(e) => setProposalForm(prev => ({ ...prev, consultor: e.target.value }))} required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="consultor_email">Email do Consultor</Label>
+                    <Input id="consultor_email" type="email" placeholder="consultor@empresa.com" value={proposalForm.consultor_email} onChange={(e) => setProposalForm(prev => ({ ...prev, consultor_email: e.target.value }))} required />
                   </div>
                 </div>
 
@@ -212,14 +328,101 @@ export default function ProposalsSection({
       <Card>
         <CardHeader>
           <CardTitle>Lista de Propostas</CardTitle>
-          <CardDescription>{proposals.length} proposta(s) cadastrada(s)</CardDescription>
+          <CardDescription>{filteredProposals.length} de {proposals.length} proposta(s)</CardDescription>
+          {activeFilters.length > 0 && (
+            <div className="text-xs mt-1 flex items-center flex-wrap gap-2">
+              {activeFilters.map((f) => (
+                <Badge key={f.key} variant="secondary" className="gap-1">
+                  <span>{f.label}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remover filtro ${f.key}`}
+                    className="ml-1 opacity-80 hover:opacity-100"
+                    onClick={() => clearFilter(f.key)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
+          {/* Filtros */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
+            <div>
+              <Input
+                placeholder="Buscar por CNPJ"
+                value={filters.q}
+                onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Select value={filters.status} onValueChange={(v) => setFilters(prev => ({ ...prev, status: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Select value={filters.operadora} onValueChange={(v) => setFilters(prev => ({ ...prev, operadora: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Operadora" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as operadoras</SelectItem>
+                  {operadoras.map(op => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            {currentUser.tipo_usuario === 'gestor' && (
+              <div>
+                <Select value={filters.analista} onValueChange={(v) => setFilters(prev => ({ ...prev, analista: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Analista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os analistas</SelectItem>
+                    {users.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {currentUser.tipo_usuario === 'gestor' && (
+              <div>
+                <Select value={filters.consultor} onValueChange={(v) => setFilters(prev => ({ ...prev, consultor: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Consultor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os consultores</SelectItem>
+                    {consultores.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex items-center md:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFilters(defaultFilters)}
+                className="w-full md:w-auto"
+              >
+                Limpar filtros
+              </Button>
+            </div>
+          </div>
+          <TooltipProvider delayDuration={200}>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Consultor</TableHead>
+                {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Analista</TableHead>}
                 <TableHead>Operadora</TableHead>
                 <TableHead>Vidas</TableHead>
@@ -230,10 +433,32 @@ export default function ProposalsSection({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {proposals.map((proposal) => (
+              {filteredProposals.map((proposal) => (
                 <TableRow key={proposal.id}>
-                  <TableCell className="font-mono text-sm">{formatCNPJ(proposal.cnpj)}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span onMouseEnter={() => fetchCnpjInfo(proposal.cnpj)} className="underline decoration-dotted cursor-help">
+                          {formatCNPJ(proposal.cnpj)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {(() => {
+                          const cnpj = String(proposal.cnpj || '').replace(/\D/g, '')
+                          const info = cnpjInfoCache[cnpj]
+                          if (!info) return 'Passar o mouse para buscar razão social'
+                          if (info.loading) return 'Carregando…'
+                          if (info.razao_social) return info.razao_social
+                          if (info.nome_fantasia) return info.nome_fantasia
+                          return info.error || 'Não encontrado'
+                        })()}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>{proposal.consultor}</TableCell>
+                  {currentUser.tipo_usuario === 'gestor' && (
+                    <TableCell className="font-mono text-xs">{proposal.consultor_email || '-'}</TableCell>
+                  )}
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>{(users.find(u => u.id === proposal.criado_por)?.nome) || '-'}</TableCell>
                   )}
@@ -268,6 +493,7 @@ export default function ProposalsSection({
               ))}
             </TableBody>
           </Table>
+          </TooltipProvider>
         </CardContent>
       </Card>
     </div>

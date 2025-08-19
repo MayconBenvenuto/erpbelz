@@ -144,6 +144,8 @@ export default function App() {
     setIsLoading(true)
     try {
       const { afterSuccess, cnpjValidationData: _ignore, ...body } = payload || {}
+      // Segurança mínima: sanitizar email no cliente
+      if (body.consultor_email) body.consultor_email = String(body.consultor_email).trim()
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const response = await fetch('/api/proposals', {
@@ -193,7 +195,7 @@ export default function App() {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const response = await fetch(`/api/proposals/${proposalId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers,
         body: JSON.stringify({ status: newStatus, criado_por: proposal.criado_por, valor: proposal.valor })
       })

@@ -16,7 +16,7 @@ Este guia complementa o COPILOT_INSTRUCTIONS.md com detalhes práticos sobre arq
   - auth/login (POST)
   - auth/logout (POST)
   - proposals (GET, POST)
-  - proposals/[id] (PUT, DELETE)
+  - proposals/[id] (PATCH, DELETE)
   - users (GET, POST)
   - goals (GET)
   - sessions (GET)
@@ -33,7 +33,7 @@ Este guia complementa o COPILOT_INSTRUCTIONS.md com detalhes práticos sobre arq
   - Gestor vê e gerencia todas as propostas.
   - Alterar status:
     - Gestor: qualquer proposta.
-    - Analista: apenas propostas que ele criou (checado no backend em PUT /api/proposals/[id]).
+  - Analista: apenas propostas que ele criou (checado no backend em PATCH /api/proposals/[id]).
   - Exclusão: UI desabilitada; backend permite somente gestor (DELETE protegido).
   - Metas: quando status muda para "implantado", chama RPC atualizar_meta_usuario com valor da proposta.
 - Usuários
@@ -50,7 +50,7 @@ Este guia complementa o COPILOT_INSTRUCTIONS.md com detalhes práticos sobre arq
 - Auth/login POST { email, password } → 200 { user:{id,nome,email,tipo_usuario}, token, sessionId }
 - Proposals GET (autenticado) → 200 [proposta]
 - Proposals POST { cnpj, consultor, operadora, quantidade_vidas, valor:number, previsao_implantacao?, status }
-- Proposals/[id] PUT { status, criado_por?, valor? } → 200 proposta atualizada (com metas se implantado)
+- Proposals/[id] PATCH { status, criado_por?, valor? } → 200 proposta atualizada (com metas se implantado)
 - Users POST { nome, email, senha, tipo_usuario } → 200 user
 - validate-cnpj POST { cnpj } → 200 { valid:boolean, data?, error? } com cache em memória
 
@@ -117,7 +117,7 @@ Observações:
 
 - Migrar auth para cookies HttpOnly/sessions no server.
 - Ajustar CORS para apenas rotas da API em prod.
-- Testes de integração para PUT /api/proposals/[id] (gestor vs analista).
+- Testes de integração para PATCH /api/proposals/[id] (gestor vs analista).
 - Feature de filtros/sort no GET /api/propostas.
 
 ---

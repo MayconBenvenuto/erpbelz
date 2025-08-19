@@ -36,7 +36,8 @@ export async function DELETE(request, { params }) {
   return handleCORS(NextResponse.json({ success: true }), origin)
 }
 
-export async function PUT(request, { params }) {
+// PATCH para atualização parcial (ex.: apenas status)
+export async function PATCH(request, { params }) {
   const origin = request.headers.get('origin')
   const auth = await requireAuth(request)
   if (auth.error) {
@@ -55,7 +56,6 @@ export async function PUT(request, { params }) {
 
   const { status, criado_por, valor } = parsed.data
 
-  // Gestor pode atualizar qualquer proposta; analista apenas as próprias
   let updateQuery = supabase
     .from('propostas')
     .update({ status })
@@ -71,11 +71,9 @@ export async function PUT(request, { params }) {
     return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
   }
   if (!updated) {
-    // Se não encontrou/atualizou, pode ser falta de permissão (analista tentando outra proposta)
     return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
   }
 
-  // Atualiza meta quando implantado
   if (status === 'implantado' && (criado_por || updated.criado_por)) {
     await supabase.rpc('atualizar_meta_usuario', {
       p_usuario_id: criado_por || updated.criado_por,
@@ -83,7 +81,7 @@ export async function PUT(request, { params }) {
     })
   }
 
-  // Envia e-mail ao analista informando a alteração de status
+  // Notificação por e-mail (mesma lógica do PUT)
   try {
     const { data: analyst, error: userErr } = await supabase
       .from('usuarios')
@@ -92,14 +90,11 @@ export async function PUT(request, { params }) {
       .single()
     if (!userErr && analyst?.email) {
       const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
+      const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
+      let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
+      const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-      // Monta dados da proposta
-  const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
-  let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
-  const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-
-      // Tenta obter razão social via endpoint de validação de CNPJ
       if (updated.cnpj) {
         try {
           const resp = await fetch(`${apiBase}/api/validate-cnpj`, {
@@ -114,13 +109,13 @@ export async function PUT(request, { params }) {
               empresaLabel = `${rs} (CNPJ ${empresaCNPJ || updated.cnpj})`
             }
           }
-        } catch (_) { /* ignora falhas de enriquecimento */ }
+        } catch (_) {}
       }
 
       const valorFmt = formatCurrency(updated.valor || 0)
       const operadora = updated.operadora || 'Não informado'
-  const subject = `[CRM Belz] Proposta ${updated.id} atualizada: ${humanStatus}`
-  const linkCRM = appUrl
+      const subject = `[CRM Belz] Proposta ${updated.id} atualizada: ${humanStatus}`
+      const linkCRM = appUrl
       const text = `Olá ${analyst.nome || ''},\n\nA proposta ${updated.id} foi atualizada.\n\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM para mais detalhes: ${linkCRM}\n\n— CRM Belz`
       const html = renderBrandedEmail({
         title: 'Atualização de status da proposta',

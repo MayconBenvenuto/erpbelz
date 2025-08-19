@@ -14,10 +14,6 @@ export async function POST() {
   return handleCORS(NextResponse.json({ error: 'Use rotas dedicadas' }, { status: 404 }))
 }
 
-export async function PUT() {
-  return handleCORS(NextResponse.json({ error: 'Use rotas dedicadas' }, { status: 404 }))
-}
-
 export async function DELETE() {
   return handleCORS(NextResponse.json({ error: 'Use rotas dedicadas' }, { status: 404 }))
 }
