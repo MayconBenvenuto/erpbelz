@@ -16,6 +16,14 @@ Este guia resume como o GitHub Copilot deve atuar neste repositório para manter
 - E-mails: `lib/email.js`, `lib/email-template.js`
 - UI: `components/ui/*`
 
+## Atualizações recentes (18/08/2025)
+
+- Atualizações API via PATCH (PUT removido); ajuste CORS para permitir PATCH.
+- Campo obrigatório em propostas: `consultor_email` (validar no frontend e backend com Zod).
+- Tooltip de Razão Social no CNPJ (usa `/api/validate-cnpj` com cache local no componente).
+- Filtros persistentes com chips (Propostas: busca/status/operadora/analista/consultor; Dashboard: status/consultor).
+- Dashboard (gestor): ordenação asc/desc nas listas, remoção de “Usuários Ativos”, grid ajustada e meta rotulada “Meta - R$ 200.000,00”.
+
 ## Padrões obrigatórios nas rotas API
 
 1. Autenticação e autorização
@@ -27,6 +35,7 @@ Este guia resume como o GitHub Copilot deve atuar neste repositório para manter
 
 - Extraia origin: `const origin = request.headers.get('origin')`;
 - Envolva as respostas com `handleCORS(NextResponse.json(...), origin)`.
+- Use método HTTP `PATCH` para updates parciais; não utilizar `PUT`.
 
 1. Validação com Zod
 
@@ -47,10 +56,8 @@ Este guia resume como o GitHub Copilot deve atuar neste repositório para manter
 
 ## Integrações externas
 
-- CNPJ: endpoint `/api/validate-cnpj` com cache em memória e fallback de provedores.
+- CNPJ: endpoint `/api/validate-cnpj` com cache em memória (lado do componente) e fallback de provedores.
 - E-mail (SMTP): `sendEmail` com `EMAIL_FROM` e opções TLS configuráveis.
-
-## Variáveis de ambiente
 
 Veja `.env.example`. Principais:
 

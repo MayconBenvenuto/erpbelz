@@ -10,7 +10,21 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## 🏗️ Arquitetura do Projeto
+## � Atualizações recentes (18/08/2025)
+
+- API padronizada para PATCH nas atualizações; PUT removido. CORS ajustado para permitir PATCH.
+- Analista pode alterar o status apenas das próprias propostas (enforced no backend e respeitado na UI).
+- Nova seção “Movimentação” para analista.
+- Propostas: tooltip no CNPJ mostra a Razão Social via `POST /api/validate-cnpj` (cache local no componente para reduzir chamadas).
+- Filtros persistentes com chips clicáveis:
+  - Propostas: busca, status, operadora, analista e, para gestores, consultor.
+  - Dashboard (gestor): status e consultor.
+  - Persistência por usuário via `localStorage` e botão “Limpar filtros”.
+- Dashboard (gestor): ordenação asc/desc em “Propostas por Status” e “Top Operadoras”; card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
+- Novo campo obrigatório em propostas: `consultor_email` (validação no frontend e no backend via Zod; coluna adicionada no DB; migration: `scripts/migrations/2025-08-18-add-consultor-email.sql`).
+- Listagem de propostas: gestores visualizam a coluna “Email do Consultor”.
+
+## �🏗️ Arquitetura do Projeto
 
 ### 📁 Estrutura de Pastas
 
@@ -174,6 +188,7 @@ CREATE TABLE propostas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cnpj VARCHAR(18) NOT NULL,
   consultor TEXT NOT NULL,
+  consultor_email TEXT NOT NULL,
   operadora TEXT CHECK (operadora IN (
     'unimed recife','unimed seguros','bradesco','amil','ampla','fox','hapvida',
     'medsenior','sulamerica','select'
@@ -188,6 +203,7 @@ CREATE TABLE propostas (
   "criado_por" UUID REFERENCES usuarios(id),
   "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+-- Para bases existentes, aplicar a migration: scripts/migrations/2025-08-18-add-consultor-email.sql
 ```
 
 ### Tabela sessoes
@@ -237,7 +253,7 @@ GET /api/proposals
   -> Lista propostas (gestor vê todas; analista vê apenas as próprias)
 
 POST /api/proposals
-  Body: { cnpj, consultor, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
+  Body: { cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por }
   -> Cria proposta (analista tem o criado_por forçado para o próprio id)
 
 PATCH /api/proposals/:id
@@ -338,12 +354,22 @@ const operadoras = [
 }
 ```
 
+Notas de UI:
+
+- Na listagem de propostas, o CNPJ exibe tooltip com Razão Social (dados obtidos de `/api/validate-cnpj`).
+- Gestores visualizam a coluna “Email do Consultor”.
+- Edição de status via Select: analistas apenas nas próprias propostas; gestores em todas.
+
 ### 📈 Dashboard e Métricas
 
 - **Cards de resumo**: Total de propostas, por status, valores
 - **Gráficos**: Distribuição por operadora e status
 - **Progresso**: Metas individuais vs atingido
 - **Auto-refresh**: Atualização automática dos dados
+
+- **Ordenação**: Alternar asc/desc em “Propostas por Status” e “Top Operadoras”.
+- **Filtros persistentes**: Status e Consultor com chips removíveis e botão “Limpar filtros”.
+- **UI**: Card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
 
 ### 👥 Gestão de Usuários (Gestor)
 

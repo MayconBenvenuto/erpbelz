@@ -16,6 +16,9 @@ Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de plano
 - Status personalizados para pipeline de vendas
 - Múltiplas operadoras de saúde suportadas
 - Dashboard com métricas e gráficos
+- Tooltip no CNPJ exibindo Razão Social (via /api/validate-cnpj)
+- Coluna “Email do Consultor” visível para gestores
+- Filtros persistentes com chips removíveis (Propostas e Dashboard)
 
 ### 🔒 Segurança
 
@@ -106,6 +109,7 @@ Aplicação padrão: <http://localhost:3000>
 - **Logs sanitizados** sem dados sensíveis
 - **Validação de entrada** rigorosa
 - **Timeouts de API** para evitar DoS
+- **CORS** atualizado para permitir PATCH (PUT removido do projeto)
 
 ### 🔒 Headers de Segurança
 
@@ -146,6 +150,7 @@ CREATE TABLE propostas (
   id UUID PRIMARY KEY,
   cnpj VARCHAR(14) NOT NULL,
   consultor VARCHAR(255) NOT NULL,
+  consultor_email VARCHAR(255) NOT NULL,
   operadora VARCHAR(255) NOT NULL,
   quantidade_vidas INTEGER,
   valor DECIMAL(15,2),
@@ -194,6 +199,10 @@ node .\tests\test_email_api.js
 node .\tests\test_email_send.js
 node .\test_cnpj_validation.js
 
+# Migration
+# Adicione a coluna obrigatória consultor_email em bases existentes:
+# veja scripts/migrations/2025-08-18-add-consultor-email.sql
+
 # Windows: preparar/remover cache do Next.js
 npm run windows:next-cache:setup
 npm run windows:next-cache:remove
@@ -217,6 +226,8 @@ CORS_ORIGINS=https://seudominio.com
 JWT_SECRET=chave_ainda_mais_forte_para_producao
 NEXT_PUBLIC_BASE_URL=https://seudominio.com
 CRM_APP_URL=https://seudominio.com
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW=900000
 ```
 
 ## 📈 Monitoramento
