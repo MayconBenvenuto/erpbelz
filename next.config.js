@@ -22,14 +22,7 @@ const nextConfig = {
     maxInactiveAge: 10000,
     pagesBufferLength: 2,
   },
-  async rewrites() {
-    const target = process.env.NEST_API_URL
-    const isPublicTarget = !!target && !/^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i.test(target)
-    // Use beforeFiles para garantir que o proxy aconteça ANTES das rotas App Router
-    return isPublicTarget
-      ? { beforeFiles: [ { source: '/api/:path*', destination: `${target.replace(/\/$/, '')}/:path*` } ] }
-      : { beforeFiles: [] }
-  },
+  async rewrites() { return { beforeFiles: [] } },
   async headers() {
     return [
       {

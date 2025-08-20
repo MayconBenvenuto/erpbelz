@@ -1,22 +1,28 @@
 import { NextResponse } from 'next/server'
+import { supabase, handleCORS } from '@/lib/api-helpers'
 
-const SERVICE_UNAVAILABLE = NextResponse.json({ error: 'Logout indisponível. Configure NEST_API_URL.' }, { status: 503 })
-
-async function forward(method, req) {
-	const target = process.env.NEST_API_URL
-	const isPublicTarget = !!target && !/^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i.test(target)
-	if (!isPublicTarget) return SERVICE_UNAVAILABLE
-	const url = `${target.replace(/\/$/, '')}/auth/logout`
-	const body = method === 'GET' || method === 'HEAD' ? undefined : await req.text()
-	const res = await fetch(url, {
-		method,
-		headers: { 'Content-Type': 'application/json' },
-		body
-	})
-	const data = await res.text()
-	return new NextResponse(data, { status: res.status, headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' } })
+export async function OPTIONS(request) {
+	const origin = request.headers.get('origin')
+	return handleCORS(new NextResponse(null, { status: 200 }), origin)
 }
 
-export async function OPTIONS(request) { return forward('OPTIONS', request) }
-export async function POST(request) { return forward('POST', request) }
-export async function GET(request) { return forward('GET', request) }
+export async function POST(request) {
+	const origin = request.headers.get('origin')
+	try {
+		const { sessionId } = await request.json().catch(() => ({}))
+		if (sessionId) {
+			const { data: sess } = await supabase.from('sessoes').select('data_login').eq('id', sessionId).single()
+			if (sess) {
+				const loginTime = new Date(sess.data_login)
+				const now = new Date()
+				const diff = now - loginTime
+				const hours = Math.floor(diff / (1000 * 60 * 60))
+				const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+				await supabase.from('sessoes').update({ data_logout: now.toISOString(), tempo_total: `${hours}:${minutes}:00` }).eq('id', sessionId)
+			}
+		}
+		return handleCORS(NextResponse.json({ success: true }), origin)
+	} catch {
+		return handleCORS(NextResponse.json({ error: 'Erro no logout' }, { status: 500 }), origin)
+	}
+}

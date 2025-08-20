@@ -1,24 +1,46 @@
 import { NextResponse } from 'next/server'
+import { supabase, handleCORS } from '@/lib/api-helpers'
+import { generateToken, verifyPassword, validateEmail, sanitizeForLog } from '@/lib/security'
 
-const SERVICE_UNAVAILABLE = NextResponse.json({ error: 'Auth indisponível. Configure NEST_API_URL.' }, { status: 503 })
-
-async function forward(method, req) {
-	const target = process.env.NEST_API_URL
-	const isPublicTarget = !!target && !/^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i.test(target)
-	if (!isPublicTarget) return SERVICE_UNAVAILABLE
-	const url = `${target.replace(/\/$/, '')}/auth/login`
-	const body = method === 'GET' || method === 'HEAD' ? undefined : await req.text()
-	const res = await fetch(url, {
-		method,
-		headers: { 'Content-Type': 'application/json' },
-		body
-	})
-	const data = await res.text()
-	return new NextResponse(data, { status: res.status, headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' } })
+export async function OPTIONS(request) {
+	const origin = request.headers.get('origin')
+	return handleCORS(new NextResponse(null, { status: 200 }), origin)
 }
 
-export async function OPTIONS(request) { return forward('OPTIONS', request) }
-export async function GET(request) { return forward('GET', request) }
-export async function POST(request) { return forward('POST', request) }
-export async function PATCH(request) { return forward('PATCH', request) }
-export async function DELETE(request) { return forward('DELETE', request) }
+export async function POST(request) {
+	const origin = request.headers.get('origin')
+	try {
+		const { email, password } = await request.json()
+		if (!validateEmail(String(email || ''))) {
+			return handleCORS(NextResponse.json({ error: 'Email inválido' }, { status: 400 }), origin)
+		}
+		if (!password || String(password).length < 3) {
+			return handleCORS(NextResponse.json({ error: 'Senha inválida' }, { status: 400 }), origin)
+		}
+
+		const { data: user, error } = await supabase
+			.from('usuarios')
+			.select('id, nome, email, senha, tipo_usuario')
+			.eq('email', String(email).toLowerCase())
+			.single()
+
+		if (error || !user) {
+			return handleCORS(NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 }), origin)
+		}
+
+		const ok = await verifyPassword(password, user.senha)
+		if (!ok) {
+			return handleCORS(NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 }), origin)
+		}
+
+		const token = generateToken(user)
+		const sessionId = crypto.randomUUID()
+		await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, data_login: new Date().toISOString() })
+
+		const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
+		return handleCORS(NextResponse.json({ user: safeUser, sessionId, token }), origin)
+	} catch (e) {
+		console.error('Login error:', sanitizeForLog({ message: e?.message }))
+		return handleCORS(NextResponse.json({ error: 'Erro no login' }, { status: 500 }), origin)
+	}
+}
