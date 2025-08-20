@@ -54,7 +54,7 @@ export async function PATCH(request, { params }) {
     )
   }
 
-  const { status, criado_por, valor } = parsed.data
+  const { status, criado_por: _criado_por_unused, valor } = parsed.data
 
   // Busca a proposta e checa autorização: gestor pode alterar qualquer; analista só a própria
   const { data: currentProposal, error: fetchError } = await supabase
@@ -91,11 +91,35 @@ export async function PATCH(request, { params }) {
     return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
   }
 
-  if (status === 'implantado' && (criado_por || updated.criado_por)) {
-    await supabase.rpc('atualizar_meta_usuario', {
-      p_usuario_id: criado_por || updated.criado_por,
-      p_valor: Number(valor || updated.valor || 0),
-    })
+  // Atualização de metas (delta) baseada em transição de status
+  try {
+    const wasImplantado = String(currentProposal.status) === 'implantado'
+    const willImplantado = String(status) === 'implantado'
+
+    // Só aplica delta quando há mudança relevante
+    let delta = 0
+    if (!wasImplantado && willImplantado) delta = 1
+    else if (wasImplantado && !willImplantado) delta = -1
+
+    if (delta !== 0 && updated?.criado_por) {
+      // Valor da proposta (preferir payload.valor se fornecido, senão valor persistido)
+      const baseValor = Number.isFinite(Number(valor))
+        ? Number(valor)
+        : Number(updated?.valor ?? currentProposal?.valor ?? 0)
+
+      const p_valor = Number((delta * baseValor).toFixed(2))
+
+      if (p_valor !== 0) {
+        // delta aplicado na meta do usuário (debug silencioso)
+        await supabase.rpc('atualizar_meta_usuario', {
+          p_usuario_id: updated.criado_por,
+          p_valor,
+        })
+      }
+    }
+  } catch (err) {
+    try { console.error('[METAS] update error', sanitizeForLog({ message: err?.message })) } catch {}
+    // não bloqueia a resposta ao cliente
   }
 
   // Notificação por e-mail (mesma lógica do PUT)

@@ -75,6 +75,21 @@ export async function POST(request) {
 		return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
 	}
 
+		// Caso a proposta já seja criada como "implantado", credita imediatamente na meta do analista
+		try {
+			if (data?.status === 'implantado' && data?.criado_por) {
+				const valor = Number(data?.valor || 0)
+				if (valor > 0) {
+					await supabase.rpc('atualizar_meta_usuario', {
+						p_usuario_id: data.criado_por,
+						p_valor: valor,
+					})
+				}
+			}
+		} catch (_) {
+			// silencioso: não bloqueia criação se atualização de meta falhar
+		}
+
 	// e-mails simples de notificação
 	try {
 		const codigo = data.codigo || data.id
