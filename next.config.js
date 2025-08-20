@@ -23,13 +23,12 @@ const nextConfig = {
     pagesBufferLength: 2,
   },
   async rewrites() {
-    const target = process.env.NEST_API_URL || 'http://localhost:3001'
+    const target = process.env.NEST_API_URL
+    const isPublicTarget = !!target && !/^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i.test(target)
     // Use beforeFiles para garantir que o proxy aconteça ANTES das rotas App Router
-    return {
-      beforeFiles: [
-        { source: '/api/:path*', destination: `${target}/:path*` },
-      ],
-    }
+    return isPublicTarget
+      ? { beforeFiles: [ { source: '/api/:path*', destination: `${target.replace(/\/$/, '')}/:path*` } ] }
+      : { beforeFiles: [] }
   },
   async headers() {
     return [

@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server'
 
-const gone = (path) => NextResponse.json({ error: 'Endpoint migrado para Nest', path }, { status: 410 })
+const SERVICE_UNAVAILABLE = NextResponse.json({ error: 'Logout indisponível. Configure NEST_API_URL.' }, { status: 503 })
 
-export async function OPTIONS() { return gone('/api/auth/logout') }
-export async function POST() { return gone('/api/auth/logout') }
-export async function GET() { return gone('/api/auth/logout') }
+async function forward(method, req) {
+	const target = process.env.NEST_API_URL
+	const isPublicTarget = !!target && !/^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1)(?::\d+)?/i.test(target)
+	if (!isPublicTarget) return SERVICE_UNAVAILABLE
+	const url = `${target.replace(/\/$/, '')}/auth/logout`
+	const body = method === 'GET' || method === 'HEAD' ? undefined : await req.text()
+	const res = await fetch(url, {
+		method,
+		headers: { 'Content-Type': 'application/json' },
+		body
+	})
+	const data = await res.text()
+	return new NextResponse(data, { status: res.status, headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' } })
+}
+
+export async function OPTIONS(request) { return forward('OPTIONS', request) }
+export async function POST(request) { return forward('POST', request) }
+export async function GET(request) { return forward('GET', request) }
