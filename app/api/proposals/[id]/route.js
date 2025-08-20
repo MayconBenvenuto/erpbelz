@@ -63,9 +63,11 @@ export async function PATCH(request, { params }) {
     .eq('id', id)
     .single()
   if (fetchError || !currentProposal) {
+    try { console.warn('[PROPOSALS] PATCH not found', { id, fetchError: fetchError?.message }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
   }
   if (auth.user.tipo_usuario !== 'gestor' && currentProposal.criado_por !== auth.user.id) {
+    try { console.warn('[PROPOSALS] PATCH forbidden', { id, by: auth.user.id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
   }
 
@@ -81,9 +83,11 @@ export async function PATCH(request, { params }) {
   const { data: updated, error } = await updateQuery.select().single()
 
   if (error) {
+    try { console.error('[PROPOSALS] PATCH update error', { id, error: error?.message }) } catch {}
     return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
   }
   if (!updated) {
+    try { console.error('[PROPOSALS] PATCH no updated row', { id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
   }
 
@@ -175,7 +179,7 @@ export async function PATCH(request, { params }) {
       await sendEmail({ to: updated.consultor_email, subject: subject2, text: text2, html: html2 })
     }
   } catch (err) {
-    console.error('Email notify error:', sanitizeForLog({ message: err?.message }))
+    try { console.error('[PROPOSALS] Email notify error', sanitizeForLog({ message: err?.message })) } catch {}
   }
 
   return handleCORS(NextResponse.json(updated), origin)
