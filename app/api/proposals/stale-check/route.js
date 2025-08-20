@@ -4,11 +4,6 @@ import { sendEmail } from '@/lib/email'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { renderBrandedEmail } from '@/lib/email-template'
 
-export async function OPTIONS(request) {
-  const origin = request.headers.get('origin')
-  return handleCORS(new NextResponse(null, { status: 200 }), origin)
-}
-
 export async function POST(request) {
   const origin = request.headers.get('origin')
   const auth = await requireAuth(request)

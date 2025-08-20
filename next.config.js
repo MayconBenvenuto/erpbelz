@@ -22,6 +22,15 @@ const nextConfig = {
     maxInactiveAge: 10000,
     pagesBufferLength: 2,
   },
+  async rewrites() {
+    const target = process.env.NEST_API_URL || 'http://localhost:3001'
+    // Use beforeFiles para garantir que o proxy aconteça ANTES das rotas App Router
+    return {
+      beforeFiles: [
+        { source: '/api/:path*', destination: `${target}/:path*` },
+      ],
+    }
+  },
   async headers() {
     return [
       {

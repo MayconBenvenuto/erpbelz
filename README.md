@@ -1,6 +1,6 @@
 # CRM Belz – Sistema de Gestão de Propostas
 
-Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. O projeto usa Next.js (App Router), Supabase (Postgres) e Shadcn/UI, com segurança robusta e controle de acesso por perfis (analista/gestor).
+Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) no frontend e NestJS no backend, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
 
 ## 🎯 Funcionalidades
 
@@ -85,15 +85,28 @@ EMAIL_FROM_NAME=CRM Belz
 CNPJA_API_KEY=
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 CRM_APP_URL=http://localhost:3000
+ 
+# Fallback de e-mail (opcional)
+# Se não houver SMTP, defina a chave do Resend e o backend usará este provedor automaticamente
+RESEND_API_KEY=
+# Override geral de destino (staging)
+EMAIL_OVERRIDE_TO=
 ```
 
-1. Execute o projeto
+1. Execute o projeto (frontend e backend separados)
 
 ```powershell
-npm run dev
+# Apenas frontend (Next.js)
+npm run dev:front
+
+# Apenas backend (NestJS)
+npm run dev:back
+
+# Ambos em paralelo
+npm run dev:all
 ```
 
-Aplicação padrão: <http://localhost:3000>
+Aplicação: <http://localhost:3000> (frontend). O backend roda em <http://localhost:3001> e o Next proxyia /api/* para o Nest.
 
 ## 🔐 Segurança
 
@@ -207,6 +220,14 @@ node .\test_cnpj_validation.js
 npm run windows:next-cache:setup
 npm run windows:next-cache:remove
 ```
+
+## 🗃️ Migração opcional: backfill e índice (consultor_email)
+
+Para melhorar a visibilidade de propostas antigas para analistas e a performance de consultas, aplique a migração em `scripts/migrations/2025-08-19-backfill-consultor-email-and-index.sql` no Supabase. Ela:
+
+- Preenche `consultor_email` quando estiver vazio, usando o e-mail do criador
+- Normaliza `consultor_email` para minúsculas
+- Cria índice `idx_propostas_consultor_email` se não existir
 
 ## 🌐 Deploy
 

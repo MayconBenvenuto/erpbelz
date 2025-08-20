@@ -6,6 +6,7 @@
 
 # ARQUIVOS CRÍTICOS DE SEGURANÇA - NUNCA COMMITAR
 .env
+.ev
 .envlocal
 .env.local
 .env.development.local

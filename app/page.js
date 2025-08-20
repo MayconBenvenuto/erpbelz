@@ -262,6 +262,13 @@ export default function App() {
     if (currentUser) loadData()
   }, [currentUser, loadData])
 
+  // Recarrega assim que o token estiver disponível após login
+  useEffect(() => {
+    if (currentUser && token) {
+      loadData()
+    }
+  }, [currentUser, token, loadData])
+
   useEffect(() => {
     if (currentUser) {
       const interval = setInterval(autoRefreshData, 30000)
@@ -322,13 +329,16 @@ export default function App() {
       <div className="ml-64 min-h-screen flex flex-col">
         <Header activeTab={activeTab} currentUser={currentUser} />
         <main className="flex-1 p-6 overflow-auto">
-          {/** Propostas visíveis conforme perfil: gestor vê todas; analista vê apenas as próprias */}
+          {/** Propostas visíveis conforme perfil: gestor vê todas; analista vê criadas por ele OU vinculadas ao seu email */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="propostas" className="space-y-6">
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
                   ? proposals
-                  : proposals.filter(p => p.criado_por === currentUser.id)
+                  : proposals.filter(p => (
+                      String(p.criado_por) === String(currentUser.id) ||
+                      (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                    ))
         return (
                   <ProposalsSection
                     currentUser={currentUser}
@@ -339,6 +349,7 @@ export default function App() {
                     onUpdateProposalStatus={handleUpdateProposalStatus}
                     isLoading={isLoading}
           users={users}
+                    userGoals={userGoals}
                   />
                 )
               })()}
@@ -348,13 +359,15 @@ export default function App() {
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
                   ? proposals
-                  : proposals.filter(p => p.criado_por === currentUser.id)
+                  : proposals.filter(p => (
+                      String(p.criado_por) === String(currentUser.id) ||
+                      (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                    ))
                 return (
                   <DashboardSection
                     currentUser={currentUser}
                     proposals={proposalsForView}
                     users={users}
-                    sessions={sessions}
                     userGoals={userGoals}
                   />
                 )

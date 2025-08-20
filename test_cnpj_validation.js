@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 // Teste da validação de CNPJ
 const testCNPJs = [
   {

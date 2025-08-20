@@ -3,8 +3,20 @@
 ## Project Overview
 This is a CRM system for Belz company focused on health insurance proposal management with role-based access control and modern security practices.
 
+Current architecture:
+- Frontend: Next.js (App Router) at port 3000
+- Backend: NestJS server (server-nest) at port 3001
+- Next proxies all /api/* routes to the Nest server (see next.config.js & middleware.js)
+
+Recent updates (2025-08-19):
+- Proposals have a sequential code (codigo) like PRP0000 (unique, validated, indexed). UI shows this as the first column and lists are ordered by codigo ascending. Emails reference only the codigo (never the UUID).
+- Status editing is inline in the table cell (Select) with per-row loading/disable during updates.
+- Analyst Proposals screen shows a “Meta” progress card (backend metas with fallback to implanted proposals sum).
+- Reports exclude gestor from monitoring; the refresh button shows spinner/disable.
+
 ## Tech Stack
-- **Framework**: Next.js 14.2.3 with App Router
+- **Frontend**: Next.js 14.2.3 with App Router
+- **Backend**: NestJS 10 (server-nest/)
 - **UI**: Shadcn/UI + TailwindCSS + Lucide Icons
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: JWT + bcryptjs
@@ -143,6 +155,12 @@ toast.info('ℹ️ Informação importante');
 
 ## API Patterns
 
+Important: All client calls go to /api/* and are proxied to the NestJS backend.
+
+Key endpoints:
+- GET /api/proposals → ordered by codigo asc when available; gestor sees all; analyst sees own only.
+- PATCH /api/proposals/:id → updates status; when to “implantado” updates metas; sends email showing only the PRP codigo.
+
 ### Standard API Call
 ```javascript
 const handleApiCall = async () => {
@@ -181,28 +199,32 @@ const handleApiCall = async () => {
 
 ## Database Schema
 
-### Users Table
+### Users Table (UUID)
 ```sql
 CREATE TABLE usuarios (
-  id SERIAL PRIMARY KEY,
-  nome VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  senha_hash VARCHAR(255) NOT NULL,
-  tipo_usuario VARCHAR(50) CHECK (tipo_usuario IN ('analista', 'gestor'))
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  senha TEXT NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor','analista')) NOT NULL,
+  criado_em TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
 ### Proposals Table
 ```sql
 CREATE TABLE propostas (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cnpj VARCHAR(18) NOT NULL,
-  consultor VARCHAR(255) NOT NULL,
-  operadora VARCHAR(100) NOT NULL,
-  quantidade_vidas INTEGER NOT NULL,
-  valor DECIMAL(10,2) NOT NULL,
-  status VARCHAR(50) DEFAULT 'em análise',
-  criado_por INTEGER REFERENCES usuarios(id)
+  consultor TEXT NOT NULL,
+  consultor_email TEXT NOT NULL,
+  operadora TEXT NOT NULL,
+  quantidade_vidas INT NOT NULL,
+  valor NUMERIC(12,2) NOT NULL,
+  previsao_implantacao DATE,
+  status TEXT NOT NULL,
+  criado_por UUID REFERENCES usuarios(id),
+  criado_em TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
@@ -295,9 +317,12 @@ className={`px-4 py-3 rounded-lg transition-colors ${
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
 JWT_SECRET=secure_32_character_secret
 BCRYPT_ROUNDS=12
 CORS_ORIGINS=http://localhost:3000
 ```
+
+Backend server (NestJS) auto-loads root .env. Ensure JWT_SECRET and Supabase keys are present.
 
 When generating code for this project, always prioritize security, follow the established patterns, and maintain consistency with the existing codebase.

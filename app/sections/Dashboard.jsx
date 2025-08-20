@@ -9,7 +9,7 @@ import { STATUS_OPTIONS } from '@/lib/constants'
 import { useEffect, useMemo, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-export default function DashboardSection({ currentUser, proposals, userGoals }) {
+export default function DashboardSection({ currentUser, proposals, userGoals, users = [] }) {
   const [statusSortAsc, setStatusSortAsc] = useState(false)
   const [operadorasSortAsc, setOperadorasSortAsc] = useState(false)
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -96,32 +96,70 @@ export default function DashboardSection({ currentUser, proposals, userGoals }) 
 
   return (
     <div className="space-y-6">
-    <Card>
+      <Card>
         <CardHeader>
-      <CardTitle>Meta - R$ 200.000,00</CardTitle>
+          <CardTitle>Meta</CardTitle>
           <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
         </CardHeader>
         <CardContent>
-          {userGoals.map((goal) => {
-            if (goal.usuario_id === currentUser.id) {
-              const target = 200000
-              const achieved = Number(goal.valor_alcancado || 0)
-              const progress = (achieved / target) * 100
+          {(() => {
+            const DEFAULT_TARGET = 200000
+            // users inclui gestores e analistas; consideraremos apenas analistas no agregado
+
+            if (currentUser.tipo_usuario === 'gestor') {
+              // Somar metas/alcance apenas dos analistas
+              const analystIds = users.filter(u => u.tipo_usuario !== 'gestor').map(u => u.id)
+              let totalTarget = 0
+              let totalAchieved = 0
+
+              analystIds.forEach(uid => {
+                const goal = userGoals.find(g => g.usuario_id === uid)
+                const target = Number(goal?.valor_meta ?? DEFAULT_TARGET)
+                // Fallback por propostas implantadas caso goal não exista
+                const achievedFallback = proposals
+                  .filter(p => String(p.criado_por) === String(uid) && p.status === 'implantado')
+                  .reduce((sum, p) => sum + Number(p.valor || 0), 0)
+                const achieved = Number(goal?.valor_alcancado ?? achievedFallback)
+                totalTarget += target
+                totalAchieved += achieved
+              })
+
+              const progress = totalTarget > 0 ? (totalAchieved / totalTarget) * 100 : 0
               return (
-                <div key={goal.id} className="space-y-2">
+                <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Progresso</span>
+                    <span>Progresso geral (analistas)</span>
+                    <span>{formatCurrency(totalAchieved)} / {formatCurrency(totalTarget)}</span>
+                  </div>
+                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3" />
+                  <p className="text-xs text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, totalTarget - totalAchieved))} para atingir a meta`}
+                  </p>
+                </div>
+              )
+            } else {
+              // Meta individual do analista
+              const goal = userGoals.find(g => g.usuario_id === currentUser.id)
+              const target = Number(goal?.valor_meta ?? DEFAULT_TARGET)
+              const achievedFallback = proposals
+                .filter(p => String(p.criado_por) === String(currentUser.id) && p.status === 'implantado')
+                .reduce((sum, p) => sum + Number(p.valor || 0), 0)
+              const achieved = Number(goal?.valor_alcancado ?? achievedFallback)
+              const progress = target > 0 ? (achieved / target) * 100 : 0
+              return (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Seu progresso</span>
                     <span>{formatCurrency(achieved)} / {formatCurrency(target)}</span>
                   </div>
-                  <Progress value={Math.min(progress, 100)} className="h-3" />
+                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3" />
                   <p className="text-xs text-muted-foreground">
-                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(target - achieved)} para atingir a meta`}
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, target - achieved))} para atingir a meta`}
                   </p>
                 </div>
               )
             }
-            return null
-          })}
+          })()}
         </CardContent>
       </Card>
       <div className="flex items-center justify-between">

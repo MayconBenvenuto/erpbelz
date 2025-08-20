@@ -7,14 +7,27 @@ import { Button } from '@/components/ui/button'
 import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
+import { useState } from 'react'
+
 export default function ReportsSection({ users, sessions, proposals, onRefresh }) {
+  const [refreshing, setRefreshing] = useState(false)
+  // Filtrar gestores do monitoramento
+  const analystUsers = Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []
+  const analystIds = new Set(analystUsers.map(u => u.id))
+  const filteredSessions = Array.isArray(sessions) ? sessions.filter(s => analystIds.has(s.usuario_id)) : []
+  const filteredProposals = Array.isArray(proposals) ? proposals.filter(p => analystIds.has(p.criado_por)) : []
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-primary">Relatórios e Monitoramento</h2>
-        <Button variant="outline" size="sm" onClick={onRefresh}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Atualizar Dados
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => { try { setRefreshing(true); await onRefresh?.() } finally { setRefreshing(false) } }}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Atualizando…' : 'Atualizar Dados'}
         </Button>
       </div>
 
@@ -25,7 +38,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Users className="w-5 h-5 text-green-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Usuários Online</p>
-                <p className="text-2xl font-bold text-green-600">{sessions.filter(s => !s.data_logout).length}</p>
+                <p className="text-2xl font-bold text-green-600">{filteredSessions.filter(s => !s.data_logout).length}</p>
               </div>
             </div>
           </CardContent>
@@ -37,7 +50,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Clock className="w-5 h-5 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Sessões Hoje</p>
-                <p className="text-2xl font-bold text-blue-600">{sessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString()).length}</p>
+                <p className="text-2xl font-bold text-blue-600">{filteredSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString()).length}</p>
               </div>
             </div>
           </CardContent>
@@ -49,7 +62,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Target className="w-5 h-5 text-yellow-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Propostas Hoje</p>
-                <p className="text-2xl font-bold text-yellow-600">{proposals.filter(p => new Date(p.criado_em).toDateString() === new Date().toDateString()).length}</p>
+                <p className="text-2xl font-bold text-yellow-600">{filteredProposals.filter(p => new Date(p.criado_em).toDateString() === new Date().toDateString()).length}</p>
               </div>
             </div>
           </CardContent>
@@ -88,7 +101,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {users.map((user) => {
+            {analystUsers.map((user) => {
               const userSessions = sessions.filter(s => s.usuario_id === user.id)
               const currentSession = userSessions.find(s => !s.data_logout)
               const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())
@@ -186,6 +199,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Consultor</TableHead>
                 <TableHead>Data Criação</TableHead>
@@ -196,7 +210,17 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
             </TableHeader>
             <TableBody>
               {proposals
-                .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+                .slice()
+                .sort((a, b) => {
+                  const ca = a?.codigo || ''
+                  const cb = b?.codigo || ''
+                  if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
+                  if (ca) return -1
+                  if (cb) return 1
+                  const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
+                  const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
+                  return da - db
+                })
                 .slice(0, 20)
                 .map((proposal) => {
                   const createdDate = new Date(proposal.criado_em)
@@ -206,6 +230,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
 
                   return (
                     <TableRow key={proposal.id}>
+                      <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
                       <TableCell className="font-mono text-sm">{formatCNPJ(proposal.cnpj)}</TableCell>
                       <TableCell>{proposal.consultor}</TableCell>
                       <TableCell>{createdDate.toLocaleString('pt-BR')}</TableCell>
