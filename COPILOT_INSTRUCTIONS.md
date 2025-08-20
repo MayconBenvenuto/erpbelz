@@ -10,9 +10,9 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## � Atualizações recentes (19/08/2025)
+## Atualizações recentes (20/08/2025)
 
-- Backend separado em NestJS (server-nest/) com Next.js proxyando todas as rotas `/api/*` para o servidor Nest (ver `next.config.js` e `middleware.js`).
+- Backend Next-only: todas as rotas `/api/*` são servidas pelo App Router; não há mais proxy ou servidor Nest separado.
 - Propostas com Código sequencial no formato `PRP0000`:
   - Nova coluna `codigo` com sequência `prp_codigo_seq`, `UNIQUE`, `CHECK '^PRP[0-9]{4,}$'` e índice dedicado.
   - Migration: `scripts/migrations/2025-08-19-add-proposta-codigo.sql` (backfill automático e `DEFAULT` para novos registros).
@@ -24,7 +24,7 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 - Mantido: API padronizada para PATCH; analista só altera status das próprias propostas; tooltip de Razão Social no CNPJ via `/api/validate-cnpj`; filtros persistentes por usuário.
 - Migration anterior: `scripts/migrations/2025-08-18-add-consultor-email.sql` adiciona `consultor_email` obrigatório às propostas.
 
-## �🏗️ Arquitetura do Projeto
+## 🏗️ Arquitetura do Projeto
 
 ### 📁 Estrutura de Pastas
 
@@ -49,7 +49,7 @@ emergent-crm-adm/
 
 - Frontend: Next.js 14.2.3 + React 18 (App Router)
 - UI: Shadcn/UI + TailwindCSS + Lucide Icons
-- Backend: NestJS 10 (server-nest/) com proxy do Next.js para `/api/*`
+- Backend: Next.js (App Router) servindo também as rotas `/api/*` (sem proxy externo)
 - Database: Supabase (PostgreSQL)
 - Auth: JWT + bcryptjs
 - E-mail: Nodemailer (SMTP)
@@ -242,7 +242,7 @@ CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUM
 
 ## 🔌 API Endpoints
 
-### 🛣️ Rotas Principais (`/api/[[...path]]`)
+### 🛣️ Rotas Principais (`/api/*`)
 
 #### **Autenticação**
 
@@ -264,7 +264,7 @@ POST /api/proposals
 
 PATCH /api/proposals/:id
   Body: { status }
-  -> Atualiza parcialmente (status). Quando "implantado" atualiza metas (RPC atualizar_meta_usuario). Dispara e-mail que referencia apenas o `codigo` (PRP...), nunca o UUID.
+  -> Atualiza parcialmente (status). Quando há transição para "implantado" soma o valor; quando sai de "implantado" subtrai; usa RPC atualizar_meta_usuario (delta). Dispara e-mail que referencia apenas o `codigo` (PRP...), nunca o UUID.
 
 DELETE /api/proposals/:id
   -> Apenas gestores
@@ -289,7 +289,7 @@ Response: { valid: boolean, data?: object, error?: string }
 
 ```javascript
 GET /api/sessions      // Listar sessões ativas
-GET /api/goals         // Metas e progresso dos usuários
+GET /api/goals         // Metas: valor_alcancado calculado dinamicamente somando propostas com status 'implantado'
 ```
 
 ---

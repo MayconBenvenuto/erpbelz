@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'nodejs'
 import { z } from 'zod'
 import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
 import { STATUS_OPTIONS } from '@/lib/constants'

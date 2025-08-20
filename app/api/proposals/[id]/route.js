@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'nodejs'
 import { supabase, handleCORS, requireAuth, ensureGestor } from '@/lib/api-helpers'
 import { sendEmail } from '@/lib/email'
 import { sanitizeForLog } from '@/lib/security'

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'nodejs'
 import { handleCORS } from '@/lib/api-helpers'
 import { sendEmail } from '@/lib/email'
 

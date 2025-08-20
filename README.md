@@ -77,9 +77,12 @@ SMTP_HOST=smtp.seudominio.com
 SMTP_PORT=587
 SMTP_USER=usuario
 SMTP_PASS=senha
-SMTP_SECURE=false
 EMAIL_FROM=comunicacao@belzseguros.com.br
 EMAIL_FROM_NAME=CRM Belz
+# TLS/SNI – defina quando o certificado do provedor for curinga (ex.: *.skymail.net.br)
+SMTP_TLS_SERVERNAME=skymail.net.br
+# NUNCA desabilite verificação de certificado em produção; use apenas para diagnóstico local
+# SMTP_TLS_REJECT_UNAUTHORIZED=false
 
 # Integrações
 CNPJA_API_KEY=
@@ -116,6 +119,12 @@ Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são s
 - **Validação de entrada** rigorosa
 - **Timeouts de API** para evitar DoS
 - **CORS** atualizado para permitir PATCH (PUT removido do projeto)
+
+### E-mail e TLS
+
+- Para erros de certificado do provedor (Hostname/IP does not match certificate's altnames), configure `SMTP_TLS_SERVERNAME` para o domínio do certificado (ex.: `skymail.net.br`).
+- Evite usar `SMTP_TLS_REJECT_UNAUTHORIZED=false` em produção. Use apenas localmente para diagnóstico.
+- Opcional: `RESEND_API_KEY` como fallback quando SMTP não estiver disponível.
 
 ### 🔒 Headers de Segurança
 
@@ -214,7 +223,15 @@ npm run windows:next-cache:setup
 npm run windows:next-cache:remove
 ```
 
-## 🗃️ Migração opcional: backfill e índice (consultor_email)
+## � Metas (lógica de negócio)
+
+- A meta do analista considera o somatório das propostas com status `implantado`.
+- Transição de status aplica deltas na meta via RPC `atualizar_meta_usuario`:
+  - De qualquer status → `implantado`: soma o valor da proposta.
+  - De `implantado` → outro status: subtrai o valor da proposta.
+- O endpoint `GET /api/goals` retorna o valor alcançado calculado dinamicamente a partir das propostas `implantado` por usuário, evitando duplicações.
+
+## �🗃️ Migração opcional: backfill e índice (consultor_email)
 
 Para melhorar a visibilidade de propostas antigas para analistas e a performance de consultas, aplique a migração em `scripts/migrations/2025-08-19-backfill-consultor-email-and-index.sql` no Supabase. Ela:
 
@@ -276,6 +293,6 @@ Este projeto é privado e proprietário da Belz.
 Em caso de problemas de segurança, entre em contato imediatamente com a equipe de desenvolvimento.
 
 —
-Atualizado em: 18/08/2025
+Atualizado em: 20/08/2025
 
 Observação: Este sistema contém dados sensíveis. Siga as melhores práticas de segurança e nunca exponha credenciais ou chaves de API.

@@ -4,9 +4,7 @@
 This is a CRM system for Belz company focused on health insurance proposal management with role-based access control and modern security practices.
 
 Current architecture:
-- Frontend: Next.js (App Router) at port 3000
-- Backend: NestJS server (server-nest) at port 3001
-- Next proxies all /api/* routes to the Nest server (see next.config.js & middleware.js)
+- Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
 
 Recent updates (2025-08-19):
 - Proposals have a sequential code (codigo) like PRP0000 (unique, validated, indexed). UI shows this as the first column and lists are ordered by codigo ascending. Emails reference only the codigo (never the UUID).
@@ -15,8 +13,7 @@ Recent updates (2025-08-19):
 - Reports exclude gestor from monitoring; the refresh button shows spinner/disable.
 
 ## Tech Stack
-- **Frontend**: Next.js 14.2.3 with App Router
-- **Backend**: NestJS 10 (server-nest/)
+- **Frontend/Backend**: Next.js 14.2.3 with App Router (/api routes)
 - **UI**: Shadcn/UI + TailwindCSS + Lucide Icons
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: JWT + bcryptjs
@@ -155,11 +152,11 @@ toast.info('ℹ️ Informação importante');
 
 ## API Patterns
 
-Important: All client calls go to /api/* and are proxied to the NestJS backend.
+Important: All client calls go to /api/* served by Next.js (no proxy).
 
 Key endpoints:
 - GET /api/proposals → ordered by codigo asc when available; gestor sees all; analyst sees own only.
-- PATCH /api/proposals/:id → updates status; when to “implantado” updates metas; sends email showing only the PRP codigo.
+- PATCH /api/proposals/:id → updates status; applies metas delta only on transitions (to/from “implantado”); sends email showing only the PRP codigo.
 
 ### Standard API Call
 ```javascript
@@ -323,6 +320,11 @@ BCRYPT_ROUNDS=12
 CORS_ORIGINS=http://localhost:3000
 ```
 
-Backend server (NestJS) auto-loads root .env. Ensure JWT_SECRET and Supabase keys are present.
+Next.js auto-loads .env files. Ensure JWT_SECRET and Supabase keys are present.
+
+Email/TLS notes:
+- Configure SMTP_TLS_SERVERNAME for providers with wildcard certificates (e.g., skymail.net.br)
+- Do not disable certificate verification in production; use only for local diagnostics
+- Optional fallback: RESEND_API_KEY
 
 When generating code for this project, always prioritize security, follow the established patterns, and maintain consistency with the existing codebase.
