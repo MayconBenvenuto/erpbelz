@@ -51,7 +51,7 @@ export async function POST(request) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
 
   async function enrichEmpresaLabel(p) {
     const cnpjFmt = p.cnpj ? formatCNPJ(p.cnpj) : undefined
@@ -88,14 +88,14 @@ export async function POST(request) {
     `- Proposta ${i.codigo}\n  Empresa: ${i.empresa}\n  Operadora: ${i.operadora}\n  Valor: ${i.valor}\n  Criada em: ${new Date(i.criado_em).toLocaleString('pt-BR')}`
   )).join('\n\n')
 
-  const text = `Olá,\n\nAs seguintes propostas estão há 48h sem alteração de status (em análise):\n\n${listText}\n\nAcesse o CRM para direcionar as ações: ${baseUrl}\n\n— CRM Belz`
+  const text = `Olá,\n\nAs seguintes propostas estão há 48h sem alteração de status (em análise):\n\n${listText}\n\nAcesse o CRM para direcionar as ações: ${appUrl}\n\n— CRM Belz`
   const listHtml = items.map((i) => (
     `<li><p><strong>Proposta:</strong> ${i.codigo}<br/><strong>Empresa:</strong> ${i.empresa}<br/><strong>Operadora:</strong> ${i.operadora}<br/><strong>Valor:</strong> ${i.valor}<br/><strong>Criada em:</strong> ${new Date(i.criado_em).toLocaleString('pt-BR')}</p></li>`
   )).join('')
   const html = renderBrandedEmail({
     title: 'Propostas sem ação há 48h',
     ctaText: 'Abrir CRM',
-    ctaUrl: appUrl,
+  ctaUrl: appUrl,
     contentHtml: `
       <p>Olá,</p>
       <p>As seguintes propostas estão há <strong>48h sem alteração</strong> de status (<em>em análise</em>):</p>
