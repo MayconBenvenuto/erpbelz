@@ -202,6 +202,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
                 <TableHead>ID</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Consultor</TableHead>
+                <TableHead>Analista</TableHead>
                 <TableHead>Data Criação</TableHead>
                 <TableHead>Status Atual</TableHead>
                 <TableHead>Tempo Decorrido</TableHead>
@@ -233,6 +234,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
                       <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
                       <TableCell className="font-mono text-sm">{formatCNPJ(proposal.cnpj)}</TableCell>
                       <TableCell>{proposal.consultor}</TableCell>
+                      <TableCell>{proposal.analista}</TableCell>
                       <TableCell>{createdDate.toLocaleString('pt-BR')}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
