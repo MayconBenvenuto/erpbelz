@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // CNPJ validation: ReceitaWS → BrasilAPI → CNPJA (cascata simples)
-async function _validateCNPJ(cnpj) {
+export async function validateCNPJ(cnpj) {
   // Helper: limpa e valida formato básico
   const cleanCNPJ = (cnpj || '').replace(/[^\d]/g, '')
   if (cleanCNPJ.length !== 14) {

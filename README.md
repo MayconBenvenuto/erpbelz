@@ -1,6 +1,6 @@
 # CRM Belz – Sistema de Gestão de Propostas
 
-Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) no frontend e NestJS no backend, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
+Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
 
 ## 🎯 Funcionalidades
 
@@ -93,20 +93,13 @@ RESEND_API_KEY=
 EMAIL_OVERRIDE_TO=
 ```
 
-1. Execute o projeto (frontend e backend separados)
+1. Execute o projeto (Next.js serve o frontend e as rotas de API)
 
 ```powershell
-# Apenas frontend (Next.js)
-npm run dev:front
-
-# Apenas backend (NestJS)
-npm run dev:back
-
-# Ambos em paralelo
-npm run dev:all
+npm run dev
 ```
 
-Aplicação: <http://localhost:3000> (frontend). O backend roda em <http://localhost:3001> e o Next proxyia /api/* para o Nest.
+Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são servidas pelo Next.
 
 ## 🔐 Segurança
 
