@@ -18,7 +18,7 @@ import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
-    <aside className="w-64 bg-card border-r shadow-lg flex flex-col">
+  <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r shadow-lg flex flex-col z-40">
       <div className="p-6 border-b">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10">
@@ -31,7 +31,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
         </div>
       </div>
 
-      <nav className="flex-1 p-4">
+  <nav className="flex-1 p-4">
         <div className="space-y-2">
           <button
             onClick={() => setActiveTab('propostas')}
