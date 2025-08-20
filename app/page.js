@@ -316,10 +316,10 @@ export default function App() {
 
   // App principal
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background">
       <Toaster />
       <Sidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} />
-      <div className="flex-1 flex flex-col">
+      <div className="ml-64 min-h-screen flex flex-col">
         <Header activeTab={activeTab} currentUser={currentUser} />
         <main className="flex-1 p-6 overflow-auto">
           {/** Propostas visíveis conforme perfil: gestor vê todas; analista vê apenas as próprias */}
