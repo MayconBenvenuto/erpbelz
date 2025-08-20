@@ -154,28 +154,31 @@ export async function PATCH(request, { params }) {
       } catch (_) {}
     }
 
-    const valorFmt = formatCurrency(updated.valor || 0)
-    const operadora = updated.operadora || 'Não informado'
-    const codigo = updated.codigo || currentProposal?.codigo || updated.id
+  const valorFmt = formatCurrency(updated.valor || 0)
+  const operadora = updated.operadora || 'Não informado'
+  const codigo = updated.codigo || currentProposal?.codigo || '—'
 
     // Envia para o analista (criado_por)
     if (!userErr && analyst?.email) {
       const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
       const subject = `[CRM Belz] Proposta ${codigo} atualizada: ${humanStatus}`
       const linkCRM = appUrl
-      const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} foi atualizada.\n\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM para mais detalhes: ${linkCRM}\n\n— CRM Belz`
+      const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM: ${linkCRM}\n\n— CRM Belz`
       const html = renderBrandedEmail({
         title: 'Atualização de status da proposta',
         ctaText: 'Abrir CRM',
         ctaUrl: linkCRM,
+        preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `
           <p>Olá ${analyst.nome || ''},</p>
-          <p>A proposta <strong>${codigo}</strong> foi atualizada com as seguintes informações:</p>
+          <p>Uma proposta teve alteração no status. Confira os detalhes:</p>
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">
-            <tr><td style="padding:6px 0;"><strong>Empresa:</strong> ${empresaLabel}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Código:</strong> ${codigo}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>CNPJ:</strong> ${updated.cnpj ? formatCNPJ(updated.cnpj) : 'Não informado'}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Razão Social:</strong> ${empresaLabel?.replace(/\s*\(CNPJ.*\)$/i, '') || 'Não informado'}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Status atual:</strong> ${humanStatus}</td></tr>
             <tr><td style="padding:6px 0;"><strong>Operadora:</strong> ${operadora}</td></tr>
             <tr><td style="padding:6px 0;"><strong>Valor:</strong> ${valorFmt}</td></tr>
-            <tr><td style="padding:6px 0;"><strong>Status atual:</strong> ${humanStatus}</td></tr>
           </table>
         `,
       })
@@ -185,19 +188,22 @@ export async function PATCH(request, { params }) {
     // Envia para o consultor (e-mail externo informado na proposta)
     if (updated?.consultor_email) {
       const subject2 = `[CRM Belz] Proposta ${codigo} atualizada: ${humanStatus}`
-      const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve seu status atualizado.\n\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— CRM Belz`
+      const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— CRM Belz`
       const html2 = renderBrandedEmail({
         title: 'Atualização de status da proposta',
         ctaText: 'Abrir CRM',
         ctaUrl: appUrl,
+        preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `
           <p>Olá ${updated.consultor || ''},</p>
-          <p>A proposta <strong>${codigo}</strong> teve seu status atualizado:</p>
+          <p>Uma proposta teve alteração no status. Confira os detalhes:</p>
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">
-            <tr><td style="padding:6px 0;"><strong>Empresa:</strong> ${empresaLabel}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Código:</strong> ${codigo}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>CNPJ:</strong> ${updated.cnpj ? formatCNPJ(updated.cnpj) : 'Não informado'}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Razão Social:</strong> ${empresaLabel?.replace(/\s*\(CNPJ.*\)$/i, '') || 'Não informado'}</td></tr>
+            <tr><td style="padding:6px 0;"><strong>Status atual:</strong> ${humanStatus}</td></tr>
             <tr><td style="padding:6px 0;"><strong>Operadora:</strong> ${operadora}</td></tr>
             <tr><td style="padding:6px 0;"><strong>Valor:</strong> ${valorFmt}</td></tr>
-            <tr><td style="padding:6px 0;"><strong>Status atual:</strong> ${humanStatus}</td></tr>
           </table>
         `,
       })
