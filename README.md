@@ -85,6 +85,12 @@ EMAIL_FROM_NAME=CRM Belz
 CNPJA_API_KEY=
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 CRM_APP_URL=http://localhost:3000
+ 
+# Fallback de e-mail (opcional)
+# Se não houver SMTP, defina a chave do Resend e o backend usará este provedor automaticamente
+RESEND_API_KEY=
+# Override geral de destino (staging)
+EMAIL_OVERRIDE_TO=
 ```
 
 1. Execute o projeto (frontend e backend separados)

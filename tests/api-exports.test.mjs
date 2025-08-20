@@ -37,7 +37,7 @@ describe('API routes exports', () => {
     const item = await import('@/app/api/proposals/[id]/route.js')
     expect(typeof list.GET).toBe('function')
     expect(typeof list.POST).toBe('function')
-    expect(typeof item.PUT).toBe('function')
+    expect(typeof item.PATCH).toBe('function')
   })
 
   it('users/goals/sessions/validate-cnpj should export handlers', async () => {
