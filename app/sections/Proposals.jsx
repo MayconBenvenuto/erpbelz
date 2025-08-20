@@ -470,9 +470,8 @@ export default function ProposalsSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>CNPJ</TableHead>
                 <TableHead>Código</TableHead>
+                <TableHead>CNPJ</TableHead>
                 <TableHead>Consultor</TableHead>
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Analista</TableHead>}
@@ -484,7 +483,14 @@ export default function ProposalsSection({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProposals.map((proposal) => (
+              {filteredProposals.map((proposal) => {
+                const canEdit = (
+                  currentUser.tipo_usuario === 'gestor' ||
+                  String(proposal.criado_por) === String(currentUser.id) ||
+                  (proposal.consultor_email && String(proposal.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                )
+                const isUpdating = !!updatingStatus[proposal.id]
+                return (
                 <TableRow key={proposal.id}>
                   <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
                   <TableCell className="font-mono text-sm">
@@ -507,7 +513,6 @@ export default function ProposalsSection({
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{proposal.codigo || '—'}</TableCell>
                   <TableCell>{proposal.consultor}</TableCell>
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell className="font-mono text-xs">{proposal.consultor_email || '-'}</TableCell>
@@ -519,64 +524,36 @@ export default function ProposalsSection({
                   <TableCell>{proposal.quantidade_vidas}</TableCell>
                   <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
-<<<<<<< HEAD
-                    {(() => {
-                      const canEdit = (
-                        currentUser.tipo_usuario === 'gestor' ||
-                        String(proposal.criado_por) === String(currentUser.id) ||
-                        (proposal.consultor_email && String(proposal.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                      )
-                      const isUpdating = !!updatingStatus[proposal.id]
-                      if (!canEdit) {
-                        return (
-                          <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
-                            {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
-                          </Badge>
-                        )
-                      }
-                      return (
-                        <Select
-                          value={proposal.status}
-                          onValueChange={async (newStatus) => {
-                            try {
-                              setUpdatingStatus(prev => ({ ...prev, [proposal.id]: true }))
-                              await onUpdateProposalStatus(proposal.id, newStatus, proposal)
-                            } finally {
-                              setUpdatingStatus(prev => ({ ...prev, [proposal.id]: false }))
-                            }
-                          }}
-                          disabled={isUpdating}
-                        >
-                          <SelectTrigger className={`w-56 capitalize ${getStatusBadgeClasses(proposal.status)} ${isUpdating ? 'opacity-80 cursor-wait' : ''}`}>
-                            <div className="flex items-center w-full justify-between">
-                              <SelectValue />
-                              {isUpdating && <RefreshCw className="h-4 w-4 ml-2 animate-spin" />}
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map(status => (
-                              <SelectItem key={status} value={status} className="capitalize">{status}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )
-                    })()}
-=======
-                    {(currentUser.tipo_usuario === 'gestor' || proposal.criado_por === currentUser.id) ? (
-                        <Select value={proposal.status} onValueChange={(newStatus) => onUpdateProposalStatus(proposal.id, newStatus, proposal)}>
-                          <SelectTrigger className={`w-48 ${getStatusBadgeClasses(proposal.status)} capitalize`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
+                    {!canEdit ? (
                       <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
                         {String(proposal.status || '').charAt(0).toUpperCase() + String(proposal.status || '').slice(1)}
                       </Badge>
+                    ) : (
+                      <Select
+                        value={proposal.status}
+                        onValueChange={async (newStatus) => {
+                          try {
+                            setUpdatingStatus(prev => ({ ...prev, [proposal.id]: true }))
+                            await onUpdateProposalStatus(proposal.id, newStatus, proposal)
+                          } finally {
+                            setUpdatingStatus(prev => ({ ...prev, [proposal.id]: false }))
+                          }
+                        }}
+                        disabled={isUpdating}
+                      >
+                        <SelectTrigger className={`w-56 capitalize ${getStatusBadgeClasses(proposal.status)} ${isUpdating ? 'opacity-80 cursor-wait' : ''}`}>
+                          <div className="flex items-center w-full justify-between">
+                            <SelectValue />
+                            {isUpdating && <RefreshCw className="h-4 w-4 ml-2 animate-spin" />}
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map(status => (
+                            <SelectItem key={status} value={status} className="capitalize">{status}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
->>>>>>> main
                   </TableCell>
                   {/* {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
@@ -584,7 +561,7 @@ export default function ProposalsSection({
                     </TableCell>
                   )} */}
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
           </TooltipProvider>
