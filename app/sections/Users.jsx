@@ -13,9 +13,32 @@ import { Progress } from '@/components/ui/progress'
 import { PlusCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-export default function UsersSection({ users, proposals, userGoals, onCreateUser, isLoading }) {
+export default function UsersSection({ currentUser, users, proposals, userGoals, onCreateUser, onUpdateUserGoal, isLoading }) {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [userForm, setUserForm] = useState({ nome: '', email: '', senha: '', tipo_usuario: 'analista' })
+  const [metaDialogUser, setMetaDialogUser] = useState(null) // usuário selecionado para edição de meta
+  const [metaForm, setMetaForm] = useState({ valor_meta_input: '' })
+
+  // Máscara de moeda BRL para input
+  const formatMoneyBRInput = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '')
+    if (!digits) return ''
+    const number = parseInt(digits, 10) / 100
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
+  }
+  const parseMoneyToNumber = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '')
+    if (!digits) return 0
+    return parseInt(digits, 10) / 100
+  }
+
+  const openMetaDialog = (user, targetValue) => {
+    setMetaDialogUser(user)
+    setMetaForm({
+      valor_meta_input: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(targetValue || 0))
+    })
+  }
+  const closeMetaDialog = () => { setMetaDialogUser(null); setMetaForm({ valor_meta_input: '' }) }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -80,6 +103,7 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
               Nenhum usuário cadastrado ainda. Clique em &quot;Novo Usuário&quot; para adicionar o primeiro.
             </div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -89,6 +113,7 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
                   <TableHead>Meta</TableHead>
                   <TableHead>Alcançado</TableHead>
                   <TableHead>Progresso</TableHead>
+                  {currentUser?.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -108,8 +133,10 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
                         <Badge variant={user.tipo_usuario === 'gestor' ? 'default' : 'secondary'}>{user.tipo_usuario}</Badge>
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(targetValue)}
-                        {!userGoal && (<span className="text-xs text-muted-foreground block">(meta padrão)</span>)}
+                        <div>
+                          {formatCurrency(targetValue)}
+                          {!userGoal && (<span className="text-xs text-muted-foreground block">(meta padrão)</span>)}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div>
@@ -130,11 +157,54 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">Faltam {formatCurrency(Math.max(0, targetValue - achievedValue))}</div>
                       </TableCell>
+                      {currentUser?.tipo_usuario === 'gestor' && (
+                        <TableCell>
+                          <Button size="sm" variant="outline" onClick={() => openMetaDialog(user, targetValue)}>Editar meta</Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
+            {/* Popup para editar meta do analista */}
+            <Dialog open={!!metaDialogUser} onOpenChange={(v) => { if (!v) closeMetaDialog() }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar meta do analista</DialogTitle>
+                  <DialogDescription>Atualize a meta do usuário selecionado.</DialogDescription>
+                </DialogHeader>
+                {metaDialogUser && (
+                  <div className="space-y-3">
+                    <div className="text-sm">
+                      <div><strong>Nome:</strong> {metaDialogUser.nome}</div>
+                      <div><strong>Email:</strong> {metaDialogUser.email}</div>
+                      <div><strong>Tipo:</strong> {metaDialogUser.tipo_usuario}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="meta-valor">Nova meta (R$)</Label>
+                      <Input
+                        id="meta-valor"
+                        type="text"
+                        inputMode="decimal"
+                        value={metaForm.valor_meta_input}
+                        onChange={(e) => setMetaForm(prev => ({ ...prev, valor_meta_input: formatMoneyBRInput(e.target.value) }))}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={closeMetaDialog}>Cancelar</Button>
+                      <Button onClick={async () => {
+                        const val = parseMoneyToNumber(metaForm.valor_meta_input)
+                        const res = await onUpdateUserGoal?.(metaDialogUser.id, val)
+                        if (res?.ok) closeMetaDialog()
+                      }}>Salvar</Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+            </>
           )}
         </CardContent>
       </Card>

@@ -40,6 +40,7 @@ function ProposalsInner({
   statusOptions,
   onCreateProposal,
   onUpdateProposalStatus,
+  onPatchProposal,
   isLoading,
   users = [],
   userGoals = [],
@@ -48,6 +49,8 @@ function ProposalsInner({
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
   const [updatingStatus, setUpdatingStatus] = useState({}) // { [proposalId]: boolean }
+  const [rowEdits, setRowEdits] = useState({})
+  const [auditOpenFor, setAuditOpenFor] = useState(null)
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   const [filters, setFilters] = useState(defaultFilters)
   const [vidasSortAsc, setVidasSortAsc] = useState(true)
@@ -156,6 +159,29 @@ function ProposalsInner({
   const consultores = useMemo(() => {
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
   }, [proposals])
+
+  const startEdit = (p) => {
+    setRowEdits(prev => ({
+      ...prev,
+      [p.id]: {
+        quantidade_vidas: Number(p.quantidade_vidas || 0),
+        valor: Number(p.valor || 0),
+        previsao_implantacao: p.previsao_implantacao ? String(p.previsao_implantacao).slice(0,10) : '',
+        operadora: p.operadora || '',
+        consultor: p.consultor || '',
+        consultor_email: p.consultor_email || '',
+        criado_por: p.criado_por,
+        arquivado: !!p.arquivado,
+      }
+    }))
+  }
+  const cancelEdit = (id) => setRowEdits(prev => { const cp = { ...prev }; delete cp[id]; return cp })
+  const applyEdit = async (id) => {
+    const payload = rowEdits[id]
+    if (!payload) return
+    const res = await onPatchProposal?.(id, payload)
+    if (res?.ok) cancelEdit(id)
+  }
 
   const parseMoneyToNumber = (masked) => {
     const digits = String(masked || '').replace(/\D/g, '')
@@ -527,7 +553,7 @@ function ProposalsInner({
                 </TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
+                {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -538,6 +564,7 @@ function ProposalsInner({
                   (proposal.consultor_email && String(proposal.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
                 )
                 const isUpdating = !!updatingStatus[proposal.id]
+                const row = rowEdits[proposal.id]
                 return (
                 <TableRow key={proposal.id}>
                   <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
@@ -568,9 +595,36 @@ function ProposalsInner({
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>{(users.find(u => u.id === proposal.criado_por)?.nome) || '-'}</TableCell>
                   )}
-                  <TableCell className="capitalize">{proposal.operadora}</TableCell>
-                  <TableCell>{proposal.quantidade_vidas}</TableCell>
-                  <TableCell>{formatCurrency(proposal.valor)}</TableCell>
+                  <TableCell className="capitalize">
+                    {currentUser.tipo_usuario === 'gestor' && row ? (
+                      <Select value={row.operadora} onValueChange={(v) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], operadora: v } }))}>
+                        <SelectTrigger><SelectValue placeholder="Operadora" /></SelectTrigger>
+                        <SelectContent>
+                          {operadoras.map(op => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="capitalize">{proposal.operadora}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {currentUser.tipo_usuario === 'gestor' && row ? (
+                      <Input type="number" className="w-24" value={row.quantidade_vidas}
+                        onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], quantidade_vidas: Number(e.target.value || 0) } }))}
+                      />
+                    ) : (
+                      proposal.quantidade_vidas
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {currentUser.tipo_usuario === 'gestor' && row ? (
+                      <Input type="number" step="0.01" className="w-28" value={row.valor}
+                        onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], valor: Number(e.target.value || 0) } }))}
+                      />
+                    ) : (
+                      formatCurrency(proposal.valor)
+                    )}
+                  </TableCell>
                   <TableCell>
                     {!canEdit ? (
                       <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
@@ -603,18 +657,92 @@ function ProposalsInner({
                       </Select>
                     )}
                   </TableCell>
-                  {/* {currentUser.tipo_usuario === 'gestor' && (
+                  {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
-                      <Button variant="destructive" size="sm" onClick={() => onDeleteProposal(proposal.id)}>Excluir</Button>
+                      {row ? (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <Input
+                            placeholder="Consultor"
+                            className="w-36"
+                            value={row.consultor}
+                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], consultor: e.target.value } }))}
+                          />
+                          <Input
+                            placeholder="Email do consultor"
+                            className="w-52"
+                            type="email"
+                            value={row.consultor_email}
+                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], consultor_email: e.target.value } }))}
+                          />
+                          <Select value={String(row.criado_por)} onValueChange={(v) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], criado_por: v } }))}>
+                            <SelectTrigger className="w-44"><SelectValue placeholder="Analista" /></SelectTrigger>
+                            <SelectContent>
+                              {users.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                            </SelectContent>
+                          </Select>
+                          <Input type="date" value={row.previsao_implantacao}
+                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], previsao_implantacao: e.target.value } }))}
+                          />
+                          <Button size="sm" onClick={() => applyEdit(proposal.id)}>Salvar</Button>
+                          <Button size="sm" variant="outline" onClick={() => cancelEdit(proposal.id)}>Cancelar</Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <Button size="sm" variant="outline" onClick={() => startEdit(proposal)}>Editar</Button>
+                          <Button size="sm" variant={proposal.arquivado ? 'secondary' : 'destructive'} onClick={() => onPatchProposal?.(proposal.id, { arquivado: !proposal.arquivado })}>
+                            {proposal.arquivado ? 'Restaurar' : 'Arquivar'}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setAuditOpenFor(proposal.id)}>Histórico</Button>
+                        </div>
+                      )}
                     </TableCell>
-                  )} */}
+                  )}
                 </TableRow>
               )})}
             </TableBody>
           </Table>
           </TooltipProvider>
+          {auditOpenFor && (
+            <AuditDrawer id={auditOpenFor} onClose={() => setAuditOpenFor(null)} />
+          )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function AuditDrawer({ id, onClose }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/proposals/${id}/audit`, { credentials: 'include' })
+        const data = await res.json().catch(() => [])
+        if (mounted) setItems(Array.isArray(data) ? data : [])
+      } finally { if (mounted) setLoading(false) }
+    })()
+    return () => { mounted = false }
+  }, [id])
+  return (
+    <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-card border w-full sm:max-w-2xl max-h-[80vh] overflow-auto rounded-t-xl sm:rounded-xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-semibold">Histórico de alterações</h3>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+        </div>
+        <div className="p-4 space-y-3 text-sm">
+          {loading ? 'Carregando…' : (
+            items.length === 0 ? 'Sem registros' : items.map((it) => (
+              <div key={it.id} className="p-3 rounded border">
+                <div className="text-xs text-muted-foreground">{new Date(it.criado_em).toLocaleString('pt-BR')}</div>
+                <pre className="text-xs whitespace-pre-wrap mt-1">{JSON.stringify(it.changes, null, 2)}</pre>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }

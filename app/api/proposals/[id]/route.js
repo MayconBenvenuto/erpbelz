@@ -7,11 +7,23 @@ import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { z } from 'zod'
 
-const updateStatusSchema = z.object({
+// Analista: apenas status
+const analistaPatchSchema = z.object({
   status: z.string().min(2),
-  criado_por: z.string().uuid().optional(),
-  valor: z.coerce.number().optional(),
 })
+
+// Gestor: campos ampliados
+const gestorPatchSchema = z.object({
+  status: z.string().min(2).optional(),
+  quantidade_vidas: z.coerce.number().int().min(0).optional(),
+  valor: z.coerce.number().min(0).optional(),
+  previsao_implantacao: z.string().optional(),
+  operadora: z.string().min(1).optional(),
+  consultor: z.string().min(1).optional(),
+  consultor_email: z.string().email().optional(),
+  criado_por: z.string().uuid().optional(),
+  arquivado: z.coerce.boolean().optional(),
+}).strict()
 
 export async function OPTIONS(request) {
   const origin = request.headers.get('origin')
@@ -47,7 +59,8 @@ export async function PATCH(request, { params }) {
 
   const { id } = params
   const body = await request.json()
-  const parsed = updateStatusSchema.safeParse(body)
+  const isGestor = auth.user.tipo_usuario === 'gestor'
+  const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
     return handleCORS(
       NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues }, { status: 400 }),
@@ -55,7 +68,7 @@ export async function PATCH(request, { params }) {
     )
   }
 
-  const { status, criado_por: _criado_por_unused, valor } = parsed.data
+  const updates = parsed.data
 
   // Busca a proposta e checa autorização:
   // - Gestor pode alterar qualquer
@@ -63,7 +76,7 @@ export async function PATCH(request, { params }) {
   // - Consultor NÃO pode alterar
   const { data: currentProposal, error: fetchError } = await supabase
     .from('propostas')
-    .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email')
+  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, arquivado')
     .eq('id', id)
     .single()
   if (fetchError || !currentProposal) {
@@ -79,9 +92,23 @@ export async function PATCH(request, { params }) {
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
   }
 
+  // Constrói update controlado
+  const updatePayload = {}
+  if (typeof updates.status !== 'undefined') updatePayload.status = updates.status
+  if (isGestor) {
+    if (typeof updates.quantidade_vidas !== 'undefined') updatePayload.quantidade_vidas = updates.quantidade_vidas
+    if (typeof updates.valor !== 'undefined') updatePayload.valor = updates.valor
+    if (typeof updates.previsao_implantacao !== 'undefined') updatePayload.previsao_implantacao = updates.previsao_implantacao
+    if (typeof updates.operadora !== 'undefined') updatePayload.operadora = updates.operadora
+    if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
+    if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
+    if (typeof updates.criado_por !== 'undefined') updatePayload.criado_por = updates.criado_por
+    if (typeof updates.arquivado !== 'undefined') updatePayload.arquivado = updates.arquivado
+  }
+
   let updateQuery = supabase
     .from('propostas')
-    .update({ status })
+    .update(updatePayload)
     .eq('id', id)
 
   if (auth.user.tipo_usuario !== 'gestor') {
@@ -102,7 +129,7 @@ export async function PATCH(request, { params }) {
   // Atualização de metas (delta) baseada em transição de status
   try {
     const wasImplantado = String(currentProposal.status) === 'implantado'
-    const willImplantado = String(status) === 'implantado'
+    const willImplantado = String((typeof updates.status !== 'undefined' ? updates.status : currentProposal.status)) === 'implantado'
 
     // Só aplica delta quando há mudança relevante
     let delta = 0
@@ -111,8 +138,8 @@ export async function PATCH(request, { params }) {
 
     if (delta !== 0 && updated?.criado_por) {
       // Valor da proposta (preferir payload.valor se fornecido, senão valor persistido)
-      const baseValor = Number.isFinite(Number(valor))
-        ? Number(valor)
+      const baseValor = Number.isFinite(Number(updates?.valor))
+        ? Number(updates?.valor)
         : Number(updated?.valor ?? currentProposal?.valor ?? 0)
 
       const p_valor = Number((delta * baseValor).toFixed(2))
@@ -130,6 +157,31 @@ export async function PATCH(request, { params }) {
     // não bloqueia a resposta ao cliente
   }
 
+  // Auditoria: registra alterações (somente campos realmente alterados)
+  try {
+    const changed = {}
+    const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email','criado_por','arquivado']
+    for (const k of keys) {
+      if (Object.prototype.hasOwnProperty.call(updatePayload, k)) {
+        const before = currentProposal[k]
+        const after = updated[k]
+        // compara valores convertendo para string para evitar NaN traps
+        if (String(before ?? '') !== String(after ?? '')) {
+          changed[k] = { before, after }
+        }
+      }
+    }
+    if (Object.keys(changed).length > 0) {
+      await supabase.from('propostas_auditoria').insert({
+        proposta_id: updated.id,
+        alterado_por: auth.user.id,
+        changes: changed,
+      })
+    }
+  } catch (e) {
+    try { console.warn('[AUDIT] failed to write audit log', sanitizeForLog({ message: e?.message })) } catch {}
+  }
+
   // Notificação por e-mail (mesma lógica do PUT)
   try {
     const { data: analyst, error: userErr } = await supabase
@@ -137,8 +189,8 @@ export async function PATCH(request, { params }) {
       .select('email, nome')
       .eq('id', updated.criado_por)
       .single()
-    // Monta informações comuns ao e-mail
-    const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
+  // Monta informações comuns ao e-mail
+  const humanStatus = String(updated.status || currentProposal.status || '').replace(/^./, c => c.toUpperCase())
     const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
     let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
   const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -166,8 +218,7 @@ export async function PATCH(request, { params }) {
   const codigo = updated.codigo || currentProposal?.codigo || '—'
 
     // Envia para o analista (criado_por)
-    if (!userErr && analyst?.email) {
-      const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
+  if (!userErr && analyst?.email) {
       const subject = `[CRM Belz] Proposta ${codigo} atualizada: ${humanStatus}`
       const linkCRM = appUrl
       const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM: ${linkCRM}\n\n— CRM Belz`
