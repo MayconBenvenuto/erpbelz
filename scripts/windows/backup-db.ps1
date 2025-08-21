@@ -5,7 +5,7 @@
 
   Pré-requisitos:
     - Ter o password do banco (SUPABASE_DB_PASSWORD). Você pode setar na sessão do PowerShell:
-        $env:SUPABASE_DB_PASSWORD = "sua-senha"
+        $env:SUPABASE_DB_PASSWORD = ""
     - Ter pg_dump instalado (PostgreSQL client) OU Docker Desktop (fallback automático).
 
   Fontes de configuração (ordem):
