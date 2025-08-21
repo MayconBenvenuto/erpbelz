@@ -1,4 +1,5 @@
 import './globals.css'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata = {
   title: 'CRM Propostas - Sistema de Gestão',
@@ -9,7 +10,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
       <body className="min-h-screen bg-background text-foreground">
-        {children}
+  {children}
+  <SpeedInsights />
       </body>
     </html>
   )
