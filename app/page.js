@@ -39,35 +39,47 @@ export default function App() {
 
   // Constantes importadas de lib/constants.js
 
-  // Persistência de sessão no localStorage
+  // Persistência de sessão no sessionStorage (sessão do navegador, não persiste após fechar)
   const saveSessionToStorage = (user, sessionId, tokenValue) => {
-    localStorage.setItem('crm_user', JSON.stringify(user))
-    localStorage.setItem('crm_session', sessionId)
-    localStorage.setItem('crm_last_activity', Date.now().toString())
-    if (tokenValue) localStorage.setItem('crm_token', tokenValue)
+    try {
+      sessionStorage.setItem('crm_user', JSON.stringify(user))
+      sessionStorage.setItem('crm_session', sessionId)
+      sessionStorage.setItem('crm_last_activity', Date.now().toString())
+      if (tokenValue) sessionStorage.setItem('crm_token', tokenValue)
+    } catch (_) {
+      // ignore quota or storage errors
+    }
   }
   const clearSessionFromStorage = () => {
-    localStorage.removeItem('crm_user')
-    localStorage.removeItem('crm_session')
-    localStorage.removeItem('crm_last_activity')
-    localStorage.removeItem('crm_token')
+    try {
+      sessionStorage.removeItem('crm_user')
+      sessionStorage.removeItem('crm_session')
+      sessionStorage.removeItem('crm_last_activity')
+      sessionStorage.removeItem('crm_token')
+    } catch (_) {
+      // ignore
+    }
   }
   const loadSessionFromStorage = () => {
-    const user = localStorage.getItem('crm_user')
-    const session = localStorage.getItem('crm_session')
-    const lastActivity = localStorage.getItem('crm_last_activity')
-    const savedToken = localStorage.getItem('crm_token')
+    try {
+      const user = sessionStorage.getItem('crm_user')
+      const session = sessionStorage.getItem('crm_session')
+      const lastActivity = sessionStorage.getItem('crm_last_activity')
+      const savedToken = sessionStorage.getItem('crm_token')
 
-    if (user && session && lastActivity && savedToken) {
-      const timeSinceLastActivity = Date.now() - parseInt(lastActivity)
-      // Sessão válida por 24h
-      if (timeSinceLastActivity < 24 * 60 * 60 * 1000) {
-        setCurrentUser(JSON.parse(user))
-        setSessionId(session)
-        setLastActivity(parseInt(lastActivity))
-        setToken(savedToken)
-        return true
+      if (user && session && lastActivity && savedToken) {
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity)
+        // Sessão válida por 24h (apenas enquanto o navegador estiver aberto)
+        if (timeSinceLastActivity < 24 * 60 * 60 * 1000) {
+          setCurrentUser(JSON.parse(user))
+          setSessionId(session)
+          setLastActivity(parseInt(lastActivity))
+          setToken(savedToken)
+          return true
+        }
       }
+    } catch (_) {
+      // ignore
     }
     return false
   }
@@ -246,7 +258,9 @@ export default function App() {
   const updateActivity = useCallback(() => {
     const now = Date.now()
     setLastActivity(now)
-    if (currentUser) localStorage.setItem('crm_last_activity', now.toString())
+    if (currentUser) {
+      try { sessionStorage.setItem('crm_last_activity', now.toString()) } catch (_) {}
+    }
   }, [currentUser])
 
   const autoRefreshData = useCallback(async () => {
@@ -289,6 +303,29 @@ export default function App() {
     if (currentUser && sessionId && token) saveSessionToStorage(currentUser, sessionId, token)
     else if (!currentUser) clearSessionFromStorage()
   }, [currentUser, sessionId, token])
+
+  // Ao fechar a aba/janela, envia logout via sendBeacon e limpa storage
+  useEffect(() => {
+    if (!sessionId) return
+
+    let beaconSent = false
+    const sendLogoutBeacon = () => {
+      if (beaconSent || !sessionId) return
+      try {
+        const blob = new Blob([JSON.stringify({ sessionId })], { type: 'application/json' })
+        navigator.sendBeacon && navigator.sendBeacon('/api/auth/logout', blob)
+      } catch (_) {}
+      beaconSent = true
+      clearSessionFromStorage()
+    }
+
+    window.addEventListener('pagehide', sendLogoutBeacon)
+    window.addEventListener('beforeunload', sendLogoutBeacon)
+    return () => {
+      window.removeEventListener('pagehide', sendLogoutBeacon)
+      window.removeEventListener('beforeunload', sendLogoutBeacon)
+    }
+  }, [sessionId])
 
   // Login
   if (!currentUser) {

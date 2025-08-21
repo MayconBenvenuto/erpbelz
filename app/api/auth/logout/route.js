@@ -20,8 +20,25 @@ export async function POST(request) {
 				const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
 				await supabase.from('sessoes').update({ data_logout: now.toISOString(), tempo_total: `${hours}:${minutes}:00` }).eq('id', sessionId)
 			}
-		}
-		return handleCORS(NextResponse.json({ success: true }), origin)
+			}
+
+			const response = NextResponse.json({ success: true })
+			const isProd = process.env.NODE_ENV === 'production'
+			try {
+				response.cookies.set('crm_auth', '', {
+					httpOnly: true,
+					sameSite: 'lax',
+					secure: isProd,
+					path: '/',
+					expires: new Date(0)
+				})
+			} catch (_) {
+				const flags = [`Path=/`, `SameSite=Lax`, `HttpOnly`, `Expires=${new Date(0).toUTCString()}`]
+				if (isProd) flags.push('Secure')
+				response.headers.append('Set-Cookie', `crm_auth=; ${flags.join('; ')}`)
+			}
+
+			return handleCORS(response, origin)
 	} catch {
 		return handleCORS(NextResponse.json({ error: 'Erro no logout' }, { status: 500 }), origin)
 	}

@@ -37,8 +37,27 @@ export async function POST(request) {
 		const sessionId = crypto.randomUUID()
 		await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, data_login: new Date().toISOString() })
 
-		const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
-		return handleCORS(NextResponse.json({ user: safeUser, sessionId, token }), origin)
+				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
+
+				// Cria resposta e define cookie de sessão (HttpOnly, SameSite=Lax, sem Max-Age/Expires)
+				const response = NextResponse.json({ user: safeUser, sessionId, token })
+				const isProd = process.env.NODE_ENV === 'production'
+				try {
+					response.cookies.set('crm_auth', token, {
+						httpOnly: true,
+						sameSite: 'lax',
+						secure: isProd,
+						path: '/',
+						// Sem expires/maxAge => cookie de sessão
+					})
+				} catch (_) {
+					// fallback direto no header Set-Cookie
+					const flags = [`Path=/`, `SameSite=Lax`, `HttpOnly`]
+					if (isProd) flags.push('Secure')
+					response.headers.append('Set-Cookie', `crm_auth=${token}; ${flags.join('; ')}`)
+				}
+
+				return handleCORS(response, origin)
 	} catch (e) {
 		console.error('Login error:', sanitizeForLog({ message: e?.message }))
 		return handleCORS(NextResponse.json({ error: 'Erro no login' }, { status: 500 }), origin)
