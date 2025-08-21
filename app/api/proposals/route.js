@@ -100,7 +100,7 @@ export async function POST(request) {
 		const html = renderBrandedEmail({
 			title: 'Nova proposta criada',
 			ctaText: 'Abrir CRM',
-			ctaUrl: process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+			ctaUrl: process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/',
 			contentHtml: `
 				<p>Uma nova proposta <strong>${codigo}</strong> foi criada.</p>
 				<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">

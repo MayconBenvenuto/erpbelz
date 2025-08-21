@@ -5,12 +5,13 @@
     "scripts": {
         "dev": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:front": "next dev --hostname 0.0.0.0 --port 3000",
-    "dev:back": "echo 'server-nest removido'",
-    "dev:all": "yarn dev:front",
+        "dev:back": "echo 'server-nest removido'",
+        "dev:all": "yarn dev:front",
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
         "build": "next build",
         "start": "next start",
+        "test": "vitest run --reporter=dot",
         "test:utils": "node ./scripts/test-utils.mjs",
         "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
         "windows:next-cache:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/setup-next-cache.ps1",
@@ -49,6 +50,7 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@supabase/supabase-js": "^2.55.0",
         "@tanstack/react-table": "^8.21.3",
+        "@vercel/speed-insights": "^1.2.0",
         "axios": "^1.10.0",
         "bcryptjs": "^2.4.3",
         "class-variance-authority": "^0.7.1",
@@ -86,7 +88,8 @@
         "postcss": "^8",
         "prettier": "^3.3.3",
         "tailwindcss": "^3.4.1",
-        "typescript": "5.6.2"
+        "typescript": "5.6.2",
+        "vitest": "3.2.4"
     },
     "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

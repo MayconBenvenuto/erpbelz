@@ -134,8 +134,8 @@ export async function PATCH(request, { params }) {
     const humanStatus = String(status).charAt(0).toUpperCase() + String(status).slice(1)
     const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
     let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
-    const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+  const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
 
     if (updated.cnpj) {
       try {
