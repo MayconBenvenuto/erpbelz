@@ -15,7 +15,25 @@ import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-export default function ProposalsSection({
+export default function ProposalsSection(props) {
+  const { currentUser } = props
+  const isConsultor = currentUser?.tipo_usuario === 'consultor'
+  if (isConsultor) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Acesso restrito</CardTitle>
+            <CardDescription>Consultores não têm acesso à tela de Propostas.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+  return <ProposalsInner {...props} />
+}
+
+function ProposalsInner({
   currentUser,
   proposals,
   operadoras,
@@ -35,7 +53,7 @@ export default function ProposalsSection({
   const [proposalForm, setProposalForm] = useState({
     cnpj: '',
     consultor: '',
-  consultor_email: '',
+    consultor_email: '',
     operadora: '',
     quantidade_vidas: '',
     valor: '',
@@ -222,7 +240,7 @@ export default function ProposalsSection({
             {currentUser.tipo_usuario === 'gestor' ? 'Visualize e monitore todas as propostas do sistema' : 'Crie, edite e gerencie suas propostas'}
           </p>
         </div>
-        {currentUser.tipo_usuario !== 'gestor' && (
+  {currentUser.tipo_usuario === 'analista' && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>

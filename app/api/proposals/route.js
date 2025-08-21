@@ -60,6 +60,9 @@ export async function POST(request) {
 	if (auth.error) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 	}
+	if (auth.user.tipo_usuario === 'consultor') {
+		return handleCORS(NextResponse.json({ error: 'Consultores não podem criar propostas' }, { status: 403 }), origin)
+	}
 
 	const body = await request.json()
 	const parsed = createSchema.safeParse(body)

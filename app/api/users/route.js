@@ -22,7 +22,7 @@ const createSchema = z.object({
 	nome: z.string().min(2),
 	email: z.string().email(),
 	senha: z.string().min(6),
-	tipo_usuario: z.enum(['gestor','analista'])
+	tipo_usuario: z.enum(['analista','consultor'])
 })
 
 export async function POST(request) {

@@ -10,7 +10,7 @@ Este documento resume a estrutura do banco para o CRM Belz, com base no script `
 - nome TEXT NOT NULL
 - email TEXT UNIQUE NOT NULL
 - senha TEXT NOT NULL (hash bcrypt em produção; pode existir plaintext legado)
-- tipo_usuario TEXT NOT NULL ('gestor' | 'analista')
+- tipo_usuario TEXT NOT NULL ('gestor' | 'analista' | 'consultor')
 - criado_em TIMESTAMPTZ DEFAULT now()
 
 ### propostas
@@ -91,9 +91,9 @@ Como aplicar:
 
 - Auth: POST /auth/login, /auth/logout – JWT 24h. `Authorization: Bearer <token>` obrigatório.
 - Propostas:
-  - GET /proposals – gestor: todas; analista: (criado_por = id) OR (consultor_email = email).
-  - POST /proposals – analista: força criado_por = id e preenche consultor_email se vazio.
-  - PATCH /proposals/:id – analista só altera se for criador ou consultor por e-mail.
+  - GET /proposals – gestor: todas; analista: (criado_por = id) OR (consultor_email = email); consultor: sem acesso no app.
+  - POST /proposals – analista: força criado_por = id e preenche consultor_email se vazio; consultor: proibido.
+  - PATCH /proposals/:id – analista só altera se for criador; consultor: proibido.
   - DELETE /proposals/:id – apenas gestor.
 - Users:
   - GET /users – lista básica
