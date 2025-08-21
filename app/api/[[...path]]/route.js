@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server'
 
-const gone = (method, path) => NextResponse.json({ error: 'Endpoint migrado para Nest', method, path }, { status: 410 })
+// Rota catch-all desativada: não deve bloquear rotas válidas sob /api/*.
+// Responde 404 genérico para caminhos não mapeados, permitindo que rotas específicas funcionem.
 
-export async function OPTIONS() { return gone('OPTIONS', '/api/*') }
-export async function GET() { return gone('GET', '/api/*') }
-export async function POST() { return gone('POST', '/api/*') }
-export async function PUT() { return gone('PUT', '/api/*') }
-export async function DELETE() { return gone('DELETE', '/api/*') }
-export async function PATCH() { return gone('PATCH', '/api/*') }
+export async function OPTIONS() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+export async function GET() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+export async function POST() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+export async function PUT() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+export async function DELETE() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+export async function PATCH() {
+	return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}

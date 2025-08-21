@@ -1,4 +1,21 @@
 import { NextResponse } from 'next/server'
-const _gone = (path) => NextResponse.json({ error: 'Endpoint migrado para Nest', path }, { status: 410 })
-export async function OPTIONS() { return _gone('/api/health') }
-export async function GET() { return _gone('/api/health') }
+import { handleCORS, getSupabaseHealth } from '@/lib/api-helpers'
+
+export async function OPTIONS(request) {
+	const origin = request.headers.get('origin')
+	return handleCORS(new NextResponse(null, { status: 200 }), origin)
+}
+
+export async function GET(request) {
+	const origin = request.headers.get('origin')
+	try {
+		const health = await getSupabaseHealth()
+		const status = health.ok ? 200 : 503
+		return handleCORS(NextResponse.json(health, { status }), origin)
+	} catch (e) {
+		return handleCORS(
+			NextResponse.json({ ok: false, error: 'health_check_failed' }, { status: 500 }),
+			origin
+		)
+	}
+}

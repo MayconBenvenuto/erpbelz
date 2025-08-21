@@ -19,16 +19,22 @@ export async function GET(request) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 	}
 
-	let query = supabase
-		.from('propostas')
-		.select('*')
-
-	if (auth.user.tipo_usuario !== 'gestor') {
-		query = query.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
+	const buildBase = () => {
+		let q = supabase.from('propostas').select('*')
+		if (auth.user.tipo_usuario !== 'gestor') {
+			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
+		}
+		return q
 	}
 
-	const { data, error } = await query
-		.order('codigo', { ascending: true, nullsFirst: false })
+	// 1) Tentativa com ordenação por código (preferencial)
+	let { data, error } = await buildBase().order('codigo', { ascending: true })
+	if (error) {
+		// 2) Fallback: ordena por criado_em (asc)
+		const fallback = await buildBase().order('criado_em', { ascending: true })
+		data = fallback.data
+		error = fallback.error
+	}
 
 	if (error) {
 		return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
