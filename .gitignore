@@ -91,6 +91,7 @@ Thumbs.db
 # Temporary folders
 tmp/
 temp/
+backups/
 
 # Supabase
 .supabase/
