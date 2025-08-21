@@ -83,7 +83,10 @@ CREATE INDEX idx_metas_usuario ON metas("usuario_id");
 
 -- Function to update user goals when proposal status changes to 'implantado'
 CREATE OR REPLACE FUNCTION atualizar_meta()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   -- Only update when status changes to 'implantado'
   IF NEW.status = 'implantado' AND (OLD.status IS NULL OR OLD.status != 'implantado') THEN
@@ -103,7 +106,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Create trigger for automatic meta updates
 CREATE TRIGGER trg_atualizar_meta
@@ -113,7 +116,10 @@ EXECUTE FUNCTION atualizar_meta();
 
 -- Function to manually update user meta (called from API)
 CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUMERIC)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
   INSERT INTO metas ("usuario_id", "valor_meta", "valor_alcancado", "atualizado_em")
   VALUES (p_usuario_id, 150000, p_valor, NOW())
@@ -121,7 +127,7 @@ BEGIN
     "valor_alcancado" = metas."valor_alcancado" + p_valor,
     "atualizado_em" = NOW();
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Insert sample users (password is plain text for demo - use proper hashing in production)
 INSERT INTO usuarios (id, nome, email, senha, tipo_usuario) VALUES
