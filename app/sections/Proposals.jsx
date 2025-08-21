@@ -236,7 +236,7 @@ export default function ProposalsSection({
                 <DialogDescription>Preencha os dados da nova proposta. O CNPJ será validado automaticamente.</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="cnpj">CNPJ</Label>
                     <Input id="cnpj" placeholder="00.000.000/0000-00" value={proposalForm.cnpj} onChange={(e) => setProposalForm(prev => ({ ...prev, cnpj: e.target.value }))} required />
@@ -283,7 +283,7 @@ export default function ProposalsSection({
                   </Card>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="operadora">Operadora</Label>
                     <Select value={proposalForm.operadora} onValueChange={(value) => setProposalForm(prev => ({ ...prev, operadora: value }))}>
@@ -301,7 +301,7 @@ export default function ProposalsSection({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="valor">Valor do Plano</Label>
                     <Input
@@ -460,7 +460,7 @@ export default function ProposalsSection({
                 type="button"
                 variant="outline"
                 onClick={() => setFilters(defaultFilters)}
-                className="w-full md:w-auto"
+                className="w-full md:w-auto min-h-10"
               >
                 Limpar filtros
               </Button>

@@ -1,22 +1,28 @@
-'use client'
+"use client"
 
 /**
  * Header
  * @param {{ activeTab: 'propostas'|'dashboard'|'usuarios'|'relatorios', currentUser: { tipo_usuario: string } }} props
  */
-export default function Header({ activeTab, currentUser }) {
+import Image from "next/image"
+
+export default function Header({ activeTab, currentUser, leftSlot }) {
   return (
-    <header className="border-b bg-card shadow-sm">
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">
+    <header className="border-b bg-card shadow-sm sticky top-0 z-30">
+      <div className="px-3 sm:px-6 py-2.5 sm:py-4">
+        <div className="flex items-center gap-3">
+          <div className="md:hidden">
+            {leftSlot}
+          </div>
+          <Image src="/logo-belz.jpg" alt="Logo Belz" width={28} height={28} className="rounded md:hidden" />
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-2xl font-bold text-foreground truncate">
               {activeTab === 'propostas' && (currentUser.tipo_usuario === 'gestor' ? 'Monitorar Propostas' : 'Gerenciar Propostas')}
               {activeTab === 'dashboard' && 'Dashboard'}
               {activeTab === 'usuarios' && 'Gerenciar Usuários'}
               {activeTab === 'relatorios' && 'Relatórios e Monitoramento'}
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="hidden sm:block text-sm text-muted-foreground mt-1">
               {activeTab === 'propostas' && (currentUser.tipo_usuario === 'gestor' ? 'Monitore e gerencie o status de todas as propostas' : 'Crie e visualize suas propostas')}
               {activeTab === 'dashboard' && 'Visão geral das métricas e indicadores'}
               {activeTab === 'usuarios' && 'Controle de usuários e permissões'}

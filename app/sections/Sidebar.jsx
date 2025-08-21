@@ -18,7 +18,7 @@ import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
-  <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r shadow-lg flex flex-col z-40">
+  <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-card border-r shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
       <div className="p-6 border-b">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10">
@@ -35,7 +35,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
         <div className="space-y-2">
           <button
             onClick={() => setActiveTab('propostas')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+            aria-current={activeTab === 'propostas' ? 'page' : undefined}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
               activeTab === 'propostas' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -45,7 +46,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
 
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
               activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -56,7 +58,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
           {currentUser.tipo_usuario !== 'gestor' && (
             <button
               onClick={() => setActiveTab('movimentacao')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                 activeTab === 'movimentacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -69,7 +72,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <>
               <button
                 onClick={() => setActiveTab('usuarios')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                aria-current={activeTab === 'usuarios' ? 'page' : undefined}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                   activeTab === 'usuarios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -79,7 +83,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
 
               <button
                 onClick={() => setActiveTab('relatorios')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                aria-current={activeTab === 'relatorios' ? 'page' : undefined}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                   activeTab === 'relatorios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -103,11 +108,11 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
         </div>
 
         <div className="mt-3 space-y-2">
-          <Button variant="outline" size="sm" onClick={onRefresh} className="w-full">
+          <Button variant="outline" size="sm" onClick={onRefresh} className="w-full" aria-label="Atualizar dados">
             <RefreshCw className="w-4 h-4 mr-2" />
             Atualizar
           </Button>
-          <Button variant="outline" size="sm" onClick={onLogout} className="w-full">
+          <Button variant="outline" size="sm" onClick={onLogout} className="w-full" aria-label="Sair da conta">
             <LogOut className="w-4 h-4 mr-2" />
             Sair
           </Button>

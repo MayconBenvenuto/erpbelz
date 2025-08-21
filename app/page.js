@@ -13,6 +13,7 @@ import Image from 'next/image'
 // Seções
 import Sidebar from '@/app/sections/Sidebar'
 import Header from '@/app/sections/Header'
+import MobileSidebar from '@/app/sections/MobileSidebar'
 import ProposalsSection from '@/app/sections/Proposals'
 import DashboardSection from '@/app/sections/Dashboard'
 import UsersSection from '@/app/sections/Users'
@@ -383,9 +384,13 @@ export default function App() {
     <div className="min-h-screen bg-background">
       <Toaster />
       <Sidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} />
-      <div className="ml-64 min-h-screen flex flex-col">
-        <Header activeTab={activeTab} currentUser={currentUser} />
-        <main className="flex-1 p-6 overflow-auto">
+      <div className="md:ml-64 min-h-screen flex flex-col">
+  <Header
+          activeTab={activeTab}
+          currentUser={currentUser}
+          leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
+        />
+  <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
           {/** Propostas visíveis conforme perfil: gestor vê todas; analista vê criadas por ele OU vinculadas ao seu email */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="propostas" className="space-y-6">
