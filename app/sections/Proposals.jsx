@@ -15,18 +15,10 @@ import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-export default function ProposalsSection({
-  currentUser,
-  proposals,
-  operadoras,
-  statusOptions,
-  onCreateProposal,
-  onUpdateProposalStatus,
-  isLoading,
-  users = [],
-  userGoals = [],
-}) {
-  if (currentUser?.tipo_usuario === 'consultor') {
+export default function ProposalsSection(props) {
+  const { currentUser } = props
+  const isConsultor = currentUser?.tipo_usuario === 'consultor'
+  if (isConsultor) {
     return (
       <div className="space-y-4">
         <Card>
@@ -38,6 +30,20 @@ export default function ProposalsSection({
       </div>
     )
   }
+  return <ProposalsInner {...props} />
+}
+
+function ProposalsInner({
+  currentUser,
+  proposals,
+  operadoras,
+  statusOptions,
+  onCreateProposal,
+  onUpdateProposalStatus,
+  isLoading,
+  users = [],
+  userGoals = [],
+}) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
@@ -47,7 +53,7 @@ export default function ProposalsSection({
   const [proposalForm, setProposalForm] = useState({
     cnpj: '',
     consultor: '',
-  consultor_email: '',
+    consultor_email: '',
     operadora: '',
     quantidade_vidas: '',
     valor: '',
