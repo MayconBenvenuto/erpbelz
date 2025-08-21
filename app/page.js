@@ -254,6 +254,31 @@ export default function App() {
     }
   }
 
+  const handlePatchProposal = async (proposalId, payload) => {
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const response = await fetch(`/api/proposals/${proposalId}`, {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+      if (response.ok) {
+        toast.success('Proposta atualizada com sucesso!')
+        await loadData()
+        return { ok: true }
+      } else {
+        const result = await response.json().catch(() => ({}))
+        toast.error(result.error || 'Erro ao atualizar proposta')
+        return { ok: false, error: result.error }
+      }
+    } catch {
+      toast.error('Erro ao conectar com o servidor')
+      return { ok: false, error: 'network' }
+    }
+  }
+
   // Handlers de usuários
   const handleCreateUser = async (payload) => {
     setIsLoading(true)
@@ -279,6 +304,30 @@ export default function App() {
       toast.error('Erro ao conectar com o servidor')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleUpdateUserGoal = async (usuarioId, valorMeta, valorAlcancado) => {
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const response = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ usuario_id: usuarioId, valor_meta: valorMeta, ...(typeof valorAlcancado === 'number' ? { valor_alcancado: valorAlcancado } : {}) })
+      })
+      if (response.ok) {
+        toast.success('Meta atualizada')
+        await loadData()
+        return { ok: true }
+      }
+      const result = await response.json().catch(() => ({}))
+      toast.error(result.error || 'Erro ao atualizar meta')
+      return { ok: false, error: result.error }
+    } catch {
+      toast.error('Erro ao conectar com o servidor')
+      return { ok: false, error: 'network' }
     }
   }
 
@@ -443,6 +492,7 @@ export default function App() {
                     statusOptions={statusOptions}
                     onCreateProposal={handleCreateProposal}
                     onUpdateProposalStatus={handleUpdateProposalStatus}
+                    onPatchProposal={handlePatchProposal}
                     isLoading={isLoading}
           users={users}
                     userGoals={userGoals}
@@ -481,7 +531,7 @@ export default function App() {
 
             {currentUser.tipo_usuario === 'gestor' && (
               <TabsContent value="usuarios" className="space-y-6">
-                <UsersSection users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} isLoading={isLoading} />
+                <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} isLoading={isLoading} />
               </TabsContent>
             )}
 

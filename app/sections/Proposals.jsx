@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { PlusCircle, X, RefreshCw } from 'lucide-react'
+import { PlusCircle, X, RefreshCw, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -40,6 +40,7 @@ function ProposalsInner({
   statusOptions,
   onCreateProposal,
   onUpdateProposalStatus,
+  onPatchProposal,
   isLoading,
   users = [],
   userGoals = [],
@@ -48,8 +49,21 @@ function ProposalsInner({
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
   const [updatingStatus, setUpdatingStatus] = useState({}) // { [proposalId]: boolean }
+  // Dialog de edição (gestor)
+  const [editDialogFor, setEditDialogFor] = useState(null) // proposta selecionada
+  const [editForm, setEditForm] = useState({
+    operadora: '',
+    quantidade_vidas: '',
+    valor: '',
+    previsao_implantacao: '',
+    consultor: '',
+    consultor_email: '',
+    criado_por: ''
+  })
+  const [auditOpenFor, setAuditOpenFor] = useState(null)
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   const [filters, setFilters] = useState(defaultFilters)
+  const [vidasSortAsc, setVidasSortAsc] = useState(true)
   const [proposalForm, setProposalForm] = useState({
     cnpj: '',
     consultor: '',
@@ -110,19 +124,21 @@ function ProposalsInner({
   const matchCodigo = !qn || (p.codigo && String(p.codigo).toLowerCase().includes(qn))
   return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor
     })
-    // Ordenação crescente por codigo (PRP0000, PRP0001, ...)
+    // Ordenação por vidas (asc/desc). Empate: usa codigo asc; fallback criado_em asc
     return list.slice().sort((a, b) => {
+      const va = Number(a?.quantidade_vidas || 0)
+      const vb = Number(b?.quantidade_vidas || 0)
+      if (va !== vb) return vidasSortAsc ? va - vb : vb - va
       const ca = a?.codigo || ''
       const cb = b?.codigo || ''
       if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
       if (ca) return -1
       if (cb) return 1
-      // Fallback: sem codigo, ordena por criado_em asc se disponível
       const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
       const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
       return da - db
     })
-  }, [proposals, filters, currentUser.tipo_usuario])
+  }, [proposals, filters, currentUser.tipo_usuario, vidasSortAsc])
 
   const activeFilters = useMemo(() => {
     const items = []
@@ -135,7 +151,7 @@ function ProposalsInner({
     if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos') {
       items.push({ key: 'consultor', label: `consultor: ${filters.consultor}` })
     }
-    if (filters.q && filters.q.trim()) items.push({ key: 'q', label: `busca: "${filters.q.trim()}"` })
+  if (filters.q && filters.q.trim()) items.push({ key: 'q', label: `busca: "${filters.q.trim()}"` })
     return items
   }, [filters, currentUser.tipo_usuario, users])
 
@@ -145,7 +161,7 @@ function ProposalsInner({
       if (key === 'operadora') return { ...prev, operadora: 'todas' }
       if (key === 'analista') return { ...prev, analista: 'todos' }
       if (key === 'consultor') return { ...prev, consultor: 'todos' }
-      if (key === 'q') return { ...prev, q: '' }
+  if (key === 'q') return { ...prev, q: '' }
       return prev
     })
   }
@@ -153,6 +169,34 @@ function ProposalsInner({
   const consultores = useMemo(() => {
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
   }, [proposals])
+
+  const openEditDialog = (p) => {
+    setEditDialogFor(p)
+    setEditForm({
+      operadora: p.operadora || '',
+      quantidade_vidas: String(p.quantidade_vidas ?? ''),
+      valor: String(p.valor ?? ''),
+      previsao_implantacao: p.previsao_implantacao ? String(p.previsao_implantacao).slice(0,10) : '',
+      consultor: p.consultor || '',
+      consultor_email: p.consultor_email || '',
+      criado_por: String(p.criado_por || '')
+    })
+  }
+  const closeEditDialog = () => { setEditDialogFor(null); setEditForm({ operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', consultor: '', consultor_email: '', criado_por: '' }) }
+  const saveEditDialog = async () => {
+    if (!editDialogFor) return
+    const payload = {
+      operadora: editForm.operadora,
+      quantidade_vidas: Number(editForm.quantidade_vidas || 0),
+      valor: Number(editForm.valor || 0),
+      previsao_implantacao: editForm.previsao_implantacao || null,
+      consultor: editForm.consultor,
+      consultor_email: editForm.consultor_email,
+      criado_por: editForm.criado_por
+    }
+    const res = await onPatchProposal?.(editDialogFor.id, payload)
+    if (res?.ok) closeEditDialog()
+  }
 
   const parseMoneyToNumber = (masked) => {
     const digits = String(masked || '').replace(/\D/g, '')
@@ -393,10 +437,10 @@ function ProposalsInner({
         </Card>
       )}
 
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>Lista de Propostas</CardTitle>
-          <CardDescription>{filteredProposals.length} de {proposals.length} proposta(s)</CardDescription>
+      <CardDescription>{filteredProposals.length} de {proposals.length} proposta(s)</CardDescription>
           {activeFilters.length > 0 && (
             <div className="text-xs mt-1 flex items-center flex-wrap gap-2">
               {activeFilters.map((f) => (
@@ -473,6 +517,19 @@ function ProposalsInner({
                 </Select>
               </div>
             )}
+            {/* Ordenação por vidas (analista e gestor) */}
+            <div className="flex items-center md:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setVidasSortAsc(v => !v)}
+                className="w-full md:w-auto min-h-10 inline-flex items-center gap-2"
+                title={vidasSortAsc ? 'Ordenar Vidas: Decrescente' : 'Ordenar Vidas: Crescente'}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                {vidasSortAsc ? 'Vidas Crescente' : 'Vidas Decrescente'}
+              </Button>
+            </div>
             <div className="flex items-center md:justify-end">
               <Button
                 type="button"
@@ -494,10 +551,24 @@ function ProposalsInner({
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Analista</TableHead>}
                 <TableHead>Operadora</TableHead>
-                <TableHead>Vidas</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => setVidasSortAsc(v => !v)}
+                    className="inline-flex items-center gap-1 hover:underline cursor-pointer select-none"
+                    title={vidasSortAsc ? 'Ordenar vidas: decrescente' : 'Ordenar vidas: crescente'}
+                    aria-label="Ordenar por vidas"
+                  >
+                    Vidas {vidasSortAsc ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
+                {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -573,18 +644,129 @@ function ProposalsInner({
                       </Select>
                     )}
                   </TableCell>
-                  {/* {currentUser.tipo_usuario === 'gestor' && (
+                  {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
-                      <Button variant="destructive" size="sm" onClick={() => onDeleteProposal(proposal.id)}>Excluir</Button>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button size="sm" variant="outline" onClick={() => openEditDialog(proposal)}>Editar</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setAuditOpenFor(proposal.id)}>Histórico</Button>
+                      </div>
                     </TableCell>
-                  )} */}
+                  )}
                 </TableRow>
               )})}
             </TableBody>
           </Table>
           </TooltipProvider>
+          {auditOpenFor && (
+            <AuditDrawer id={auditOpenFor} onClose={() => setAuditOpenFor(null)} />
+          )}
+          {/* Dialog de edição de proposta (gestor) */}
+          <Dialog open={!!editDialogFor} onOpenChange={(v) => { if (!v) closeEditDialog() }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Editar proposta</DialogTitle>
+                <DialogDescription>Atualize os dados da proposta selecionada.</DialogDescription>
+              </DialogHeader>
+              {editDialogFor && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Operadora</Label>
+                      <Select value={editForm.operadora} onValueChange={(v) => setEditForm(prev => ({ ...prev, operadora: v }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a operadora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operadoras.map(op => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantidade de Vidas</Label>
+                      <Input type="number" value={editForm.quantidade_vidas} onChange={(e) => setEditForm(prev => ({ ...prev, quantidade_vidas: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Valor do Plano</Label>
+                      <Input type="number" step="0.01" value={editForm.valor} onChange={(e) => setEditForm(prev => ({ ...prev, valor: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Previsão de Implantação</Label>
+                      <Input type="date" value={editForm.previsao_implantacao} onChange={(e) => setEditForm(prev => ({ ...prev, previsao_implantacao: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Consultor</Label>
+                      <Input value={editForm.consultor} onChange={(e) => setEditForm(prev => ({ ...prev, consultor: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email do Consultor</Label>
+                      <Input type="email" value={editForm.consultor_email} onChange={(e) => setEditForm(prev => ({ ...prev, consultor_email: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Analista</Label>
+                    <Select value={editForm.criado_por} onValueChange={(v) => setEditForm(prev => ({ ...prev, criado_por: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o analista" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={closeEditDialog}>Cancelar</Button>
+                    <Button onClick={saveEditDialog}>Salvar</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function AuditDrawer({ id, onClose }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/proposals/${id}/audit`, { credentials: 'include' })
+        const data = await res.json().catch(() => [])
+        if (mounted) setItems(Array.isArray(data) ? data : [])
+      } finally { if (mounted) setLoading(false) }
+    })()
+    return () => { mounted = false }
+  }, [id])
+  return (
+    <div className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-card border w-full sm:max-w-2xl max-h-[80vh] overflow-auto rounded-t-xl sm:rounded-xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-semibold">Histórico de alterações</h3>
+          <Button variant="ghost" onClick={onClose}>Fechar</Button>
+        </div>
+        <div className="p-4 space-y-3 text-sm">
+          {loading ? 'Carregando…' : (
+            items.length === 0 ? 'Sem registros' : items.map((it) => (
+              <div key={it.id} className="p-3 rounded border">
+                <div className="text-xs text-muted-foreground">{new Date(it.criado_em).toLocaleString('pt-BR')}</div>
+                <pre className="text-xs whitespace-pre-wrap mt-1">{JSON.stringify(it.changes, null, 2)}</pre>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -7,10 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
-export default function ReportsSection({ users, sessions, proposals, onRefresh }) {
+export default function ReportsSection({ users, sessions, proposals, onRefresh, currentUser, token }) {
   const [refreshing, setRefreshing] = useState(false)
+  const [perf, setPerf] = useState(null)
+  const [loadingPerf, setLoadingPerf] = useState(false)
+  const [start, setStart] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10))
+  const [end, setEnd] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).toISOString().slice(0,10))
   // Filtrar gestores do monitoramento
   const analystUsers = Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []
   const analystIds = new Set(analystUsers.map(u => u.id))
@@ -18,8 +24,166 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
   const filteredProposals = Array.isArray(proposals) ? proposals.filter(p => analystIds.has(p.criado_por)) : []
   const now = Date.now()
   const isSessionActive = (s) => !s.data_logout && (!s.ultimo_ping || (now - new Date(s.ultimo_ping).getTime()) < 5 * 60 * 1000)
+
+  const loadPerformance = async () => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    setLoadingPerf(true)
+    try {
+      const res = await fetch(`/api/reports/performance?start=${start}&end=${end}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setPerf(data)
+    } catch (_) {
+      // silencioso no relatório
+    } finally {
+      setLoadingPerf(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPerformance()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <div className="space-y-6">
+      {currentUser?.tipo_usuario === 'gestor' && (
+        <section className="space-y-4">
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="text-sm block mb-1">Início</label>
+              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm block mb-1">Fim</label>
+              <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+            <Button onClick={loadPerformance} disabled={loadingPerf} className="ml-auto">
+              {loadingPerf ? 'Atualizando...' : 'Atualizar'}
+            </Button>
+          </div>
+
+          {perf && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card className="lg:col-span-3">
+                <CardHeader>
+                  <CardTitle>Painel de Desempenho</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>KPIs</CardTitle></CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between"><span>Total propostas</span><strong>{perf.kpis?.total_propostas ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Implantadas</span><strong>{perf.kpis?.implantadas ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Ticket médio</span><strong>R$ {Number(perf.kpis?.ticket_medio_geral ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+                      <div className="flex justify-between"><span>Vidas</span><strong>{perf.kpis?.vidas_totais ?? 0}</strong></div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="xl:col-span-1">
+                    <CardHeader><CardTitle>Funil por Status</CardTitle></CardHeader>
+                    <CardContent className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perf.funilStatus || []}>
+                          <XAxis dataKey="status" hide />
+                          <YAxis hide />
+                          <Tooltip />
+                          <Bar dataKey="total" fill="#130E54" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="xl:col-span-1">
+                    <CardHeader><CardTitle>Vidas por Operadora</CardTitle></CardHeader>
+                    <CardContent className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perf.vidasPorOperadora || []}>
+                          <XAxis dataKey="operadora" hide />
+                          <YAxis hide />
+                          <Tooltip />
+                          <Bar dataKey="vidas_total" fill="#021d79" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="xl:col-span-1">
+                    <CardHeader><CardTitle>Ticket Médio (implantadas)</CardTitle></CardHeader>
+                    <CardContent className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={[{ name: 'Ticket', value: Number(perf.kpis?.ticket_medio_geral || 0) }]} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
+                            <Cell fill="#6b7cff" />
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Ranking por Analista</CardTitle></CardHeader>
+                <CardContent className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Analista</TableHead>
+                        <TableHead>Propostas</TableHead>
+                        <TableHead>Implantadas</TableHead>
+                        <TableHead>Ticket Médio</TableHead>
+                        <TableHead>Vidas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(perf.rankingAnalistas || []).map((r) => (
+                        <TableRow key={r.usuario_id || r.nome}>
+                          <TableCell>{r.nome}</TableCell>
+                          <TableCell>{r.total_propostas}</TableCell>
+                          <TableCell>{r.implantadas} ({r.taxa_implantacao}%)</TableCell>
+                          <TableCell>R$ {Number(r.ticket_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell>{r.vidas_total}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Ranking por Consultor</CardTitle></CardHeader>
+                <CardContent className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Consultor</TableHead>
+                        <TableHead>Propostas</TableHead>
+                        <TableHead>Implantadas</TableHead>
+                        <TableHead>Ticket Médio</TableHead>
+                        <TableHead>Vidas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(perf.rankingConsultores || []).map((r) => (
+                        <TableRow key={r.consultor}>
+                          <TableCell>{r.consultor}</TableCell>
+                          <TableCell>{r.total_propostas}</TableCell>
+                          <TableCell>{r.implantadas} ({r.taxa_implantacao}%)</TableCell>
+                          <TableCell>R$ {Number(r.ticket_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell>{r.vidas_total}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </section>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-primary">Relatórios e Monitoramento</h2>
         <Button
