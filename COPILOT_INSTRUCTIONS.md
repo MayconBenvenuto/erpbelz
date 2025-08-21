@@ -24,6 +24,14 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 - Mantido: API padronizada para PATCH; analista só altera status das próprias propostas; tooltip de Razão Social no CNPJ via `/api/validate-cnpj`; filtros persistentes por usuário.
 - Migration anterior: `scripts/migrations/2025-08-18-add-consultor-email.sql` adiciona `consultor_email` obrigatório às propostas.
 
+### Sessão do Navegador e Heartbeat
+
+- Autenticação usa cookie HttpOnly de sessão `crm_auth` (SameSite=Lax, sem Max-Age/Expires) definido no login e removido no logout.
+- O app cliente mantém estado da sessão em `sessionStorage`. Recarregar a página faz bootstrap via `GET /api/auth/me`. Fechou o navegador? Nova sessão é exigida ao reabrir.
+- Todos os fetches para `/api/*` devem usar `credentials: 'include'` para enviar o cookie.
+- Online/Offline em Relatórios considera sessões sem `data_logout` e com `ultimo_ping` recente (< 2 minutos). O cliente envia `POST /api/sessions/ping` a cada ~60s.
+- SQL opcional para habilitar heartbeat: adicionar coluna `ultimo_ping TIMESTAMPTZ` à tabela `sessoes` e índices (`idx_sessoes_ultimo_ping`, `idx_sessoes_usuario_id`).
+
 ## 🏗️ Arquitetura do Projeto
 
 ### 📁 Estrutura de Pastas
@@ -250,6 +258,14 @@ CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUM
 POST /api/auth/login
 Body: { email: string, password: string }
 Response: { user: object, sessionId: string, token: string }
+
+```http
+GET /api/auth/me
+  -> Retorna o usuário autenticado com base no cookie/token.
+
+POST /api/sessions/ping
+  Body: { sessionId: string }
+  -> Atualiza `ultimo_ping` da sessão do usuário autenticado.
 ```
 
 #### Propostas

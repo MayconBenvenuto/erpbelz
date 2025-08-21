@@ -292,6 +292,44 @@ Este projeto é privado e proprietário da Belz.
 
 Em caso de problemas de segurança, entre em contato imediatamente com a equipe de desenvolvimento.
 
+## 🕒 Sessões e Heartbeat (Online/Offline)
+
+Este projeto usa cookie de sessão HttpOnly e sessionStorage para controlar a sessão do usuário:
+
+- Cookie `crm_auth` (HttpOnly, SameSite=Lax, sem Max-Age/Expires) é definido no login e removido no logout.
+- No cliente, os dados da sessão (usuário, sessionId, last_activity e opcionalmente o token) são guardados no `sessionStorage` apenas durante a sessão do navegador.
+- Recarregar a página mantém o login (bootstrap via `GET /api/auth/me`), mas ao fechar o navegador a sessão é perdida e será necessário novo login ao reabrir.
+- Todas as chamadas `fetch` do cliente para `/api/*` usam `credentials: 'include'` para garantir o envio do cookie.
+
+### Endpoints de sessão
+
+- `GET /api/auth/me` → Retorna o usuário autenticado com base no cookie/token.
+- `POST /api/sessions/ping` → Atualiza `ultimo_ping` da sessão do usuário para melhorar o cálculo de “online”.
+
+### SQL (migration opcional) – coluna de heartbeat
+
+```sql
+ALTER TABLE public.sessoes
+  ADD COLUMN IF NOT EXISTS ultimo_ping TIMESTAMPTZ;
+
+-- Backfill básico
+UPDATE public.sessoes
+SET ultimo_ping = data_logout
+WHERE ultimo_ping IS NULL AND data_logout IS NOT NULL;
+
+UPDATE public.sessoes
+SET ultimo_ping = data_login
+WHERE ultimo_ping IS NULL;
+
+-- Índices úteis
+CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_ping DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
+```
+
+### Cálculo de usuários “online”
+
+Um usuário é considerado online se possui sessão sem `data_logout` e com `ultimo_ping` recente (ex.: nos últimos 2 minutos). O cliente envia pings a cada ~60s.
+
 —
 Atualizado em: 20/08/2025
 
