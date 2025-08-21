@@ -1,0 +1,31 @@
+import { NextResponse } from 'next/server'
+import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+
+export async function OPTIONS(request) {
+  const origin = request.headers.get('origin')
+  return handleCORS(new NextResponse(null, { status: 200 }), origin)
+}
+
+export async function POST(request) {
+  const origin = request.headers.get('origin')
+  const auth = await requireAuth(request)
+  if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+
+  try {
+    const { sessionId } = await request.json().catch(() => ({}))
+    if (!sessionId) return handleCORS(NextResponse.json({ error: 'sessionId requerido' }, { status: 400 }), origin)
+
+    const { error } = await supabase
+      .from('sessoes')
+      .update({ ultimo_ping: new Date().toISOString() })
+      .eq('id', sessionId)
+      .eq('usuario_id', auth.user.id)
+
+    if (error) {
+      return handleCORS(NextResponse.json({ ok: false, skipped: true }), origin)
+    }
+    return handleCORS(NextResponse.json({ ok: true }), origin)
+  } catch {
+    return handleCORS(NextResponse.json({ ok: false }), origin)
+  }
+}

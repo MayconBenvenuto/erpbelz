@@ -45,7 +45,7 @@ export default function App() {
       sessionStorage.setItem('crm_user', JSON.stringify(user))
       sessionStorage.setItem('crm_session', sessionId)
       sessionStorage.setItem('crm_last_activity', Date.now().toString())
-      if (tokenValue) sessionStorage.setItem('crm_token', tokenValue)
+  if (tokenValue) sessionStorage.setItem('crm_token', tokenValue)
     } catch (_) {
       // ignore quota or storage errors
     }
@@ -65,16 +65,16 @@ export default function App() {
       const user = sessionStorage.getItem('crm_user')
       const session = sessionStorage.getItem('crm_session')
       const lastActivity = sessionStorage.getItem('crm_last_activity')
-      const savedToken = sessionStorage.getItem('crm_token')
-
-      if (user && session && lastActivity && savedToken) {
+    const savedToken = sessionStorage.getItem('crm_token')
+    // aceita sessão baseada em cookie (sem token salvo no storage)
+    if (user && session && lastActivity) {
         const timeSinceLastActivity = Date.now() - parseInt(lastActivity)
         // Sessão válida por 24h (apenas enquanto o navegador estiver aberto)
         if (timeSinceLastActivity < 24 * 60 * 60 * 1000) {
           setCurrentUser(JSON.parse(user))
           setSessionId(session)
           setLastActivity(parseInt(lastActivity))
-          setToken(savedToken)
+      if (savedToken) setToken(savedToken)
           return true
         }
       }
@@ -92,6 +92,7 @@ export default function App() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(loginForm)
       })
       const result = await response.json()
@@ -118,6 +119,7 @@ export default function App() {
         await fetch('/api/auth/logout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ sessionId })
         })
       }
@@ -136,11 +138,12 @@ export default function App() {
   const loadData = useCallback(async () => {
     try {
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+      const common = { credentials: 'include' }
       const [proposalsRes, usersRes, goalsRes, sessionsRes] = await Promise.all([
-        fetch('/api/proposals', { headers: authHeaders }),
-        fetch('/api/users', { headers: authHeaders }),
-        fetch('/api/goals', { headers: authHeaders }),
-        fetch('/api/sessions', { headers: authHeaders })
+        fetch('/api/proposals', { headers: authHeaders, ...common }),
+        fetch('/api/users', { headers: authHeaders, ...common }),
+        fetch('/api/goals', { headers: authHeaders, ...common }),
+        fetch('/api/sessions', { headers: authHeaders, ...common })
       ])
       if (proposalsRes.ok) setProposals(await proposalsRes.json())
       if (usersRes.ok) setUsers(await usersRes.json())
@@ -163,6 +166,7 @@ export default function App() {
       const response = await fetch('/api/proposals', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify(body)
       })
       const result = await response.json()
@@ -209,6 +213,7 @@ export default function App() {
       const response = await fetch(`/api/proposals/${proposalId}`, {
         method: 'PATCH',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus, criado_por: proposal.criado_por, valor: proposal.valor })
       })
       if (response.ok) {
@@ -237,6 +242,7 @@ export default function App() {
       const response = await fetch('/api/users', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify(body)
       })
       const result = await response.json()
@@ -269,7 +275,26 @@ export default function App() {
 
   // Effects
   useEffect(() => {
-    loadSessionFromStorage()
+    const hadSession = loadSessionFromStorage()
+    if (!hadSession) {
+      // tenta bootstrapping via cookie HttpOnly
+      ;(async () => {
+        try {
+          const res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' })
+          if (res.ok) {
+            const data = await res.json()
+            if (data?.user) {
+              // cria nova sessão local baseada no cookie (sem sessionId do backend)
+              const pseudoSessionId = `cookie-${Date.now()}`
+              setCurrentUser(data.user)
+              setSessionId(pseudoSessionId)
+              setToken(null) // token não é exposto via cookie HttpOnly
+              saveSessionToStorage(data.user, pseudoSessionId, '')
+            }
+          }
+        } catch {}
+      })()
+    }
   }, [])
 
   useEffect(() => {
@@ -286,9 +311,25 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       const interval = setInterval(autoRefreshData, 30000)
-      return () => clearInterval(interval)
+      // também envia ping de sessão para melhorar precisão do status online
+      const ping = async () => {
+        try {
+          if (!sessionId) return
+          const headers = { 'Content-Type': 'application/json' }
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          await fetch('/api/sessions/ping', {
+            method: 'POST',
+            headers,
+            credentials: 'include',
+            body: JSON.stringify({ sessionId })
+          })
+        } catch {}
+      }
+      const pingInterval = setInterval(ping, 60000)
+      ping()
+      return () => { clearInterval(interval); clearInterval(pingInterval) }
     }
-  }, [currentUser, autoRefreshData])
+  }, [currentUser, autoRefreshData, sessionId, token])
 
   useEffect(() => {
     if (currentUser) {
@@ -304,28 +345,7 @@ export default function App() {
     else if (!currentUser) clearSessionFromStorage()
   }, [currentUser, sessionId, token])
 
-  // Ao fechar a aba/janela, envia logout via sendBeacon e limpa storage
-  useEffect(() => {
-    if (!sessionId) return
-
-    let beaconSent = false
-    const sendLogoutBeacon = () => {
-      if (beaconSent || !sessionId) return
-      try {
-        const blob = new Blob([JSON.stringify({ sessionId })], { type: 'application/json' })
-        navigator.sendBeacon && navigator.sendBeacon('/api/auth/logout', blob)
-      } catch (_) {}
-      beaconSent = true
-      clearSessionFromStorage()
-    }
-
-    window.addEventListener('pagehide', sendLogoutBeacon)
-    window.addEventListener('beforeunload', sendLogoutBeacon)
-    return () => {
-      window.removeEventListener('pagehide', sendLogoutBeacon)
-      window.removeEventListener('beforeunload', sendLogoutBeacon)
-    }
-  }, [sessionId])
+  // Sem logout automático no pagehide/beforeunload para preservar sessão em reload.
 
   // Login
   if (!currentUser) {

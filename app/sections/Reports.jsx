@@ -16,6 +16,8 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
   const analystIds = new Set(analystUsers.map(u => u.id))
   const filteredSessions = Array.isArray(sessions) ? sessions.filter(s => analystIds.has(s.usuario_id)) : []
   const filteredProposals = Array.isArray(proposals) ? proposals.filter(p => analystIds.has(p.criado_por)) : []
+  const now = Date.now()
+  const isSessionActive = (s) => !s.data_logout && (!s.ultimo_ping || (now - new Date(s.ultimo_ping).getTime()) < 5 * 60 * 1000)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -38,7 +40,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
               <Users className="w-5 h-5 text-green-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Usuários Online</p>
-                <p className="text-2xl font-bold text-green-600">{filteredSessions.filter(s => !s.data_logout).length}</p>
+                <p className="text-2xl font-bold text-green-600">{filteredSessions.filter(s => isSessionActive(s)).length}</p>
               </div>
             </div>
           </CardContent>
@@ -103,7 +105,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh }
           <div className="space-y-4">
             {analystUsers.map((user) => {
               const userSessions = sessions.filter(s => s.usuario_id === user.id)
-              const currentSession = userSessions.find(s => !s.data_logout)
+              const currentSession = userSessions.find(s => isSessionActive(s))
               const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())
 
               const calculateSessionTime = (session) => {
