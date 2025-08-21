@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { PlusCircle, X, RefreshCw } from 'lucide-react'
+import { PlusCircle, X, RefreshCw, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -50,6 +50,7 @@ function ProposalsInner({
   const [updatingStatus, setUpdatingStatus] = useState({}) // { [proposalId]: boolean }
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   const [filters, setFilters] = useState(defaultFilters)
+  const [vidasSortAsc, setVidasSortAsc] = useState(true)
   const [proposalForm, setProposalForm] = useState({
     cnpj: '',
     consultor: '',
@@ -110,19 +111,21 @@ function ProposalsInner({
   const matchCodigo = !qn || (p.codigo && String(p.codigo).toLowerCase().includes(qn))
   return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor
     })
-    // Ordenação crescente por codigo (PRP0000, PRP0001, ...)
+    // Ordenação por vidas (asc/desc). Empate: usa codigo asc; fallback criado_em asc
     return list.slice().sort((a, b) => {
+      const va = Number(a?.quantidade_vidas || 0)
+      const vb = Number(b?.quantidade_vidas || 0)
+      if (va !== vb) return vidasSortAsc ? va - vb : vb - va
       const ca = a?.codigo || ''
       const cb = b?.codigo || ''
       if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
       if (ca) return -1
       if (cb) return 1
-      // Fallback: sem codigo, ordena por criado_em asc se disponível
       const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
       const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
       return da - db
     })
-  }, [proposals, filters, currentUser.tipo_usuario])
+  }, [proposals, filters, currentUser.tipo_usuario, vidasSortAsc])
 
   const activeFilters = useMemo(() => {
     const items = []
@@ -135,7 +138,7 @@ function ProposalsInner({
     if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos') {
       items.push({ key: 'consultor', label: `consultor: ${filters.consultor}` })
     }
-    if (filters.q && filters.q.trim()) items.push({ key: 'q', label: `busca: "${filters.q.trim()}"` })
+  if (filters.q && filters.q.trim()) items.push({ key: 'q', label: `busca: "${filters.q.trim()}"` })
     return items
   }, [filters, currentUser.tipo_usuario, users])
 
@@ -145,7 +148,7 @@ function ProposalsInner({
       if (key === 'operadora') return { ...prev, operadora: 'todas' }
       if (key === 'analista') return { ...prev, analista: 'todos' }
       if (key === 'consultor') return { ...prev, consultor: 'todos' }
-      if (key === 'q') return { ...prev, q: '' }
+  if (key === 'q') return { ...prev, q: '' }
       return prev
     })
   }
@@ -393,10 +396,10 @@ function ProposalsInner({
         </Card>
       )}
 
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>Lista de Propostas</CardTitle>
-          <CardDescription>{filteredProposals.length} de {proposals.length} proposta(s)</CardDescription>
+      <CardDescription>{filteredProposals.length} de {proposals.length} proposta(s)</CardDescription>
           {activeFilters.length > 0 && (
             <div className="text-xs mt-1 flex items-center flex-wrap gap-2">
               {activeFilters.map((f) => (
@@ -473,6 +476,19 @@ function ProposalsInner({
                 </Select>
               </div>
             )}
+            {/* Ordenação por vidas (analista e gestor) */}
+            <div className="flex items-center md:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setVidasSortAsc(v => !v)}
+                className="w-full md:w-auto min-h-10 inline-flex items-center gap-2"
+                title={vidasSortAsc ? 'Ordenar Vidas: Decrescente' : 'Ordenar Vidas: Crescente'}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                {vidasSortAsc ? 'Vidas Crescente' : 'Vidas Decrescente'}
+              </Button>
+            </div>
             <div className="flex items-center md:justify-end">
               <Button
                 type="button"
@@ -494,7 +510,21 @@ function ProposalsInner({
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Email do Consultor</TableHead>}
                 {currentUser.tipo_usuario === 'gestor' && <TableHead>Analista</TableHead>}
                 <TableHead>Operadora</TableHead>
-                <TableHead>Vidas</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => setVidasSortAsc(v => !v)}
+                    className="inline-flex items-center gap-1 hover:underline cursor-pointer select-none"
+                    title={vidasSortAsc ? 'Ordenar vidas: decrescente' : 'Ordenar vidas: crescente'}
+                    aria-label="Ordenar por vidas"
+                  >
+                    Vidas {vidasSortAsc ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
                 {/* {currentUser.tipo_usuario === 'gestor' && <TableHead>Ações</TableHead>} */}
