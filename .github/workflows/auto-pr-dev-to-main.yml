@@ -1,0 +1,97 @@
+name: Auto PR dev -> main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'dev' }}
+    runs-on: ubuntu-latest
+    env:
+      PR_LABELS: release,auto-pr
+      PR_ASSIGNEES: ""
+      PR_REVIEWERS: ""
+    steps:
+      - name: Create or reuse PR dev -> main
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const head = 'dev';
+            const base = 'main';
+            // Skip if no changes between branches
+            try {
+              const cmp = await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${base}...${head}` });
+              if (cmp.data.ahead_by === 0) {
+                core.info('Sem diferenças entre dev e main. PR não necessário.');
+                return;
+              }
+            } catch (e) {
+              core.warning(`Falha ao comparar branches: ${e.message}`);
+            }
+            const existing = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base });
+            let prNumber;
+            if (existing.data.length > 0) {
+              prNumber = existing.data[0].number;
+              core.info(`PR já aberto: #${prNumber}`);
+            } else {
+              const title = 'chore: Release dev -> main';
+              const body = 'PR automático para promover homologação (`dev`) para produção (`main`).';
+              try {
+                const pr = await github.rest.pulls.create({ owner, repo, head, base, title, body, maintainer_can_modify: true, draft: false });
+                prNumber = pr.data.number;
+                core.info(`PR criado: #${prNumber}`);
+              } catch (e) {
+                if (e.status === 422) {
+                  core.info('Sem commits entre as branches. Nada a fazer.');
+                  return;
+                } else {
+                  throw e;
+                }
+              }
+            }
+
+            // Apply labels, assignees, and reviewers if configured
+            if (prNumber) {
+              const labels = (process.env.PR_LABELS || '').split(',').map(s => s.trim()).filter(Boolean);
+              if (labels.length) {
+                try {
+                  await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels });
+                } catch (e) {
+                  core.warning(`Falha ao adicionar labels: ${e.message}`);
+                }
+              }
+
+              const assignees = (process.env.PR_ASSIGNEES || '').split(',').map(s => s.trim()).filter(Boolean);
+              if (assignees.length) {
+                try {
+                  await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees });
+                } catch (e) {
+                  core.warning(`Falha ao atribuir responsáveis: ${e.message}`);
+                }
+              } else {
+                // fallback: assign repo owner
+                try {
+                  await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees: [owner] });
+                } catch (e) {
+                  core.info('Não foi possível atribuir o owner, seguindo sem assignees.');
+                }
+              }
+
+              const reviewers = (process.env.PR_REVIEWERS || '').split(',').map(s => s.trim()).filter(Boolean);
+              if (reviewers.length) {
+                try {
+                  await github.rest.pulls.requestReviewers({ owner, repo, pull_number: prNumber, reviewers });
+                } catch (e) {
+                  core.warning(`Falha ao solicitar reviewers: ${e.message}`);
+                }
+              }
+            }

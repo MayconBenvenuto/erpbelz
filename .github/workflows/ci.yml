@@ -1,11 +1,10 @@
 name: CI
 
 on:
-  # Temporariamente desativado para push/PR
-  # push:
-  #   branches: [ main, dev, testes ]
-  # pull_request:
-  #   branches: [ main, dev, testes ]
+  push:
+    branches: [ main, dev, testes ]
+  pull_request:
+    branches: [ main, dev, testes ]
   workflow_dispatch:
 
 concurrency:
