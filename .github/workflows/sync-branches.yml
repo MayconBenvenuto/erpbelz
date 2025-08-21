@@ -1,0 +1,36 @@
+name: Sync branches
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Push main -> dev
+        run: |
+          git fetch origin dev || true
+          git checkout -B dev origin/dev || git checkout -b dev
+          git merge --no-edit origin/main || true
+          git push origin dev
+
+      - name: Push main -> testes
+        run: |
+          git fetch origin testes || true
+          git checkout -B testes origin/testes || git checkout -b testes
+          git merge --no-edit origin/main || true
+          git push origin testes
