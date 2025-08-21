@@ -19,7 +19,7 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await onCreateUser({ ...userForm, afterSuccess: () => { setUserForm({ nome: '', email: '', senha: '', tipo_usuario: 'analista' }); setIsUserDialogOpen(false) } })
+  await onCreateUser({ ...userForm, afterSuccess: () => { setUserForm({ nome: '', email: '', senha: '', tipo_usuario: 'analista' }); setIsUserDialogOpen(false) } })
   }
 
   return (
@@ -33,7 +33,7 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Novo Usuário</DialogTitle>
-              <DialogDescription>Adicione um novo usuário analista ao sistema.</DialogDescription>
+              <DialogDescription>Adicione um novo usuário (analista ou consultor) ao sistema.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -50,13 +50,13 @@ export default function UsersSection({ users, proposals, userGoals, onCreateUser
               </div>
               <div className="space-y-2">
                 <Label htmlFor="user-tipo">Tipo de Usuário</Label>
-                <Select value={userForm.tipo_usuario} onValueChange={(value) => setUserForm(prev => ({ ...prev, tipo_usuario: value }))}>
+        <Select value={userForm.tipo_usuario} onValueChange={(value) => setUserForm(prev => ({ ...prev, tipo_usuario: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="analista">Analista</SelectItem>
-                    <SelectItem value="gestor">Gestor</SelectItem>
+                    <SelectItem value="consultor">Consultor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

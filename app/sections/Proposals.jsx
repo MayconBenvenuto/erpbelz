@@ -26,6 +26,18 @@ export default function ProposalsSection({
   users = [],
   userGoals = [],
 }) {
+  if (currentUser?.tipo_usuario === 'consultor') {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Acesso restrito</CardTitle>
+            <CardDescription>Consultores não têm acesso à tela de Propostas.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
@@ -222,7 +234,7 @@ export default function ProposalsSection({
             {currentUser.tipo_usuario === 'gestor' ? 'Visualize e monitore todas as propostas do sistema' : 'Crie, edite e gerencie suas propostas'}
           </p>
         </div>
-        {currentUser.tipo_usuario !== 'gestor' && (
+  {currentUser.tipo_usuario === 'analista' && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>

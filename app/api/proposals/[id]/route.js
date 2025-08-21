@@ -57,7 +57,10 @@ export async function PATCH(request, { params }) {
 
   const { status, criado_por: _criado_por_unused, valor } = parsed.data
 
-  // Busca a proposta e checa autorização: gestor pode alterar qualquer; analista só a própria
+  // Busca a proposta e checa autorização:
+  // - Gestor pode alterar qualquer
+  // - Analista pode alterar apenas se for o criador
+  // - Consultor NÃO pode alterar
   const { data: currentProposal, error: fetchError } = await supabase
     .from('propostas')
     .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email')
@@ -66,6 +69,10 @@ export async function PATCH(request, { params }) {
   if (fetchError || !currentProposal) {
     try { console.warn('[PROPOSALS] PATCH not found', { id, fetchError: fetchError?.message }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+  }
+  if (auth.user.tipo_usuario === 'consultor') {
+    try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
+    return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
   }
   if (auth.user.tipo_usuario !== 'gestor' && currentProposal.criado_por !== auth.user.id) {
     try { console.warn('[PROPOSALS] PATCH forbidden', { id, by: auth.user.id }) } catch {}

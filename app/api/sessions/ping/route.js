@@ -15,6 +15,18 @@ export async function POST(request) {
     const { sessionId } = await request.json().catch(() => ({}))
     if (!sessionId) return handleCORS(NextResponse.json({ error: 'sessionId requerido' }, { status: 400 }), origin)
 
+    // Verifica se a sessão ainda está aberta; se já tiver logout, ignora ping
+    const { data: sess } = await supabase
+      .from('sessoes')
+      .select('id, data_logout')
+      .eq('id', sessionId)
+      .eq('usuario_id', auth.user.id)
+      .maybeSingle?.() || {}
+
+    if (!sess || sess.data_logout) {
+      return handleCORS(NextResponse.json({ ok: false, skipped: true, reason: 'session_closed' }), origin)
+    }
+
     const { error } = await supabase
       .from('sessoes')
       .update({ ultimo_ping: new Date().toISOString() })
