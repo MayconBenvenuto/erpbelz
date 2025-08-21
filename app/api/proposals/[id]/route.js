@@ -22,7 +22,6 @@ const gestorPatchSchema = z.object({
   consultor: z.string().min(1).optional(),
   consultor_email: z.string().email().optional(),
   criado_por: z.string().uuid().optional(),
-  arquivado: z.coerce.boolean().optional(),
 }).strict()
 
 export async function OPTIONS(request) {
@@ -76,7 +75,7 @@ export async function PATCH(request, { params }) {
   // - Consultor NÃO pode alterar
   const { data: currentProposal, error: fetchError } = await supabase
     .from('propostas')
-  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, arquivado')
+  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao')
     .eq('id', id)
     .single()
   if (fetchError || !currentProposal) {
@@ -103,7 +102,6 @@ export async function PATCH(request, { params }) {
     if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
     if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
     if (typeof updates.criado_por !== 'undefined') updatePayload.criado_por = updates.criado_por
-    if (typeof updates.arquivado !== 'undefined') updatePayload.arquivado = updates.arquivado
   }
 
   let updateQuery = supabase
@@ -160,7 +158,7 @@ export async function PATCH(request, { params }) {
   // Auditoria: registra alterações (somente campos realmente alterados)
   try {
     const changed = {}
-    const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email','criado_por','arquivado']
+  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email','criado_por']
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(updatePayload, k)) {
         const before = currentProposal[k]

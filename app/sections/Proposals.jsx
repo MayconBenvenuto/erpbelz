@@ -49,7 +49,17 @@ function ProposalsInner({
   const [cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, razao_social, nome_fantasia, error } }
   const [updatingStatus, setUpdatingStatus] = useState({}) // { [proposalId]: boolean }
-  const [rowEdits, setRowEdits] = useState({})
+  // Dialog de edição (gestor)
+  const [editDialogFor, setEditDialogFor] = useState(null) // proposta selecionada
+  const [editForm, setEditForm] = useState({
+    operadora: '',
+    quantidade_vidas: '',
+    valor: '',
+    previsao_implantacao: '',
+    consultor: '',
+    consultor_email: '',
+    criado_por: ''
+  })
   const [auditOpenFor, setAuditOpenFor] = useState(null)
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   const [filters, setFilters] = useState(defaultFilters)
@@ -160,27 +170,32 @@ function ProposalsInner({
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
   }, [proposals])
 
-  const startEdit = (p) => {
-    setRowEdits(prev => ({
-      ...prev,
-      [p.id]: {
-        quantidade_vidas: Number(p.quantidade_vidas || 0),
-        valor: Number(p.valor || 0),
-        previsao_implantacao: p.previsao_implantacao ? String(p.previsao_implantacao).slice(0,10) : '',
-        operadora: p.operadora || '',
-        consultor: p.consultor || '',
-        consultor_email: p.consultor_email || '',
-        criado_por: p.criado_por,
-        arquivado: !!p.arquivado,
-      }
-    }))
+  const openEditDialog = (p) => {
+    setEditDialogFor(p)
+    setEditForm({
+      operadora: p.operadora || '',
+      quantidade_vidas: String(p.quantidade_vidas ?? ''),
+      valor: String(p.valor ?? ''),
+      previsao_implantacao: p.previsao_implantacao ? String(p.previsao_implantacao).slice(0,10) : '',
+      consultor: p.consultor || '',
+      consultor_email: p.consultor_email || '',
+      criado_por: String(p.criado_por || '')
+    })
   }
-  const cancelEdit = (id) => setRowEdits(prev => { const cp = { ...prev }; delete cp[id]; return cp })
-  const applyEdit = async (id) => {
-    const payload = rowEdits[id]
-    if (!payload) return
-    const res = await onPatchProposal?.(id, payload)
-    if (res?.ok) cancelEdit(id)
+  const closeEditDialog = () => { setEditDialogFor(null); setEditForm({ operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', consultor: '', consultor_email: '', criado_por: '' }) }
+  const saveEditDialog = async () => {
+    if (!editDialogFor) return
+    const payload = {
+      operadora: editForm.operadora,
+      quantidade_vidas: Number(editForm.quantidade_vidas || 0),
+      valor: Number(editForm.valor || 0),
+      previsao_implantacao: editForm.previsao_implantacao || null,
+      consultor: editForm.consultor,
+      consultor_email: editForm.consultor_email,
+      criado_por: editForm.criado_por
+    }
+    const res = await onPatchProposal?.(editDialogFor.id, payload)
+    if (res?.ok) closeEditDialog()
   }
 
   const parseMoneyToNumber = (masked) => {
@@ -564,7 +579,6 @@ function ProposalsInner({
                   (proposal.consultor_email && String(proposal.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
                 )
                 const isUpdating = !!updatingStatus[proposal.id]
-                const row = rowEdits[proposal.id]
                 return (
                 <TableRow key={proposal.id}>
                   <TableCell className="font-mono text-sm">{proposal.codigo || (proposal.id ? `PRP${String(proposal.id).slice(0,4).toUpperCase()}` : '-')}</TableCell>
@@ -595,36 +609,9 @@ function ProposalsInner({
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>{(users.find(u => u.id === proposal.criado_por)?.nome) || '-'}</TableCell>
                   )}
-                  <TableCell className="capitalize">
-                    {currentUser.tipo_usuario === 'gestor' && row ? (
-                      <Select value={row.operadora} onValueChange={(v) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], operadora: v } }))}>
-                        <SelectTrigger><SelectValue placeholder="Operadora" /></SelectTrigger>
-                        <SelectContent>
-                          {operadoras.map(op => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="capitalize">{proposal.operadora}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {currentUser.tipo_usuario === 'gestor' && row ? (
-                      <Input type="number" className="w-24" value={row.quantidade_vidas}
-                        onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], quantidade_vidas: Number(e.target.value || 0) } }))}
-                      />
-                    ) : (
-                      proposal.quantidade_vidas
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {currentUser.tipo_usuario === 'gestor' && row ? (
-                      <Input type="number" step="0.01" className="w-28" value={row.valor}
-                        onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], valor: Number(e.target.value || 0) } }))}
-                      />
-                    ) : (
-                      formatCurrency(proposal.valor)
-                    )}
-                  </TableCell>
+                  <TableCell className="capitalize">{proposal.operadora}</TableCell>
+                  <TableCell>{proposal.quantidade_vidas}</TableCell>
+                  <TableCell>{formatCurrency(proposal.valor)}</TableCell>
                   <TableCell>
                     {!canEdit ? (
                       <Badge variant="outline" className={getStatusBadgeClasses(proposal.status)}>
@@ -659,42 +646,10 @@ function ProposalsInner({
                   </TableCell>
                   {currentUser.tipo_usuario === 'gestor' && (
                     <TableCell>
-                      {row ? (
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <Input
-                            placeholder="Consultor"
-                            className="w-36"
-                            value={row.consultor}
-                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], consultor: e.target.value } }))}
-                          />
-                          <Input
-                            placeholder="Email do consultor"
-                            className="w-52"
-                            type="email"
-                            value={row.consultor_email}
-                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], consultor_email: e.target.value } }))}
-                          />
-                          <Select value={String(row.criado_por)} onValueChange={(v) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], criado_por: v } }))}>
-                            <SelectTrigger className="w-44"><SelectValue placeholder="Analista" /></SelectTrigger>
-                            <SelectContent>
-                              {users.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
-                            </SelectContent>
-                          </Select>
-                          <Input type="date" value={row.previsao_implantacao}
-                            onChange={(e) => setRowEdits(prev => ({ ...prev, [proposal.id]: { ...prev[proposal.id], previsao_implantacao: e.target.value } }))}
-                          />
-                          <Button size="sm" onClick={() => applyEdit(proposal.id)}>Salvar</Button>
-                          <Button size="sm" variant="outline" onClick={() => cancelEdit(proposal.id)}>Cancelar</Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <Button size="sm" variant="outline" onClick={() => startEdit(proposal)}>Editar</Button>
-                          <Button size="sm" variant={proposal.arquivado ? 'secondary' : 'destructive'} onClick={() => onPatchProposal?.(proposal.id, { arquivado: !proposal.arquivado })}>
-                            {proposal.arquivado ? 'Restaurar' : 'Arquivar'}
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setAuditOpenFor(proposal.id)}>Histórico</Button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button size="sm" variant="outline" onClick={() => openEditDialog(proposal)}>Editar</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setAuditOpenFor(proposal.id)}>Histórico</Button>
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -705,6 +660,75 @@ function ProposalsInner({
           {auditOpenFor && (
             <AuditDrawer id={auditOpenFor} onClose={() => setAuditOpenFor(null)} />
           )}
+          {/* Dialog de edição de proposta (gestor) */}
+          <Dialog open={!!editDialogFor} onOpenChange={(v) => { if (!v) closeEditDialog() }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Editar proposta</DialogTitle>
+                <DialogDescription>Atualize os dados da proposta selecionada.</DialogDescription>
+              </DialogHeader>
+              {editDialogFor && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Operadora</Label>
+                      <Select value={editForm.operadora} onValueChange={(v) => setEditForm(prev => ({ ...prev, operadora: v }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a operadora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operadoras.map(op => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantidade de Vidas</Label>
+                      <Input type="number" value={editForm.quantidade_vidas} onChange={(e) => setEditForm(prev => ({ ...prev, quantidade_vidas: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Valor do Plano</Label>
+                      <Input type="number" step="0.01" value={editForm.valor} onChange={(e) => setEditForm(prev => ({ ...prev, valor: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Previsão de Implantação</Label>
+                      <Input type="date" value={editForm.previsao_implantacao} onChange={(e) => setEditForm(prev => ({ ...prev, previsao_implantacao: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Consultor</Label>
+                      <Input value={editForm.consultor} onChange={(e) => setEditForm(prev => ({ ...prev, consultor: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email do Consultor</Label>
+                      <Input type="email" value={editForm.consultor_email} onChange={(e) => setEditForm(prev => ({ ...prev, consultor_email: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Analista</Label>
+                    <Select value={editForm.criado_por} onValueChange={(v) => setEditForm(prev => ({ ...prev, criado_por: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o analista" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map(u => (<SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={closeEditDialog}>Cancelar</Button>
+                    <Button onClick={saveEditDialog}>Salvar</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>
