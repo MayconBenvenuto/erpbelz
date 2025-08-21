@@ -1,3 +1,73 @@
+name: Sync branches from main
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Lista de branches de destino separadas por vírgula (ex: develop,staging)"
+        required: false
+        default: "develop,staging"
+  schedule:
+    - cron: '0 3 * * *' # diário 03:00 UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-branches
+  cancel-in-progress: false
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.set-matrix.outputs.targets }}
+    steps:
+      - name: Determinar branches de destino
+        id: set-matrix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const input = core.getInput('targets') || 'develop,staging';
+            const arr = input.split(',').map(s => s.trim()).filter(Boolean);
+            core.setOutput('targets', JSON.stringify(arr));
+
+  merge-main-into-targets:
+    needs: build-matrix
+    if: ${{ needs.build-matrix.outputs.targets != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.build-matrix.outputs.targets) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge main -> ${{ matrix.branch }}
+        uses: devmasx/merge-branch@v1.4.0
+        with:
+          type: now
+          from_branch: main
+          target_branch: ${{ matrix.branch }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Abrir PR se merge não foi possível
+        if: failure()
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(sync): merge main em ${{ matrix.branch }}"
+          title: "chore(sync): Atualizar ${{ matrix.branch }} com main"
+          body: |
+            Este PR foi criado automaticamente para sincronizar `main` em `${{ matrix.branch }}`.
+            Resolva conflitos se necessário e faça o merge.
+          base: ${{ matrix.branch }}
+          branch: sync/main-into-${{ matrix.branch }}
+          delete-branch: true
 name: Sync branches
 
 on:
