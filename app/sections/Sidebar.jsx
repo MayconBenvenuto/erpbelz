@@ -26,8 +26,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <Image src="/logo-belz.jpg" alt="Logo Belz" width={40} height={40} className="rounded-lg object-cover" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-primary font-montserrat">ADM Belz</h1>
-            <p className="text-xs text-muted-foreground">Sistema de Propostas</p>
+            <h1 className="text-lg font-bold text-primary font-montserrat">Sistema de Gestão - Belz</h1>
+            <p className="text-xs text-muted-foreground">&nbsp;</p>
           </div>
         </div>
       </div>

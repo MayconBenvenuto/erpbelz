@@ -1,4 +1,4 @@
-# CRM Belz – Sistema de Gestão de Propostas
+# Sistema de Gestão - Belz
 
 Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
 

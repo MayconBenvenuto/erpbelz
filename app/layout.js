@@ -2,7 +2,7 @@ import './globals.css'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata = {
-  title: 'CRM Propostas - Sistema de Gestão',
+  title: 'Sistema de Gestão - Belz',
   description: 'Sistema completo de gestão de propostas com controle de usuários e metas',
 }
 
