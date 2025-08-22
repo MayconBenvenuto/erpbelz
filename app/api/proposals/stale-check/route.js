@@ -83,12 +83,12 @@ export async function POST(request) {
     }
   }))
 
-  const subject = `[CRM Belz] Propostas sem ação há 48h (${items.length})`
+  const subject = `[Sistema de Gestão - Belz] Propostas sem ação há 48h (${items.length})`
   const listText = items.map((i) => (
     `- Proposta ${i.codigo}\n  Empresa: ${i.empresa}\n  Operadora: ${i.operadora}\n  Valor: ${i.valor}\n  Criada em: ${new Date(i.criado_em).toLocaleString('pt-BR')}`
   )).join('\n\n')
 
-  const text = `Olá,\n\nAs seguintes propostas estão há 48h sem alteração de status (em análise):\n\n${listText}\n\nAcesse o CRM para direcionar as ações: ${appUrl}\n\n— CRM Belz`
+  const text = `Olá,\n\nAs seguintes propostas estão há 48h sem alteração de status (em análise):\n\n${listText}\n\nAcesse o Sistema de Gestão para direcionar as ações: ${appUrl}\n\n— Sistema de Gestão - Belz`
   const listHtml = items.map((i) => (
     `<li><p><strong>Proposta:</strong> ${i.codigo}<br/><strong>Empresa:</strong> ${i.empresa}<br/><strong>Operadora:</strong> ${i.operadora}<br/><strong>Valor:</strong> ${i.valor}<br/><strong>Criada em:</strong> ${new Date(i.criado_em).toLocaleString('pt-BR')}</p></li>`
   )).join('')

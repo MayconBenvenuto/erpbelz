@@ -19,6 +19,7 @@ import DashboardSection from '@/app/sections/Dashboard'
 import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
+import ImplantacaoSection from '@/app/sections/Implantacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
 
 export default function App() {
@@ -103,6 +104,8 @@ export default function App() {
   setLastActivity(Date.now())
   setToken(result.token)
   saveSessionToStorage(result.user, result.sessionId, result.token)
+  if (result.user?.tipo_usuario === 'consultor') setActiveTab('movimentacao')
+  else if (result.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
         toast.success('Login realizado com sucesso!')
       } else {
         toast.error(result.error || 'Erro no login')
@@ -138,22 +141,40 @@ export default function App() {
   // Carregar dados
   const loadData = useCallback(async () => {
     try {
+      if (currentUser?.tipo_usuario === 'consultor') return
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
       const common = { credentials: 'include' }
-      const [proposalsRes, usersRes, goalsRes, sessionsRes] = await Promise.all([
-        fetch('/api/proposals', { headers: authHeaders, ...common }),
-        fetch('/api/users', { headers: authHeaders, ...common }),
-        fetch('/api/goals', { headers: authHeaders, ...common }),
-        fetch('/api/sessions', { headers: authHeaders, ...common })
-      ])
-      if (proposalsRes.ok) setProposals(await proposalsRes.json())
-      if (usersRes.ok) setUsers(await usersRes.json())
-      if (goalsRes.ok) setUserGoals(await goalsRes.json())
-      if (sessionsRes.ok) setSessions(await sessionsRes.json())
+      const fetches = []
+      // Propostas: gestor e analista usam
+      fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+      // Users e Sessions: apenas gestor precisa
+      const needsAdminData = currentUser?.tipo_usuario === 'gestor'
+      if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
+      // Metas: analista e gestor (dashboard)
+      const needsGoals = currentUser?.tipo_usuario !== 'consultor'
+      if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
+      if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
+
+      const responses = await Promise.all(fetches)
+      let idx = 0
+      const proposalsRes = responses[idx++]
+      if (proposalsRes?.ok) setProposals(await proposalsRes.json())
+      if (needsAdminData) {
+        const usersRes = responses[idx++]
+        if (usersRes?.ok) setUsers(await usersRes.json())
+      }
+      if (needsGoals) {
+        const goalsRes = responses[idx++]
+        if (goalsRes?.ok) setUserGoals(await goalsRes.json())
+      }
+      if (needsAdminData) {
+        const sessionsRes = responses[idx++]
+        if (sessionsRes?.ok) setSessions(await sessionsRes.json())
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     }
-  }, [token])
+  }, [token, currentUser?.tipo_usuario])
 
   // Handlers de propostas
   const handleCreateProposal = async (payload) => {
@@ -233,6 +254,31 @@ export default function App() {
     }
   }
 
+  const handlePatchProposal = async (proposalId, payload) => {
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const response = await fetch(`/api/proposals/${proposalId}`, {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      })
+      if (response.ok) {
+        toast.success('Proposta atualizada com sucesso!')
+        await loadData()
+        return { ok: true }
+      } else {
+        const result = await response.json().catch(() => ({}))
+        toast.error(result.error || 'Erro ao atualizar proposta')
+        return { ok: false, error: result.error }
+      }
+    } catch {
+      toast.error('Erro ao conectar com o servidor')
+      return { ok: false, error: 'network' }
+    }
+  }
+
   // Handlers de usuários
   const handleCreateUser = async (payload) => {
     setIsLoading(true)
@@ -258,6 +304,30 @@ export default function App() {
       toast.error('Erro ao conectar com o servidor')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleUpdateUserGoal = async (usuarioId, valorMeta, valorAlcancado) => {
+    try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const response = await fetch('/api/goals', {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ usuario_id: usuarioId, valor_meta: valorMeta, ...(typeof valorAlcancado === 'number' ? { valor_alcancado: valorAlcancado } : {}) })
+      })
+      if (response.ok) {
+        toast.success('Meta atualizada')
+        await loadData()
+        return { ok: true }
+      }
+      const result = await response.json().catch(() => ({}))
+      toast.error(result.error || 'Erro ao atualizar meta')
+      return { ok: false, error: result.error }
+    } catch {
+      toast.error('Erro ao conectar com o servidor')
+      return { ok: false, error: 'network' }
     }
   }
 
@@ -291,6 +361,8 @@ export default function App() {
               setSessionId(pseudoSessionId)
               setToken(null) // token não é exposto via cookie HttpOnly
               saveSessionToStorage(data.user, pseudoSessionId, '')
+              if (data.user?.tipo_usuario === 'consultor') setActiveTab('movimentacao')
+              else if (data.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
             }
           }
         } catch {}
@@ -301,6 +373,16 @@ export default function App() {
   useEffect(() => {
     if (currentUser) loadData()
   }, [currentUser, loadData])
+
+  // Consultor: pode acessar Movimentação e Implantação; redireciona somente se cair em abas proibidas
+  useEffect(() => {
+    if (currentUser?.tipo_usuario === 'consultor') {
+      const forbidden = ['propostas', 'dashboard', 'usuarios', 'relatorios']
+      if (forbidden.includes(activeTab)) {
+        setActiveTab('movimentacao')
+      }
+    }
+  }, [currentUser?.tipo_usuario, activeTab])
 
   // Recarrega assim que o token estiver disponível após login
   useEffect(() => {
@@ -358,7 +440,7 @@ export default function App() {
             <div className="mx-auto mb-4">
               <Image src="/logo-belz.jpg" alt="Logo Belz" width={120} height={60} className="mx-auto rounded-lg" priority />
             </div>
-            <CardTitle className="text-2xl text-primary font-montserrat">ADM Belz</CardTitle>
+            <CardTitle className="text-2xl text-primary font-montserrat">Sistema de Gestão - Belz</CardTitle>
             <CardDescription>Faça login para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
@@ -391,8 +473,9 @@ export default function App() {
           leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
         />
   <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
-          {/** Propostas visíveis conforme perfil: gestor vê todas; analista vê criadas por ele OU vinculadas ao seu email */}
+          {/** Para consultor: restringe Propostas/Dashboard; Implantação é aberta a todos */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
+            {currentUser.tipo_usuario !== 'consultor' && (
             <TabsContent value="propostas" className="space-y-6">
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
@@ -409,6 +492,7 @@ export default function App() {
                     statusOptions={statusOptions}
                     onCreateProposal={handleCreateProposal}
                     onUpdateProposalStatus={handleUpdateProposalStatus}
+                    onPatchProposal={handlePatchProposal}
                     isLoading={isLoading}
           users={users}
                     userGoals={userGoals}
@@ -416,7 +500,9 @@ export default function App() {
                 )
               })()}
             </TabsContent>
+            )}
 
+            {currentUser.tipo_usuario !== 'consultor' && (
             <TabsContent value="dashboard" className="space-y-6">
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
@@ -435,8 +521,9 @@ export default function App() {
                 )
               })()}
             </TabsContent>
+            )}
 
-            {currentUser.tipo_usuario !== 'gestor' && (
+            {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
               <TabsContent value="movimentacao" className="space-y-6">
                 <MovimentacaoSection />
               </TabsContent>
@@ -444,7 +531,7 @@ export default function App() {
 
             {currentUser.tipo_usuario === 'gestor' && (
               <TabsContent value="usuarios" className="space-y-6">
-                <UsersSection users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} isLoading={isLoading} />
+                <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} isLoading={isLoading} />
               </TabsContent>
             )}
 
@@ -453,6 +540,11 @@ export default function App() {
                 <ReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
               </TabsContent>
             )}
+
+            {/* Implantação: todos os perfis */}
+            <TabsContent value="implantacao" className="space-y-6">
+              <ImplantacaoSection />
+            </TabsContent>
           </Tabs>
         </main>
       </div>

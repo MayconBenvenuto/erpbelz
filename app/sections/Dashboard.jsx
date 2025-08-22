@@ -14,6 +14,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   const [operadorasSortAsc, setOperadorasSortAsc] = useState(false)
   const [statusFilter, setStatusFilter] = useState('todos')
   const [consultorFilter, setConsultorFilter] = useState('todos')
+  const [vidasFilter, setVidasFilter] = useState('todos')
   const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
   // Persistência do filtro de status por usuário
@@ -50,6 +51,23 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
     } catch (_) {}
   }, [consultorFilter, currentUser?.id])
 
+  // Persistência do filtro de vidas por usuário
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
+      const saved = localStorage.getItem(key)
+      if (saved) setVidasFilter(saved)
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    try {
+      const key = `crm:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
+      localStorage.setItem(key, vidasFilter)
+    } catch (_) {}
+  }, [vidasFilter, currentUser?.id])
+
   // Lista de filtros ativos (preparado para futuros filtros)
   const activeFilters = useMemo(() => {
     const items = []
@@ -59,20 +77,46 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
     if (consultorFilter !== 'todos') {
       items.push({ key: 'consultor', label: `consultor: ${consultorFilter}`, onClear: () => setConsultorFilter('todos') })
     }
+    if (vidasFilter !== 'todos') {
+      items.push({ key: 'vidas', label: `vidas: ${vidasFilter.replaceAll('-', '–')}`, onClear: () => setVidasFilter('todos') })
+    }
     return items
-  }, [statusFilter, consultorFilter])
+  }, [statusFilter, consultorFilter, vidasFilter])
 
   const filteredProposals = useMemo(() => {
     let list = proposals
     if (statusFilter !== 'todos') list = list.filter(p => normalize(p.status) === normalize(statusFilter))
     if (consultorFilter !== 'todos') list = list.filter(p => normalize(p.consultor) === normalize(consultorFilter))
+    // Vidas filter by ranges
+    const getVidas = (p) => Number(p.quantidade_vidas || 0)
+    switch (vidasFilter) {
+      case '0-10':
+        list = list.filter(p => getVidas(p) >= 0 && getVidas(p) <= 10)
+        break
+      case '11-50':
+        list = list.filter(p => getVidas(p) >= 11 && getVidas(p) <= 50)
+        break
+      case '51-100':
+        list = list.filter(p => getVidas(p) >= 51 && getVidas(p) <= 100)
+        break
+      case '101-200':
+        list = list.filter(p => getVidas(p) >= 101 && getVidas(p) <= 200)
+        break
+      case '200+':
+        list = list.filter(p => getVidas(p) >= 200)
+        break
+      default:
+        break
+    }
     return list
-  }, [proposals, statusFilter, consultorFilter])
+  }, [proposals, statusFilter, consultorFilter, vidasFilter])
 
   const totalProposals = filteredProposals.length
   const implantedProposals = filteredProposals.filter(p => p.status === 'implantado').length
   const totalValue = filteredProposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
   const implantedValue = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
+  const totalLives = filteredProposals.reduce((sum, p) => sum + Number(p.quantidade_vidas || 0), 0)
+  const implantedLives = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + Number(p.quantidade_vidas || 0), 0)
 
   const statusCounts = useMemo(() =>
     STATUS_OPTIONS.map((status) => {
@@ -165,61 +209,79 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
         <div className="flex items-center space-x-3">
-          {currentUser.tipo_usuario === 'gestor' && (
-            <div className="flex items-center space-x-2">
-              <div className="w-48">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Filtrar status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
-                    {STATUS_OPTIONS.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-56">
-                <Select value={consultorFilter} onValueChange={setConsultorFilter}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Filtrar consultor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os consultores</SelectItem>
-                    {consultores.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setStatusFilter('todos'); setConsultorFilter('todos') }}
-                className="text-xs px-2 py-1 border rounded-md hover:bg-muted"
-                title="Limpar filtro"
-              >
-                Limpar
-              </button>
-              {activeFilters.length > 0 && (
-                <div className="flex items-center flex-wrap gap-2">
-                  {activeFilters.map(f => (
-                    <Badge key={f.key} variant="secondary" className="text-xs gap-1">
-                      <span>{f.label}</span>
-                      <button
-                        type="button"
-                        aria-label={`Remover filtro ${f.key}`}
-                        className="ml-1 opacity-80 hover:opacity-100"
-                        onClick={f.onClear}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+          <div className="flex items-center space-x-2">
+            {currentUser.tipo_usuario === 'gestor' && (
+              <>
+                <div className="w-48">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Filtrar status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os status</SelectItem>
+                      {STATUS_OPTIONS.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                <div className="w-56">
+                  <Select value={consultorFilter} onValueChange={setConsultorFilter}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Filtrar consultor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os consultores</SelectItem>
+                      {consultores.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            {/* Filtro de vidas visível para analistas e gestores */}
+            <div className="w-44">
+              <Select value={vidasFilter} onValueChange={setVidasFilter}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Filtrar vidas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas as vidas</SelectItem>
+                  <SelectItem value="0-10">0–10 vidas</SelectItem>
+                  <SelectItem value="11-50">11–50 vidas</SelectItem>
+                  <SelectItem value="51-100">51–100 vidas</SelectItem>
+                  <SelectItem value="101-200">101–200 vidas</SelectItem>
+                  <SelectItem value="200+">200+ vidas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('todos'); setConsultorFilter('todos'); setVidasFilter('todos') }}
+              className="text-xs px-2 py-1 border rounded-md hover:bg-muted"
+              title="Limpar filtro"
+            >
+              Limpar
+            </button>
+            {activeFilters.length > 0 && (
+              <div className="flex items-center flex-wrap gap-2">
+                {activeFilters.map(f => (
+                  <Badge key={f.key} variant="secondary" className="text-xs gap-1">
+                    <span>{f.label}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remover filtro ${f.key}`}
+                      className="ml-1 opacity-80 hover:opacity-100"
+                      onClick={f.onClear}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <RefreshCw className="w-4 h-4" />
             <span>Atualização automática a cada 30s</span>
@@ -236,6 +298,17 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
           <CardContent>
             <div className="text-2xl font-bold text-primary">{totalProposals}</div>
             <p className="text-xs text-muted-foreground">Total no sistema</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-purple-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vidas Totais (filtradas)</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{totalLives}</div>
+            <p className="text-xs text-muted-foreground">Somatório de vidas nas propostas</p>
           </CardContent>
         </Card>
 
@@ -271,6 +344,19 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
             <p className="text-xs text-muted-foreground">{totalValue > 0 ? Math.round((implantedValue / totalValue) * 100) : 0}% do total</p>
           </CardContent>
         </Card>
+
+            {/*COMENTADO O CARD DE ''VIDAS IMPLANTADAS*/}
+            
+        {/*<Card className="border-l-4 border-l-emerald-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vidas Implantadas</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{implantedLives}</div>
+            <p className="text-xs text-muted-foreground">{totalLives > 0 ? Math.round((implantedLives / totalLives) * 100) : 0}% do total de vidas</p>
+          </CardContent>
+        </Card>*/}
       </div>
 
       {currentUser.tipo_usuario === 'gestor' && (

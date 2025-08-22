@@ -17,7 +17,7 @@ CREATE TABLE usuarios (
   nome TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   senha TEXT NOT NULL,
-  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor', 'analista')) NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor', 'analista', 'consultor')) NOT NULL,
   "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

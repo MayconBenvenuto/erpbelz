@@ -1,5 +1,5 @@
 {
-    "name": "nextjs-mongo-template",
+    "name": "sistema-gestao-belz",
     "version": "0.1.0",
     "private": true,
     "scripts": {
@@ -16,6 +16,8 @@
         "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
         "windows:next-cache:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/setup-next-cache.ps1",
         "windows:next-cache:remove": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/remove-next-cache.ps1",
+        "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/backup-db.ps1",
+        "db:restore": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/restore-db.ps1",
         "lint": "eslint .",
         "format": "prettier --write ."
     },
@@ -70,7 +72,7 @@
         "react-dom": "^18",
         "react-hook-form": "^7.58.1",
         "react-resizable-panels": "^3.0.3",
-        "recharts": "^2.15.3",
+        "recharts": "^2.15.4",
         "sonner": "^2.0.5",
         "supabase": "^2.34.3",
         "tailwind-merge": "^3.3.1",

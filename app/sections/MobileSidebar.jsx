@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { FileText, BarChart3, Users, TrendingUp, LogOut, RefreshCw, Repeat } from "lucide-react"
+import { CheckSquare } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,41 +25,75 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
           <div className="flex items-center gap-3">
             <Image src="/logo-belz.jpg" alt="Logo Belz" width={36} height={36} className="rounded object-cover" />
             <div>
-              <h1 className="text-base font-bold text-primary">ADM Belz</h1>
-              <p className="text-xs text-muted-foreground">Sistema de Propostas</p>
+              <h1 className="text-base font-bold text-primary">Sistema de Gestão - Belz</h1>
+              <p className="text-xs text-muted-foreground">&nbsp;</p>
             </div>
           </div>
         </div>
 
         <nav className="p-3" role="navigation" aria-label="Menu móvel">
           <div className="space-y-1">
+            {/* Para gestor, Dashboard como primeira opção */}
+            {currentUser?.tipo_usuario === 'gestor' && (
+              <SheetClose asChild>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  aria-current={activeTab === 'dashboard' ? 'page' : undefined}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <BarChart3 className="w-5 h-5" />
+                  <span className="font-medium">Dashboard</span>
+                </button>
+              </SheetClose>
+            )}
+            {currentUser?.tipo_usuario !== 'consultor' && (
+              <SheetClose asChild>
+                <button
+                  onClick={() => setActiveTab('propostas')}
+                  aria-current={activeTab === 'propostas' ? 'page' : undefined}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    activeTab === 'propostas' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <FileText className="w-5 h-5" />
+                  <span className="font-medium">Propostas</span>
+                </button>
+              </SheetClose>
+            )}
+
+            {/* Implantação (todos) */}
             <SheetClose asChild>
               <button
-                onClick={() => setActiveTab('propostas')}
-                aria-current={activeTab === 'propostas' ? 'page' : undefined}
+                onClick={() => setActiveTab('implantacao')}
+                aria-current={activeTab === 'implantacao' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                  activeTab === 'propostas' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  activeTab === 'implantacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <FileText className="w-5 h-5" />
-                <span className="font-medium">Propostas</span>
+                <CheckSquare className="w-5 h-5" />
+                <span className="font-medium">Implantação</span>
               </button>
             </SheetClose>
 
-            <SheetClose asChild>
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                  activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <BarChart3 className="w-5 h-5" />
-                <span className="font-medium">Dashboard</span>
-              </button>
-            </SheetClose>
+            {/* Para analista, Dashboard segue aqui; gestor já vê no topo */}
+            {currentUser?.tipo_usuario !== 'consultor' && currentUser?.tipo_usuario !== 'gestor' && (
+              <SheetClose asChild>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  aria-current={activeTab === 'dashboard' ? 'page' : undefined}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <BarChart3 className="w-5 h-5" />
+                  <span className="font-medium">Dashboard</span>
+                </button>
+              </SheetClose>
+            )}
 
-            {currentUser?.tipo_usuario !== 'gestor' && (
+            {(currentUser?.tipo_usuario === 'analista' || currentUser?.tipo_usuario === 'consultor' || currentUser?.tipo_usuario === 'gestor') && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('movimentacao')}
