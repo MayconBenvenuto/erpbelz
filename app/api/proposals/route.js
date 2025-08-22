@@ -105,7 +105,7 @@ export async function POST(request) {
 		const codigo = data.codigo || data.id
 		const empresa = formatCNPJ(data.cnpj)
 		const valorFmt = formatCurrency(data.valor || 0)
-		const subject = `[CRM Belz] Proposta ${codigo} criada`
+		const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} criada`
 		const html = renderBrandedEmail({
 			title: 'Nova proposta criada',
 			ctaText: 'Abrir CRM',

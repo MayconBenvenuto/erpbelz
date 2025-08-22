@@ -217,9 +217,9 @@ export async function PATCH(request, { params }) {
 
     // Envia para o analista (criado_por)
   if (!userErr && analyst?.email) {
-      const subject = `[CRM Belz] Proposta ${codigo} atualizada: ${humanStatus}`
+  const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
       const linkCRM = appUrl
-      const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o CRM: ${linkCRM}\n\n— CRM Belz`
+  const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o Sistema de Gestão: ${linkCRM}\n\n— Sistema de Gestão - Belz`
       const html = renderBrandedEmail({
         title: 'Atualização de status da proposta',
         ctaText: 'Abrir CRM',
@@ -243,8 +243,8 @@ export async function PATCH(request, { params }) {
 
     // Envia para o consultor (e-mail externo informado na proposta)
     if (updated?.consultor_email) {
-      const subject2 = `[CRM Belz] Proposta ${codigo} atualizada: ${humanStatus}`
-      const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— CRM Belz`
+  const subject2 = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
+  const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— Sistema de Gestão - Belz`
       const html2 = renderBrandedEmail({
         title: 'Atualização de status da proposta',
         ctaText: 'Abrir CRM',

@@ -25,8 +25,8 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
           <div className="flex items-center gap-3">
             <Image src="/logo-belz.jpg" alt="Logo Belz" width={36} height={36} className="rounded object-cover" />
             <div>
-              <h1 className="text-base font-bold text-primary">ADM Belz</h1>
-              <p className="text-xs text-muted-foreground">Sistema de Propostas</p>
+              <h1 className="text-base font-bold text-primary">Sistema de Gestão - Belz</h1>
+              <p className="text-xs text-muted-foreground">&nbsp;</p>
             </div>
           </div>
         </div>

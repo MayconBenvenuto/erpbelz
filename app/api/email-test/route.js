@@ -33,7 +33,7 @@ export async function POST(request) {
 	})
 	const res = await sendEmail({
 		to: to || process.env.EMAIL_OVERRIDE_TO || 'devnull@example.com',
-		subject: 'Teste de Email — CRM Belz',
+		subject: 'Teste de Email — Sistema de Gestão - Belz',
 		text: `Proposta ${example.codigo} atualizada. CNPJ ${example.cnpj}. ${example.razao_social}.`,
 		html,
 	})

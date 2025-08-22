@@ -440,7 +440,7 @@ export default function App() {
             <div className="mx-auto mb-4">
               <Image src="/logo-belz.jpg" alt="Logo Belz" width={120} height={60} className="mx-auto rounded-lg" priority />
             </div>
-            <CardTitle className="text-2xl text-primary font-montserrat">ADM Belz</CardTitle>
+            <CardTitle className="text-2xl text-primary font-montserrat">Sistema de Gestão - Belz</CardTitle>
             <CardDescription>Faça login para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>

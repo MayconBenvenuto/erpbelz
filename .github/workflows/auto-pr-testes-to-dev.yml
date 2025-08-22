@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   open-pr:
@@ -17,10 +18,15 @@ jobs:
       PR_ASSIGNEES: ""
       PR_REVIEWERS: ""
     steps:
+      - name: Definir token efetivo
+        id: token
+        run: |
+          # Usando apenas GITHUB_TOKEN. Para usar PAT crie secret GH_PAT e substitua manualmente aqui.
+          echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
       - name: Create or reuse PR testes -> dev
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.token.outputs.token }}
           script: |
             const { owner, repo } = context.repo;
             const head = 'testes';
@@ -51,9 +57,12 @@ jobs:
                 if (e.status === 422) {
                   core.info('Sem commits entre as branches. Nada a fazer.');
                   return;
-                } else {
-                  throw e;
                 }
+                if (e.status === 403 && /not permitted to create or approve pull requests/i.test(e.message)) {
+                  core.warning('O token não tem permissão para criar PR. Habilite "Allow GitHub Actions to create and approve pull requests" nas configurações ou forneça um PAT em GH_PAT.');
+                  return;
+                }
+                throw e;
               }
             }
 
@@ -64,7 +73,11 @@ jobs:
                 try {
                   await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels });
                 } catch (e) {
-                  core.warning(`Falha ao adicionar labels: ${e.message}`);
+                  if (e.status === 403) {
+                    core.warning('Sem permissão para adicionar labels (precisa issues: write).');
+                  } else {
+                    core.warning(`Falha ao adicionar labels: ${e.message}`);
+                  }
                 }
               }
 
