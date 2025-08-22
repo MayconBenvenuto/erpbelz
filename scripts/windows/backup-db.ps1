@@ -1,24 +1,4 @@
 #Requires -Version 5.1
-<#
-  backup-db.ps1
-  Gera um dump do banco de dados (Supabase Postgres) usando pg_dump.
-
-  Pré-requisitos:
-    - Ter o password do banco (SUPABASE_DB_PASSWORD). Você pode setar na sessão do PowerShell:
-        $env:SUPABASE_DB_PASSWORD = ""
-    - Ter pg_dump instalado (PostgreSQL client) OU Docker Desktop (fallback automático).
-
-  Fontes de configuração (ordem):
-    1) supabase/.temp/pooler-url (se existir)
-    2) supabase/.temp/project-ref para montar o usuário postgres.<ref>
-    3) NEXT_PUBLIC_SUPABASE_URL para deduzir o project ref, se necessário
-
-  Uso:
-    powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/windows/backup-db.ps1 [-OutDir ./backups] [-Schema public] [-Format c]
-
-  Saída:
-    Cria um arquivo de dump com timestamp na pasta indicada (default: ./backups).
-#>
 
 param(
   [string]$OutDir = "./backups",
