@@ -374,6 +374,21 @@ export default function App() {
     if (currentUser) loadData()
   }, [currentUser, loadData])
 
+  // Renovar token se usuário autenticado via cookie e token ausente
+  useEffect(() => {
+    if (currentUser && !token) {
+      ;(async () => {
+        try {
+          const res = await fetch('/api/auth/renew', { method: 'GET', credentials: 'include' })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.token) setToken(data.token)
+          }
+        } catch {}
+      })()
+    }
+  }, [currentUser, token])
+
   // Consultor: pode acessar Movimentação e Implantação; redireciona somente se cair em abas proibidas
   useEffect(() => {
     if (currentUser?.tipo_usuario === 'consultor') {
@@ -525,7 +540,7 @@ export default function App() {
 
             {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
               <TabsContent value="movimentacao" className="space-y-6">
-                <MovimentacaoSection />
+                <MovimentacaoSection currentUser={currentUser} token={token} />
               </TabsContent>
             )}
 
