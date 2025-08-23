@@ -286,6 +286,39 @@ DELETE /api/proposals/:id
   -> Apenas gestores
 ```
 
+#### Movimentações (Solicitações) – Novo (23/08/2025)
+
+```http
+GET /api/solicitacoes
+  -> Lista solicitações. Regras:
+     * consultor: apenas suas (criado_por = user.id)
+     * analista: não atribuídas + atribuídas a ele
+     * gestor: todas
+     * Ordena por codigo asc (MVM0000)
+
+POST /api/solicitacoes
+  Body: { tipo, subtipo, razao_social, cnpj, observacoes?, sla_previsto?, arquivos?[] }
+  -> Cria solicitação (codigo gerado automaticamente MVM####)
+
+PATCH /api/solicitacoes/:id
+  Body opções:
+    { claim: true }                -> analista assume se não atribuída
+    { status: 'em execução' }      -> atualiza status (controle de permissão aplicado)
+    { sla_previsto: 'YYYY-MM-DD' } -> atualiza SLA (gestor ou analista responsável)
+
+GET /api/solicitacoes/:id
+  -> Detalhe + URLs assinadas de arquivos; autorização: gestor, criador consultor ou analista atribuído
+
+POST /api/solicitacoes/upload
+  -> Upload de arquivo (pdf,jpeg,png,xlsx,xls,csv; <=7MB). Retorna { path, url, nome, mime }
+```
+
+Notas:
+
+- Histórico de status mantido em array `historico` (últimos eventos exibidos).
+- SLA editável conforme regras de role.
+- Evento global `solicitacao:created` disparado no frontend após criação bem-sucedida para refresh reativo.
+
 #### Usuários (gestores)
 
 ```http
@@ -401,6 +434,15 @@ Notas de UI:
 - **Tipos**: Analista (criador) / Gestor (monitor)
 
 ### 📊 Relatórios e Monitoramento (Gestor)
+
+### 🔄 Movimentações – UI & Fluxo
+
+- Consultor: tabela própria (somente leitura) + botão “Nova Solicitação”.
+- Analista/Gestor: board Kanban por status + (gestor) timelines recentes com histórico.
+- Claim: botão “Assumir” visível para analista enquanto `atendido_por` vazio.
+- Status e SLA: analista só altera se atribuído; gestor pode sempre.
+- Spinner de recarregamento exibido ao lado do título enquanto busca dados.
+- Uploads: armazenados em bucket dedicado; nomes e paths preservados; URLs assinadas geradas on-demand no detalhe.
 
 - **Sessões ativas**: Usuários online e última atividade
 - **Logs de acesso**: Histórico de logins e IPs
