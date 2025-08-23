@@ -23,7 +23,7 @@ export async function GET(req, { params }) {
     const id = params.id
     if (!id) return NextResponse.json({ message: 'ID ausente' }, { status: 400 })
 
-    const { data, error } = await supabase.from('solicitacoes').select('*').eq('id', id).single()
+  const { data, error } = await supabase.from('solicitacoes').select('*').eq('id', id).single()
     if (error || !data) return NextResponse.json({ message: 'Não encontrado' }, { status: 404 })
 
     // autorização
@@ -49,6 +49,18 @@ export async function GET(req, { params }) {
       }
     }
     data.arquivos = enriched
+
+    // Buscar dados do consultor criador (nome/email) para exibir nos detalhes
+    if (data.criado_por) {
+      try {
+        const { data: usr } = await supabase.from('usuarios').select('nome,email,tipo_usuario').eq('id', data.criado_por).single()
+        if (usr) {
+          data.criado_por_nome = usr.nome
+          data.criado_por_email = usr.email
+          data.criado_por_tipo = usr.tipo_usuario
+        }
+      } catch {}
+    }
     return NextResponse.json({ data })
   } catch (e) {
     console.error('Erro GET solicitacao', sanitizeForLog(e))
