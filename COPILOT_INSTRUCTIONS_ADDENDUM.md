@@ -99,6 +99,57 @@ async function loadPerformance(start, end, token) {
 - Ticket médio calculado apenas em propostas `implantado`.
 - Rankings ordenados por `valor_total` desc (limit 10).
 
+## 🆕 Movimentações (Solicitações) – 23/08/2025
+
+Implementado módulo de Movimentações (solicitações de movimentação de apólice) com:
+
+- Tabela `solicitacoes` (sequencial `codigo` formato `MVM0000`).
+- Gatilho de geração automática via sequence dedicada.
+- Campos principais: `id`, `codigo`, `tipo`, `subtipo`, `razao_social`, `cnpj`, `observacoes`, `sla_previsto`, `status`, `historico[]`, `arquivos[]`, `atendido_por`, `atendido_por_nome`, `criado_por`.
+- Status workflow (array `SOLICITACAO_STATUS`): `aberta`, `em validação`, `em execução`, `concluída`, `cancelada`.
+- Claim: analista assume solicitação via `PATCH /api/solicitacoes/:id { claim: true }` se ainda sem `atendido_por`.
+- SLA editável (gestor sempre; analista somente se atribuído).
+- Histórico mantido como array de objetos `{ status, em }` (UTC ISO) limitado em exibição (slice).
+- Upload de arquivos via `POST /api/solicitacoes/upload` (MIME permitido: pdf, jpeg, png, xlsx, xls, csv; limite 7MB cada).
+- GET detalhe `/api/solicitacoes/:id` retorna URLs assinadas para arquivos sem `url`.
+
+### UI
+
+- Consultor: tabela simples somente leitura + botão “Nova Solicitação”.
+- Analista/Gestor: board (kanban simplificado) agrupado por status + timeline (somente gestor) com até 25 itens recentes.
+- Dialog de criação dispara evento global `window.dispatchEvent(new CustomEvent('solicitacao:created'))` ao concluir com sucesso.
+- `MovimentacaoSection` escuta esse evento e chama `loadSolicitacoes()` para atualizar sem refresh manual.
+- Spinner de recarregamento (`Loader2`) exibido ao lado da descrição do título enquanto `reloading=true`.
+
+### Padrões / Regras
+
+1. Nunca chamar funções de reset inexistentes (ex: erro anterior com `setArquivos`).
+2. Após criação bem-sucedida: fechar dialog, resetar state, emitir evento global.
+3. Diferenciar claramente erros de rede (`catch` fetch) de erros HTTP (`!res.ok`).
+4. Não permitir analista editar SLA ou status de solicitações que não assumiu.
+5. Email futuro (se implementado) deve referenciar apenas `codigo` MVM (não UUID).
+6. Toda listagem ordenada asc por `codigo`.
+
+### Exemplo Listener (já implementado)
+
+```javascript
+useEffect(() => {
+  const handler = () => loadSolicitacoes()
+  window.addEventListener('solicitacao:created', handler)
+  return () => window.removeEventListener('solicitacao:created', handler)
+}, [loadSolicitacoes])
+```
+
+### Erro Corrigido
+
+Removida referência inexistente `setArquivos([])` que causava `ReferenceError` e exibia toast enganoso “Erro de conexão” após criação. Agora o fluxo mostra toast de sucesso e recarrega lista automaticamente.
+
+### Boas Práticas Específicas
+
+- Ao adicionar novos campos em `solicitacoes`, atualizar o endpoint de detalhe para incluir e, se for sensível, filtrar conforme role.
+- Limitar sempre o histórico retornado ou paginar caso cresça demasiadamente.
+- Usar `CustomEvent` para outras interações reativas (ex: atualização de SLA em massa) ao invés de polling adicional.
+
 ## 🔄 Metas (Goals)
 
 - Continuação: `GET /api/goals` retorna metas com fallback ao somatório de propostas implantadas.
