@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { sanitizeInput, validateCNPJ } from '@/lib/security'
 import { OPERADORAS } from '@/lib/constants'
+import { assertSupabaseBrowser } from '@/lib/supabase-client'
 import { Info } from 'lucide-react'
 import Image from 'next/image'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -229,46 +230,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   // --- Documentos obrigatórios dinâmicos ---
   // requiredDocKeys e docLabel agora são funções normais acima
 
-  const uploadSingle = async (file, docKey) => {
-    if (!file) return
-    if (!allowedMime.includes(file.type)) {
-      toast.error('Tipo não permitido')
-      return
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      toast.error(`Arquivo >${MAX_FILE_SIZE_MB}MB`)
-      return
-    }
-    setUploading(true)
-    try {
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.log('[UPLOAD] iniciando', { name: file.name, size: file.size, type: file.type })
-      }
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch('/api/solicitacoes/upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        toast.error(`Falha upload: ${data?.message || file.name}`)
-        return
-      }
-      if (docKey) {
-        setDocFiles(prev => ({ ...prev, [docKey]: data }))
-      } else {
-        setExtraFiles(prev => [...prev, data])
-      }
-      toast.success('Documento enviado')
-    } catch {
-      toast.error('Erro upload')
-    } finally {
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.log('[UPLOAD] fim', { name: file.name })
-      }
-      setUploading(false)
-    }
-  }
+  // uploadSingle removido (substituído por directUpload)
 
   const removeDocFile = (docKey) => {
     setDocFiles(prev => {
@@ -280,9 +242,44 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
 
   const removeExtraFile = (path) => setExtraFiles(prev => prev.filter(f => f.path !== path))
 
+  // Upload via Signed Upload URL (gerado no backend)
+  async function directUpload(file, docKey) {
+    const supa = assertSupabaseBrowser()
+    if (!file) return
+    if (!allowedMime.includes(file.type)) { toast.error('Tipo não permitido'); return }
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) { toast.error('Arquivo muito grande'); return }
+    setUploading(true)
+    try {
+      // 1) Solicita URL assinada
+      const resp = await fetch('/api/solicitacoes/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ filename: file.name, mime: file.type, size: file.size })
+      })
+      const signedData = await resp.json().catch(() => null)
+      if (!resp.ok) { toast.error(signedData?.message || 'Falha gerar URL'); return }
+  const { path, token: uploadToken, bucket } = signedData
+      // 2) Envia arquivo usando uploadToSignedUrl
+      const { error: upErr } = await supa.storage.from(bucket).uploadToSignedUrl(path, uploadToken, file, { upsert: false, contentType: file.type })
+      if (upErr) { toast.error(`Falha upload: ${upErr.message}`); return }
+      // 3) URL pública / fallback signed
+      let publicUrl = null
+      try { const { data } = supa.storage.from(bucket).getPublicUrl(path); publicUrl = data?.publicUrl || null } catch {}
+      if (!publicUrl) {
+        try { const { data } = await supa.storage.from(bucket).createSignedUrl(path, 3600); publicUrl = data?.signedUrl || null } catch {}
+      }
+      const meta = { path, nome: file.name, tipo: file.type, url: publicUrl, signed: !publicUrl, bucket }
+      if (docKey) setDocFiles(prev => ({ ...prev, [docKey]: meta }))
+      else setExtraFiles(prev => [...prev, meta])
+      toast.success('Documento enviado')
+    } catch (_) {
+      toast.error('Erro upload')
+    } finally { setUploading(false) }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" description="Formulário completo para criação e envio de uma nova solicitação com uploads de documentos.">
         <DialogHeader>
           <DialogTitle>Gerenciar Solicitação</DialogTitle>
         </DialogHeader>
@@ -409,7 +406,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
                         <div className="text-xs font-medium">{docLabel(docKey)}</div>
                         {!meta && (
                           <>
-                            <Input id={inputId} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.csv,.xls,.xlsx" onChange={e => uploadSingle(e.target.files?.[0], docKey)} />
+                            <Input id={inputId} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.csv,.xls,.xlsx" onChange={e => directUpload(e.target.files?.[0], docKey)} />
                             <Button type="button" size="sm" className="bg-[#021d79] hover:bg-[#021d79]/90 text-white h-7" onClick={() => document.getElementById(inputId).click()}>Enviar</Button>
                           </>
                         )}
@@ -434,7 +431,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
             <div>
               <Label className="font-semibold">Documentos adicionais (opcional)</Label>
               <div className="flex items-center gap-3 mt-2">
-                <Input id="file-extra-input" className="hidden" type="file" accept=".pdf,.jpg,.jpeg,.png,.csv,.xls,.xlsx" onChange={e => uploadSingle(e.target.files?.[0], null)} />
+                <Input id="file-extra-input" className="hidden" type="file" accept=".pdf,.jpg,.jpeg,.png,.csv,.xls,.xlsx" onChange={e => directUpload(e.target.files?.[0], null)} />
                 <Button type="button" onClick={() => document.getElementById('file-extra-input').click()} className="bg-[#021d79] hover:bg-[#021d79]/90 text-white">Adicionar Documento</Button>
                 <span className="text-xs text-muted-foreground">Anexe outros documentos de apoio.</span>
               </div>
@@ -461,7 +458,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
       {/* Dialog de Preview de Arquivo */}
       {previewFile && (
         <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-          <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto" description="Pré-visualização do arquivo enviado. Use para conferir nitidez e conteúdo antes de concluir.">
             <DialogHeader>
               <DialogTitle>Visualizar arquivo</DialogTitle>
             </DialogHeader>

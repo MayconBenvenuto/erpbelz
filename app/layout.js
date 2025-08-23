@@ -1,5 +1,23 @@
 import './globals.css'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import React from 'react'
+
+function KeepAlivePing() {
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    let stopped = false
+    const intervalMs = 2 * 60 * 1000 // 2 minutos
+    const ping = async () => {
+      if (stopped) return
+      try { await fetch('/api/health', { cache: 'no-store' }) } catch (_) {}
+      if (!stopped) setTimeout(ping, intervalMs)
+    }
+    // pequeno atraso inicial para não disputar com carregamento principal
+    const t = setTimeout(ping, 20_000)
+    return () => { stopped = true; clearTimeout(t) }
+  }, [])
+  return null
+}
 
 export const metadata = {
   title: 'Sistema de Gestão - Belz',
@@ -25,8 +43,9 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/logo-belz.jpg" sizes="32x32" />
         <link rel="apple-touch-icon" href="/logo-belz.jpg" />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased scroll-smooth">
+    <body className="min-h-screen bg-background text-foreground antialiased scroll-smooth">
   {children}
+  <KeepAlivePing />
   <SpeedInsights />
       </body>
     </html>
