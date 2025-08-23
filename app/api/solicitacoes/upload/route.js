@@ -51,13 +51,31 @@ export async function POST(req) {
   const ext = file.name.split('.').pop()?.toLowerCase()
     const path = `${user.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
-    // Opcional: checa existência do bucket (ignora se falhar pois é custoso chamar sempre)
+    // Verificação de existência do bucket (sem bloquear por erro de permissão com anon key)
     try {
       const { data: bucketInfo, error: bucketErr } = await supabase.storage.getBucket(BUCKET)
-      if (bucketErr || !bucketInfo) {
-        return NextResponse.json({ message: `Bucket '${BUCKET}' inexistente. Crie no Supabase Storage.` }, { status: 500 })
+      if (bucketErr) {
+        const msg = bucketErr.message?.toLowerCase() || ''
+        // Somente interrompe se realmente indicar inexistência
+        if (msg.includes('not found') || msg.includes('no such bucket') || msg.includes('não encontrado')) {
+          return NextResponse.json({ message: `Bucket '${BUCKET}' inexistente. Crie no Supabase Storage.` }, { status: 500 })
+        }
+        // Caso seja erro de autorização, continua e deixa o upload tentar (políticas podem permitir upload direto)
+        if (msg.includes('unauthorized') || msg.includes('permission') || msg.includes('not authorized')) {
+          // segue sem retornar
+        } else {
+          // Loga silenciosamente outros erros e prossegue
+          // eslint-disable-next-line no-console
+          console.warn('[UPLOAD][BUCKET-CHECK] Erro inesperado ao checar bucket', msg)
+        }
+      } else if (!bucketInfo) {
+        return NextResponse.json({ message: `Bucket '${BUCKET}' não acessível.` }, { status: 500 })
       }
-    } catch {}
+    } catch (e) {
+      // Falha na chamada getBucket não deve impedir tentativa de upload
+      // eslint-disable-next-line no-console
+      console.warn('[UPLOAD][BUCKET-CHECK] Exceção ignorada', e?.message)
+    }
 
     const arrayBuffer = await file.arrayBuffer()
     const { error } = await supabase.storage.from(BUCKET).upload(path, Buffer.from(arrayBuffer), {
