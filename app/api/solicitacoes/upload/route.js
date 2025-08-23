@@ -51,30 +51,29 @@ export async function POST(req) {
   const ext = file.name.split('.').pop()?.toLowerCase()
     const path = `${user.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
-    // Verificação de existência do bucket (sem bloquear por erro de permissão com anon key)
-    try {
-      const { data: bucketInfo, error: bucketErr } = await supabase.storage.getBucket(BUCKET)
-      if (bucketErr) {
-        const msg = bucketErr.message?.toLowerCase() || ''
-        // Somente interrompe se realmente indicar inexistência
-        if (msg.includes('not found') || msg.includes('no such bucket') || msg.includes('não encontrado')) {
-          return NextResponse.json({ message: `Bucket '${BUCKET}' inexistente. Crie no Supabase Storage.` }, { status: 500 })
-        }
-        // Caso seja erro de autorização, continua e deixa o upload tentar (políticas podem permitir upload direto)
-        if (msg.includes('unauthorized') || msg.includes('permission') || msg.includes('not authorized')) {
-          // segue sem retornar
-        } else {
-          // Loga silenciosamente outros erros e prossegue
+    // Verificação opcional de existência do bucket.
+    // Observação: getBucket exige service role para retornar metadados; com apenas ANON pode retornar 404/Not Found
+    // dando a impressão de bucket inexistente. Portanto só validamos estritamente se houver SERVICE_ROLE.
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    if (hasServiceRole) {
+      try {
+        const { data: bucketInfo, error: bucketErr } = await supabase.storage.getBucket(BUCKET)
+        if (bucketErr) {
+          const msg = bucketErr.message?.toLowerCase() || ''
+          const indicativeNotFound = ['not found', 'no such bucket', 'não encontrado'].some(k => msg.includes(k))
+          if (indicativeNotFound) {
+            return NextResponse.json({ message: `Bucket '${BUCKET}' aparenta não existir (getBucket). Verifique no painel Storage.` }, { status: 500 })
+          }
+          // Outros erros apenas logamos (permission / policy etc.) e seguimos para tentar upload
           // eslint-disable-next-line no-console
-          console.warn('[UPLOAD][BUCKET-CHECK] Erro inesperado ao checar bucket', msg)
+          console.warn('[UPLOAD][BUCKET-CHECK] Erro getBucket (ignorado para prosseguir upload)', msg)
+        } else if (!bucketInfo) {
+          return NextResponse.json({ message: `Bucket '${BUCKET}' não acessível (sem metadados).` }, { status: 500 })
         }
-      } else if (!bucketInfo) {
-        return NextResponse.json({ message: `Bucket '${BUCKET}' não acessível.` }, { status: 500 })
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[UPLOAD][BUCKET-CHECK] Exceção ignorada em getBucket', e?.message)
       }
-    } catch (e) {
-      // Falha na chamada getBucket não deve impedir tentativa de upload
-      // eslint-disable-next-line no-console
-      console.warn('[UPLOAD][BUCKET-CHECK] Exceção ignorada', e?.message)
     }
 
     const arrayBuffer = await file.arrayBuffer()
