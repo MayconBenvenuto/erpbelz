@@ -228,7 +228,7 @@ export default function App() {
   }
   */
 
-  const handleUpdateProposalStatus = async (proposalId, newStatus, proposal) => {
+  const handleUpdateProposalStatus = async (proposalId, newStatus) => {
     try {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
@@ -236,7 +236,8 @@ export default function App() {
         method: 'PATCH',
         headers,
         credentials: 'include',
-        body: JSON.stringify({ status: newStatus, criado_por: proposal.criado_por, valor: proposal.valor })
+  // Envia somente status para evitar 400 (servidor bloqueia criado_por / valor para analista)
+  body: JSON.stringify({ status: String(newStatus).trim().toLowerCase() })
       })
       if (response.ok) {
         toast.success('Status da proposta atualizado com sucesso!')

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, sanitizeForLog, sanitizeInput } from '@/lib/security'
+import { verifyToken, sanitizeForLog, sanitizeInput, checkRateLimit } from '@/lib/security'
 import { supabase } from '@/lib/api-helpers'
 import { SOLICITACAO_STATUS } from '@/lib/constants'
 
@@ -34,13 +34,15 @@ export async function GET(req, { params }) {
       return NextResponse.json({ message: 'Sem permissão para ver detalhes' }, { status: 403 })
     }
 
-    // garantir URLs de download (gera assinada se necessário)
-    const arquivos = Array.isArray(data.arquivos) ? data.arquivos : []
+  // garantir URLs de download (gera assinada se necessário) com validação de path
+  const safePath = (p) => typeof p === 'string' && !p.startsWith('/') && !p.includes('..') && p.length < 200
+  const arquivos = Array.isArray(data.arquivos) ? data.arquivos : []
     const enriched = []
     for (const arq of arquivos) {
       if (arq?.url) { enriched.push(arq); continue }
-      const path = arq?.path
+  const path = arq?.path
       if (!path) { enriched.push(arq); continue }
+  if (!safePath(path)) { enriched.push({ ...arq, url: null, invalid: true }); continue }
       try {
         const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 600)
         enriched.push({ ...arq, url: signed?.signedUrl || arq.url || null, signed: true })
@@ -85,6 +87,12 @@ export async function PATCH(req, { params }) {
     const id = params.id
     if (!id) return NextResponse.json({ message: 'ID ausente' }, { status: 400 })
     const body = await req.json().catch(() => ({}))
+
+    // rate limit para alterações
+    const rlKey = `patch:solicitacao:${user.userId}`
+    if (!checkRateLimit(rlKey)) {
+      return NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
+    }
 
     const updates = {}
     const historicoAppend = []
