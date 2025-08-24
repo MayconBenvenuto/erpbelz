@@ -7,23 +7,64 @@ import { Button } from '@/components/ui/button'
 import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh, currentUser, token }) {
   const [refreshing, setRefreshing] = useState(false)
   const [perf, setPerf] = useState(null)
+  // Heurística de sessão ativa ainda usada para blocos detalhados (fallback)
+  const isSessionActive = useCallback((s) => {
+    const now = Date.now()
+    return !s.data_logout && (!s.ultimo_ping || (now - new Date(s.ultimo_ping).getTime()) < 5 * 60 * 1000)
+  }, [])
   const [loadingPerf, setLoadingPerf] = useState(false)
   const [start, setStart] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10))
   const [end, setEnd] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).toISOString().slice(0,10))
   // Filtrar gestores do monitoramento
-  const analystUsers = Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []
+  const analystUsers = useMemo(() => (Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []), [users])
   const analystIds = new Set(analystUsers.map(u => u.id))
+  const [onlineUsers, setOnlineUsers] = useState([])
   const filteredSessions = Array.isArray(sessions) ? sessions.filter(s => analystIds.has(s.usuario_id)) : []
+
+  // Função para saber se usuário está online (view + fallback sessão ativa)
+  const userIsOnline = useCallback((user) => {
+    const onlineSet = new Set(onlineUsers.map(u => String(u.id)))
+    if (onlineSet.has(String(user.id))) return true
+    // fallback pela sessão ativa (caso view ainda não atualizou)
+    const userSessions = (sessions || []).filter(s => s.usuario_id === user.id)
+    return userSessions.some(s => isSessionActive(s))
+  }, [onlineUsers, sessions, isSessionActive])
+
+  // Ordenação: online primeiro (alfabética), depois offline (alfabética)
+  const sortedAnalystUsers = useMemo(() => {
+    return [...analystUsers].sort((a,b) => {
+      const aOnline = userIsOnline(a)
+      const bOnline = userIsOnline(b)
+      if (aOnline && !bOnline) return -1
+      if (!aOnline && bOnline) return 1
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
+    })
+  }, [analystUsers, userIsOnline])
+
+  const onlineCount = useMemo(() => sortedAnalystUsers.filter(u => userIsOnline(u)).length, [sortedAnalystUsers, userIsOnline])
   const filteredProposals = Array.isArray(proposals) ? proposals.filter(p => analystIds.has(p.criado_por)) : []
-  const now = Date.now()
-  const isSessionActive = (s) => !s.data_logout && (!s.ultimo_ping || (now - new Date(s.ultimo_ping).getTime()) < 5 * 60 * 1000)
+  const loadOnlineUsers = useCallback(async () => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    try {
+      const res = await fetch('/api/users/online', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      const data = await res.json()
+      if (res.ok) setOnlineUsers(Array.isArray(data.data) ? data.data : [])
+    } catch {}
+  }, [currentUser?.tipo_usuario, token])
+
+  useEffect(() => { loadOnlineUsers() }, [loadOnlineUsers])
+  useEffect(() => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    const id = setInterval(loadOnlineUsers, 60000)
+    return () => clearInterval(id)
+  }, [currentUser?.tipo_usuario, loadOnlineUsers])
 
   const loadPerformance = async () => {
     if (currentUser?.tipo_usuario !== 'gestor') return
@@ -204,7 +245,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               <Users className="w-5 h-5 text-green-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Usuários Online</p>
-                <p className="text-2xl font-bold text-green-600">{filteredSessions.filter(s => isSessionActive(s)).length}</p>
+                <p className="text-2xl font-bold text-green-600">{onlineCount}</p>
               </div>
             </div>
           </CardContent>
@@ -267,7 +308,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analystUsers.map((user) => {
+            {sortedAnalystUsers.map((user) => {
               const userSessions = sessions.filter(s => s.usuario_id === user.id)
               const currentSession = userSessions.find(s => isSessionActive(s))
               const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())
