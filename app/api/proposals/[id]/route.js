@@ -2,26 +2,37 @@ import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 import { supabase, handleCORS, requireAuth, ensureGestor } from '@/lib/api-helpers'
 import { sendEmail } from '@/lib/email'
-import { sanitizeForLog } from '@/lib/security'
+import { sanitizeForLog, checkRateLimit } from '@/lib/security'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
+import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
 import { z } from 'zod'
 
-// Analista: apenas status
+// Validações endurecidas
+const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
+const validateFutureOrToday = (d) => {
+  if (!isoDateRegex.test(d)) return false
+  const dt = new Date(d + 'T00:00:00Z')
+  if (isNaN(dt.getTime())) return false
+  const today = new Date()
+  const todayUTC = new Date(today.toISOString().slice(0,10) + 'T00:00:00Z')
+  return dt >= todayUTC
+}
+
+// Analista: apenas status permitido dentro do conjunto definido
 const analistaPatchSchema = z.object({
-  status: z.string().min(2),
+  status: z.enum([...STATUS_OPTIONS]),
 })
 
-// Gestor: campos ampliados
+// Gestor: campos ampliados (criado_por REMOVIDO - imutável)
 const gestorPatchSchema = z.object({
-  status: z.string().min(2).optional(),
+  status: z.enum([...STATUS_OPTIONS]).optional(),
   quantidade_vidas: z.coerce.number().int().min(0).optional(),
   valor: z.coerce.number().min(0).optional(),
-  previsao_implantacao: z.string().optional(),
-  operadora: z.string().min(1).optional(),
+  previsao_implantacao: z.string().regex(isoDateRegex).refine(validateFutureOrToday, 'Data não pode ser passada').optional(),
+  operadora: z.enum([...OPERADORAS]).optional(),
   consultor: z.string().min(1).optional(),
   consultor_email: z.string().email().optional(),
-  criado_por: z.string().uuid().optional(),
 }).strict()
 
 export async function OPTIONS(request) {
@@ -58,16 +69,30 @@ export async function PATCH(request, { params }) {
 
   const { id } = params
   const body = await request.json()
+
+  // Rate limit por usuário (defesa contra abuso)
+  const rlKey = `patch:proposta:${auth.user.id}`
+  const rlOk = checkRateLimit(rlKey)
+  if (!rlOk) {
+    return handleCORS(NextResponse.json({ error: 'Muitas requisições, tente novamente mais tarde' }, { status: 429 }), origin)
+  }
+
+  // Bloqueia tentativa de mutação de criado_por (mesmo para gestor)
+  if (Object.prototype.hasOwnProperty.call(body, 'criado_por')) {
+    return handleCORS(NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }), origin)
+  }
   const isGestor = auth.user.tipo_usuario === 'gestor'
   const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
-    return handleCORS(
-      NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues }, { status: 400 }),
-      origin
-    )
+    const payloadErr = process.env.NODE_ENV === 'production'
+      ? { error: 'Dados inválidos' }
+      : { error: 'Dados inválidos', issues: parsed.error.issues }
+    return handleCORS(NextResponse.json(payloadErr, { status: 400 }), origin)
   }
 
-  const updates = parsed.data
+  const updates = { ...parsed.data }
+  // Normaliza email de consultor se fornecido
+  if (updates.consultor_email) updates.consultor_email = String(updates.consultor_email).trim().toLowerCase()
 
   // Busca a proposta e checa autorização:
   // - Gestor pode alterar qualquer
@@ -101,7 +126,6 @@ export async function PATCH(request, { params }) {
     if (typeof updates.operadora !== 'undefined') updatePayload.operadora = updates.operadora
     if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
     if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
-    if (typeof updates.criado_por !== 'undefined') updatePayload.criado_por = updates.criado_por
   }
 
   let updateQuery = supabase
@@ -158,7 +182,7 @@ export async function PATCH(request, { params }) {
   // Auditoria: registra alterações (somente campos realmente alterados)
   try {
     const changed = {}
-  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email','criado_por']
+  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email']
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(updatePayload, k)) {
         const before = currentProposal[k]

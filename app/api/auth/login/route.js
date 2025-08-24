@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase, handleCORS } from '@/lib/api-helpers'
-import { generateToken, verifyPassword, validateEmail, sanitizeForLog } from '@/lib/security'
+import { generateToken, verifyPassword, validateEmail, sanitizeForLog, checkRateLimit } from '@/lib/security'
 
 export async function OPTIONS(request) {
 	const origin = request.headers.get('origin')
@@ -11,6 +11,12 @@ export async function POST(request) {
 	const origin = request.headers.get('origin')
 	try {
 		const { email, password } = await request.json()
+		// Rate limit por IP/email (básico - IP via header X-Forwarded-For se presente)
+		const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'ip:unknown'
+		const rlKey = `login:${ip}:${String(email||'').toLowerCase()}`
+		if (!checkRateLimit(rlKey)) {
+			return handleCORS(NextResponse.json({ error: 'Muitas tentativas, aguarde' }, { status: 429 }), origin)
+		}
 		if (!validateEmail(String(email || ''))) {
 			return handleCORS(NextResponse.json({ error: 'Email inválido' }, { status: 400 }), origin)
 		}

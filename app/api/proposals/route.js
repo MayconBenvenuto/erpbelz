@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 import { z } from 'zod'
 import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
-import { STATUS_OPTIONS } from '@/lib/constants'
+import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
 import { sendEmail } from '@/lib/email'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -42,15 +42,25 @@ export async function GET(request) {
 	return handleCORS(NextResponse.json(data || []), origin)
 }
 
+const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
+const validateFutureOrToday = (d) => {
+	if (!isoDateRegex.test(d)) return false
+	const dt = new Date(d + 'T00:00:00Z')
+	if (isNaN(dt.getTime())) return false
+	const today = new Date()
+	const todayUTC = new Date(today.toISOString().slice(0,10) + 'T00:00:00Z')
+	return dt >= todayUTC
+}
+
 const createSchema = z.object({
 	cnpj: z.string().min(14),
 	consultor: z.string().min(2),
 	consultor_email: z.string().email(),
-	operadora: z.string().min(2),
+	operadora: z.enum([...OPERADORAS]),
 	quantidade_vidas: z.coerce.number().int().min(1),
 	valor: z.coerce.number().min(0.01),
-	previsao_implantacao: z.string().optional(),
-	status: z.string().refine(s => STATUS_OPTIONS.includes(s)),
+	previsao_implantacao: z.string().regex(isoDateRegex).refine(validateFutureOrToday, 'Data não pode ser passada').optional(),
+	status: z.enum([...STATUS_OPTIONS]),
 	criado_por: z.string().uuid(),
 })
 
@@ -67,10 +77,14 @@ export async function POST(request) {
 	const body = await request.json()
 	const parsed = createSchema.safeParse(body)
 	if (!parsed.success) {
-		return handleCORS(NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues }, { status: 400 }), origin)
+		const payloadErr = process.env.NODE_ENV === 'production'
+			? { error: 'Dados inválidos' }
+			: { error: 'Dados inválidos', issues: parsed.error.issues }
+		return handleCORS(NextResponse.json(payloadErr, { status: 400 }), origin)
 	}
 
-	const payload = parsed.data
+	const payload = { ...parsed.data }
+	payload.consultor_email = payload.consultor_email.trim().toLowerCase()
 	// força autor do token
 	if (auth.user.tipo_usuario !== 'gestor' && payload.criado_por !== auth.user.id) {
 		payload.criado_por = auth.user.id

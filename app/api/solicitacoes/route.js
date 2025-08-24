@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, sanitizeInput, sanitizeForLog } from '@/lib/security'
+import { verifyToken, sanitizeInput, sanitizeForLog, checkRateLimit } from '@/lib/security'
 import { supabase } from '@/lib/api-helpers'
 
 function extractToken(req) {
@@ -62,6 +62,11 @@ export async function POST(req) {
   const user = verifyToken(token)
     if (!user) return NextResponse.json({ message: 'Token inválido' }, { status: 401 })
 
+    const rlKey = `post:solicitacao:${user.userId}`
+    if (!checkRateLimit(rlKey)) {
+      return NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
+    }
+
     const body = await req.json()
     const required = ['tipo', 'razao_social', 'cnpj', 'apolice_da_belz']
     for (const r of required) {
@@ -82,6 +87,10 @@ export async function POST(req) {
       if (isNaN(d.getTime())) return NextResponse.json({ message: 'sla_previsto inválido' }, { status: 400 })
       slaPrevisto = d.toISOString().slice(0,10)
     }
+    // Validação básica dos arquivos (se existirem)
+    const safePath = (p) => typeof p === 'string' && !p.startsWith('/') && !p.includes('..') && p.length < 200
+    const arquivosSan = (Array.isArray(body.arquivos) ? body.arquivos : []).filter(a => a && safePath(a.path || ''))
+
     const payload = {
       tipo: clean(body.tipo),
       subtipo: body.subtipo ? clean(body.subtipo) : null,
@@ -91,7 +100,7 @@ export async function POST(req) {
       acesso_empresa: clean(body.acesso_empresa || ''),
       operadora: clean(body.operadora || ''),
       observacoes: clean(body.observacoes || ''),
-      arquivos: Array.isArray(body.arquivos) ? body.arquivos : [],
+      arquivos: arquivosSan,
   dados: body.dados || {},
   criado_por: user.userId,
   sla_previsto: slaPrevisto,
