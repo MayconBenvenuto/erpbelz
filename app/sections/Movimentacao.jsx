@@ -102,9 +102,9 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
     return { total, atrasadas, concluidas, mediaDias }
   }, [solicitacoes, hoje])
 
-  const updateStatus = async (id, status) => {
-    // Se vier de ação direta (sem bypass) abre confirmação primeiro
-    if (!confirmBusy && !confirmStatus?.bypass) {
+  const updateStatus = async (id, status, bypass = false) => {
+    // Primeira chamada: abre diálogo de confirmação
+    if (!bypass) {
       const sol = solicitacoes.find(s => s.id === id)
       setConfirmStatus({ id, from: sol?.status, to: status })
       return
@@ -112,7 +112,11 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
     setUpdating(prev => ({ ...prev, [id]: true }))
     try {
       const body = status ? { status } : {}
-      const res = await fetch(`/api/solicitacoes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) })
+      const res = await fetch(`/api/solicitacoes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body)
+      })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.message || 'Falha ao atualizar')

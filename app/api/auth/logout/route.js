@@ -54,6 +54,11 @@ export async function POST(request) {
 			}
 		}
 
+		// Marca last_logout_at para presença
+		if (authUser?.id) {
+			try { await supabase.from('usuarios').update({ last_logout_at: new Date().toISOString() }).eq('id', authUser.id) } catch {}
+		}
+
 			const response = NextResponse.json({ success: true })
 			const isProd = process.env.NODE_ENV === 'production'
 			try {

@@ -27,11 +27,15 @@ export async function POST(request) {
       return handleCORS(NextResponse.json({ ok: false, skipped: true, reason: 'session_closed' }), origin)
     }
 
+    const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('sessoes')
-      .update({ ultimo_ping: new Date().toISOString() })
+      .update({ ultimo_ping: nowIso })
       .eq('id', sessionId)
       .eq('usuario_id', auth.user.id)
+
+    // Atualiza last_active_at do usuário (presença)
+    try { await supabase.from('usuarios').update({ last_active_at: nowIso }).eq('id', auth.user.id) } catch {}
 
     if (error) {
       return handleCORS(NextResponse.json({ ok: false, skipped: true }), origin)

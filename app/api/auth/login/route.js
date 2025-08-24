@@ -37,6 +37,11 @@ export async function POST(request) {
 		const sessionId = crypto.randomUUID()
 		await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, data_login: new Date().toISOString() })
 
+		// Marca presença inicial do usuário no login
+		try {
+			await supabase.from('usuarios').update({ last_active_at: new Date().toISOString(), last_logout_at: null }).eq('id', user.id)
+		} catch {}
+
 				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
 
 				// Cria resposta e define cookie de sessão (HttpOnly, SameSite=Lax, sem Max-Age/Expires)
