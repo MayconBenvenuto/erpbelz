@@ -3,9 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Clock, Activity, CheckCircle2, XCircle, Pencil, Save, FileDown, Eye, Loader2 } from 'lucide-react'
+import { Clock, Activity, CheckCircle2, XCircle, Pencil, Save, FileDown, Loader2 } from 'lucide-react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { SOLICITACAO_STATUS } from '@/lib/constants'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { NovaSolicitacaoDialog } from '@/components/solicitacoes/NovaSolicitacaoDialog'
 
 // Helper para formatar datas
@@ -33,6 +35,8 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
   const [detailLoading, setDetailLoading] = useState(false)
   const [detail, setDetail] = useState(null)
   const [reloading, setReloading] = useState(false)
+  const [confirmStatus, setConfirmStatus] = useState(null) // { id, from, to }
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   useEffect(() => {
     if (parentToken) {
@@ -98,11 +102,21 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
     return { total, atrasadas, concluidas, mediaDias }
   }, [solicitacoes, hoje])
 
-  const updateStatus = async (id, status) => {
+  const updateStatus = async (id, status, bypass = false) => {
+    // Primeira chamada: abre diálogo de confirmação
+    if (!bypass) {
+      const sol = solicitacoes.find(s => s.id === id)
+      setConfirmStatus({ id, from: sol?.status, to: status })
+      return
+    }
     setUpdating(prev => ({ ...prev, [id]: true }))
     try {
       const body = status ? { status } : {}
-      const res = await fetch(`/api/solicitacoes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) })
+      const res = await fetch(`/api/solicitacoes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body)
+      })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.message || 'Falha ao atualizar')
@@ -262,22 +276,41 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                       <button disabled={updating[sol.id]} onClick={() => claim(sol.id)} className="px-2 py-0.5 text-[11px] bg-primary text-white rounded disabled:opacity-50">Assumir</button>
                     </div>
                   )}
-                  {(currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id)) && (
-                    <div className="flex gap-1">
-                      <button onClick={() => openDetails(sol.id)} className="px-2 py-0.5 text-[11px] bg-primary/10 hover:bg-primary/20 rounded flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Ver</button>
+                  {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
+                    <div className="flex gap-1 flex-wrap">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            disabled={updating[sol.id]}
+                            className="px-2 py-0.5 text-[11px] rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+                            aria-label="Ações da solicitação"
+                          >
+                            Ações
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-40">
+                          <DropdownMenuLabel className="text-[11px]">Solicitação</DropdownMenuLabel>
+                          <DropdownMenuItem className="text-[12px]" onClick={() => openDetails(sol.id)}>
+                            Ver detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-[11px]">Alterar status</DropdownMenuLabel>
+                          {SOLICITACAO_STATUS.filter(s => s !== sol.status).map(next => (
+                            <DropdownMenuItem
+                              key={next}
+                              className="text-[12px] capitalize"
+                              disabled={updating[sol.id]}
+                              onClick={() => updateStatus(sol.id, next)}
+                            >
+                              {next}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   )}
                   {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) !== String(currentUser?.id) && (
                     <div className="text-[10px] text-muted-foreground">Em análise por {sol.atendido_por_nome || 'outro analista'}</div>
-                  )}
-                  {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
-                    <div className="flex gap-1 flex-wrap">
-                      {SOLICITACAO_STATUS.filter(s => s !== sol.status).slice(0,3).map(next => (
-                        <button key={next} disabled={updating[sol.id]} onClick={() => updateStatus(sol.id, next)} className="px-1.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-[10px] capitalize">
-                          {next.split(' ')[0]}
-                        </button>
-                      ))}
-                    </div>
                   )}
                   {currentUser?.tipo_usuario !== 'analista' && sol.atendido_por_nome && (
                     <div className="text-[10px] text-muted-foreground">Analista: {sol.atendido_por_nome}</div>
@@ -345,6 +378,13 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                   <div><span className="font-medium">Status:</span> {detail.status}</div>
                   <div><span className="font-medium">SLA:</span> {detail.sla_previsto?fmt(detail.sla_previsto):'—'}</div>
                   <div><span className="font-medium">Analista:</span> {detail.atendido_por_nome || '—'}</div>
+                  <div className="col-span-2 text-xs mt-1">
+                    <span className="font-medium">Consultor solicitante:</span> {detail.criado_por_nome ? (
+                      <>
+                        {detail.criado_por_nome} {detail.criado_por_email && <span className="text-muted-foreground">(&lt;{detail.criado_por_email}&gt;)</span>}
+                      </>
+                    ) : '—'}
+                  </div>
                 </div>
                 <div>
                   <span className="font-medium">Observações:</span>
@@ -382,6 +422,34 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
           </div>
         </div>
       )}
+      {/* Confirmação de mudança de status */}
+      <AlertDialog open={!!confirmStatus} onOpenChange={(o)=>{ if(!o) setConfirmStatus(null) }}>
+        {confirmStatus && (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-sm">Confirmar mudança de status</AlertDialogTitle>
+              <AlertDialogDescription className="text-xs">
+                Alterar de <span className="font-medium">{confirmStatus.from}</span> para <span className="font-medium">{confirmStatus.to}</span>? Essa ação será registrada no histórico.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={confirmBusy} onClick={()=>setConfirmStatus(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={confirmBusy}
+                onClick={async () => {
+                  if(!confirmStatus) return
+                  setConfirmBusy(true)
+                  await updateStatus(confirmStatus.id, confirmStatus.to, true)
+                  setConfirmBusy(false)
+                  setConfirmStatus(null)
+                }}
+              >
+                {confirmBusy ? 'Salvando...' : 'Confirmar'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
     </div>
   )
 }

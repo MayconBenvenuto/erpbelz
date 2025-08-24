@@ -34,19 +34,17 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
 
   <nav className="flex-1 p-4">
         <div className="space-y-2">
-          {/* Para gestor, Dashboard como primeira opção */}
-          {currentUser.tipo_usuario === 'gestor' && (
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <BarChart3 className="w-5 h-5" />
-              <span className="font-medium">Dashboard</span>
-            </button>
-          )}
+          {/* Dashboard: sempre a primeira opção para todos os perfis */}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+              activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="font-medium">Dashboard</span>
+          </button>
 
           {currentUser.tipo_usuario !== 'consultor' && (
             <button
@@ -72,20 +70,6 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <CheckSquare className="w-5 h-5" />
             <span className="font-medium">Implantação</span>
           </button>
-
-          {/* Para analista, Dashboard segue após Implantação; gestor já vê no topo */}
-          {currentUser.tipo_usuario !== 'consultor' && currentUser.tipo_usuario !== 'gestor' && (
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <BarChart3 className="w-5 h-5" />
-              <span className="font-medium">Dashboard</span>
-            </button>
-          )}
 
           {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
             <button
