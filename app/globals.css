@@ -131,7 +131,50 @@ code {
     }
 }
 
+/* Estilos personalizados para Timeline */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
 
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thumb-primary\/20::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.2);
+}
+
+/* Animação de gradiente para linha da timeline */
+.timeline-gradient {
+  background: linear-gradient(90deg, 
+    hsl(var(--primary) / 0.6) 0%, 
+    hsl(var(--primary) / 0.4) 50%, 
+    hsl(var(--primary) / 0.3) 100%
+  );
+}
+
+/* Smooth scroll behavior */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
 
 @layer base {
   * {

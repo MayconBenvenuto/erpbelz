@@ -4,16 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Clock, TrendingUp, RefreshCw, Target } from 'lucide-react'
+import { Users, Clock, TrendingUp, RefreshCw, Target, Activity, BarChart3, AlertTriangle, Layers, TimerReset, LineChart, Bell, Play } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh, currentUser, token }) {
   const [refreshing, setRefreshing] = useState(false)
   const [perf, setPerf] = useState(null)
+  // Estados para alertas de propostas estagnadas
+  const [alertsInfo, setAlertsInfo] = useState(null)
+  const [loadingAlerts, setLoadingAlerts] = useState(false)
+  const [triggeringAlert, setTriggeringAlert] = useState(false)
   // Heurística de sessão ativa ainda usada para blocos detalhados (fallback)
   const isSessionActive = useCallback((s) => {
     const now = Date.now()
@@ -85,8 +90,54 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
 
   useEffect(() => {
     loadPerformance()
+    if (currentUser?.tipo_usuario === 'gestor') {
+      loadAlertsInfo()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Carrega informações dos alertas
+  const loadAlertsInfo = async () => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    setLoadingAlerts(true)
+    try {
+      const res = await fetch('/api/alerts/stale-proposals', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAlertsInfo(data)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar alertas:', err)
+    } finally {
+      setLoadingAlerts(false)
+    }
+  }
+
+  // Executa verificação manual de alertas
+  const triggerStaleCheck = async () => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    setTriggeringAlert(true)
+    try {
+      const res = await fetch('/api/alerts/stale-proposals', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(`✅ Verificação executada! ${data.notified || 0} propostas notificadas.`)
+        await loadAlertsInfo() // Recarrega info
+      } else {
+        toast.error(`❌ Erro: ${data.error || 'Falha na verificação'}`)
+      }
+    } catch (err) {
+      console.error('Erro ao executar alerta:', err)
+      toast.error('❌ Erro de conexão ao executar verificação')
+    } finally {
+      setTriggeringAlert(false)
+    }
+  }
   return (
     <div className="space-y-6">
       {currentUser?.tipo_usuario === 'gestor' && (
@@ -105,26 +156,157 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
             </Button>
           </div>
 
+          {/* Seção de Alertas de Propostas Estagnadas */}
+          <Card className="border-l-4 border-l-orange-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+                Sistema de Alertas - Propostas Estagnadas
+              </CardTitle>
+              <CardDescription>
+                Monitora propostas em análise há mais de 48h e envia notificações automáticas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {loadingAlerts ? '...' : alertsInfo?.propostas_48h || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Propostas há +48h</div>
+                </div>
+                <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600">
+                    {loadingAlerts ? '...' : alertsInfo?.propostas_72h || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Críticas (+72h)</div>
+                </div>
+                <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Último check</div>
+                  <div className="font-medium">
+                    {loadingAlerts ? 'Carregando...' : alertsInfo?.ultimo_check || 'Nunca'}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  onClick={triggerStaleCheck} 
+                  disabled={triggeringAlert}
+                  variant="outline"
+                  size="sm"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  {triggeringAlert ? 'Executando...' : 'Verificar Agora'}
+                </Button>
+                <Button 
+                  onClick={loadAlertsInfo} 
+                  disabled={loadingAlerts}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loadingAlerts ? 'animate-spin' : ''}`} />
+                  {loadingAlerts ? 'Carregando...' : 'Atualizar Status'}
+                </Button>
+              </div>
+
+              {alertsInfo?.detalhes && (
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Ver propostas estagnadas</summary>
+                  <div className="mt-2 space-y-2">
+                    {alertsInfo.detalhes.propostas_48h?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-orange-600 mb-2">Propostas há +48h:</h4>
+                        {alertsInfo.detalhes.propostas_48h.map((p, i) => (
+                          <div key={i} className="text-xs bg-orange-50 dark:bg-orange-950/20 p-2 rounded">
+                            <strong>{p.codigo}</strong> - {p.cnpj} - {p.consultor} ({p.horas_parado}h parado)
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {alertsInfo.detalhes.propostas_72h_criticas?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-red-600 mb-2">Propostas críticas (+72h):</h4>
+                        {alertsInfo.detalhes.propostas_72h_criticas.map((p, i) => (
+                          <div key={i} className="text-xs bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                            <strong>{p.codigo}</strong> - {p.cnpj} - {p.consultor} ({p.horas_parado}h parado)
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
+
+              <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
+                <strong>Funcionamento automático:</strong> O sistema executa verificação diária às 9:00 BRT via GitHub Actions. 
+                Propostas em análise entre 48h-72h recebem notificação por e-mail para todos os gestores.
+              </div>
+            </CardContent>
+          </Card>
+
           {perf && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="lg:col-span-3">
+            <div className="grid grid-cols-1 2xl:grid-cols-3 gap-4">
+              <Card className="2xl:col-span-3">
                 <CardHeader>
                   <CardTitle>Painel de Desempenho</CardTitle>
+                  <CardDescription>Métricas ampliadas de propostas e implantação</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                <CardContent className="grid grid-cols-1 xl:grid-cols-6 gap-4">
                   <Card className="col-span-1">
-                    <CardHeader><CardTitle>KPIs</CardTitle></CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between"><span>Total propostas</span><strong>{perf.kpis?.total_propostas ?? 0}</strong></div>
+                    <CardHeader><CardTitle>KPIs Básicos</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Total</span><strong>{perf.kpis?.total_propostas ?? 0}</strong></div>
                       <div className="flex justify-between"><span>Implantadas</span><strong>{perf.kpis?.implantadas ?? 0}</strong></div>
-                      <div className="flex justify-between"><span>Ticket médio</span><strong>R$ {Number(perf.kpis?.ticket_medio_geral ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+                      <div className="flex justify-between"><span>Conversão</span><strong>{perf.kpis?.taxa_conversao_final ?? 0}%</strong></div>
                       <div className="flex justify-between"><span>Vidas</span><strong>{perf.kpis?.vidas_totais ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Valor Implantado</span><strong>R$ {Number(perf.kpis?.valor_implantado || 0).toLocaleString('pt-BR')}</strong></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>Financeiro</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Ticket Médio</span><strong>R$ {Number(perf.kpis?.ticket_medio_geral || 0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div>
+                      <div className="flex justify-between"><span>Desv.Padrão</span><strong>R$ {Number(perf.kpis?.ticket_desvio_padrao || 0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div>
+                      <div className="flex justify-between"><span>Forecast</span><strong>R$ {Number(perf.kpis?.forecast_valor_ponderado || 0).toLocaleString('pt-BR',{minimumFractionDigits:0})}</strong></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>Tempos</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Lead Time</span><strong>{perf.kpis?.lead_time_medio_dias ?? 0}d</strong></div>
+                      <div className="flex justify-between"><span>1º Avanço</span><strong>{perf.kpis?.tempo_medio_primeiro_avanco_dias ?? 0}d</strong></div>
+                      <div className="flex justify-between"><span>Aging Médio</span><strong>{perf.kpis?.aging_medio_dias ?? 0}d</strong></div>
+                      <div className="flex justify-between"><span>SLA Implantação</span><strong>{perf.kpis?.sla_implantacao_pct ?? 0}%</strong></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>Qualidade</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Perdas</span><strong>{perf.kpis?.propostas_negadas ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Taxa Perda</span><strong>{perf.kpis?.taxa_perda_pct ?? 0}%</strong></div>
+                      <div className="flex justify-between"><span>Recup. Estagnação</span><strong>{perf.kpis?.recuperacoes_estagnacao ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Retrabalho</span><strong>{perf.kpis?.retrabalho_pct ?? 0}%</strong></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>Run Rate</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Run Rate (dia)</span><strong>{perf.kpis?.run_rate_implantacao ?? 0}</strong></div>
+                      <div className="flex justify-between"><span>Prev. Mês</span><strong>{perf.kpis?.previsao_fim_mes_implantadas ?? 0}</strong></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-1">
+                    <CardHeader><CardTitle>Meta / Parâmetros</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-xs">
+                      <div>SLA dias: {perf.meta_info?.sla_dias}</div>
+                      <div>Estagnação dias: {perf.meta_info?.estagnacao_dias}</div>
                     </CardContent>
                   </Card>
 
-                  <Card className="xl:col-span-1">
-                    <CardHeader><CardTitle>Funil por Status</CardTitle></CardHeader>
-                    <CardContent className="h-64">
+                  <Card className="col-span-2 xl:col-span-3">
+                    <CardHeader className="py-3"><CardTitle>Funil (Qtd)</CardTitle></CardHeader>
+                    <CardContent className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={perf.funilStatus || []}>
                           <XAxis dataKey="status" hide />
@@ -135,31 +317,29 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
-
-                  <Card className="xl:col-span-1">
-                    <CardHeader><CardTitle>Vidas por Operadora</CardTitle></CardHeader>
-                    <CardContent className="h-64">
+                  <Card className="col-span-2 xl:col-span-2">
+                    <CardHeader className="py-3"><CardTitle>Pipeline Valor</CardTitle></CardHeader>
+                    <CardContent className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perf.pipelineValor || []}>
+                          <XAxis dataKey="status" hide />
+                          <YAxis hide />
+                          <Tooltip formatter={(v)=>`R$ ${Number(v).toLocaleString('pt-BR')}`} />
+                          <Bar dataKey="valor_total" fill="#021d79" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                  <Card className="col-span-2 xl:col-span-1">
+                    <CardHeader className="py-3"><CardTitle>Vidas por Operadora</CardTitle></CardHeader>
+                    <CardContent className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={perf.vidasPorOperadora || []}>
                           <XAxis dataKey="operadora" hide />
                           <YAxis hide />
                           <Tooltip />
-                          <Bar dataKey="vidas_total" fill="#021d79" />
+                          <Bar dataKey="vidas_total" fill="#6b7cff" />
                         </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="xl:col-span-1">
-                    <CardHeader><CardTitle>Ticket Médio (implantadas)</CardTitle></CardHeader>
-                    <CardContent className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={[{ name: 'Ticket', value: Number(perf.kpis?.ticket_medio_geral || 0) }]} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
-                            <Cell fill="#6b7cff" />
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
                       </ResponsiveContainer>
                     </CardContent>
                   </Card>
@@ -167,12 +347,12 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>Ranking por Analista</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Ranking Usuários (Analistas/Consultores)</CardTitle></CardHeader>
                 <CardContent className="overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Analista</TableHead>
+                        <TableHead>Usuário</TableHead>
                         <TableHead>Propostas</TableHead>
                         <TableHead>Implantadas</TableHead>
                         <TableHead>Ticket Médio</TableHead>
@@ -180,7 +360,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(perf.rankingAnalistas || []).map((r) => (
+                      {(perf.rankingUsuarios || []).map((r) => (
                         <TableRow key={r.usuario_id || r.nome}>
                           <TableCell>{r.nome}</TableCell>
                           <TableCell>{r.total_propostas}</TableCell>
@@ -215,6 +395,34 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                           <TableCell>{r.implantadas} ({r.taxa_implantacao}%)</TableCell>
                           <TableCell>R$ {Number(r.ticket_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>{r.vidas_total}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Ranking por Consultor (E-mail)</CardTitle></CardHeader>
+                <CardContent className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>Propostas</TableHead>
+                        <TableHead>Implantadas</TableHead>
+                        <TableHead>Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(perf.rankingConsultoresEmail || []).map(r => (
+                        <TableRow key={r.consultor_email}>
+                          <TableCell>{r.consultor_email}</TableCell>
+                          <TableCell>{r.nome_usuario || '-'}</TableCell>
+                          <TableCell>{r.total_propostas}</TableCell>
+                          <TableCell>{r.implantadas} ({r.taxa_implantacao}%)</TableCell>
+                          <TableCell>R$ {Number(r.valor_total || 0).toLocaleString('pt-BR')}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
