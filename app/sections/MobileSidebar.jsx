@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import { FileText, BarChart3, Users, TrendingUp, LogOut, RefreshCw, Repeat } from "lucide-react"
-import { CheckSquare } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -48,7 +47,8 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
                 </button>
               </SheetClose>
             )}
-            {currentUser?.tipo_usuario !== 'consultor' && (
+            {/* Propostas agora visível também para consultor */}
+            {true && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('propostas')}
@@ -63,22 +63,10 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
               </SheetClose>
             )}
 
-            {/* Implantação (todos) */}
-            <SheetClose asChild>
-              <button
-                onClick={() => setActiveTab('implantacao')}
-                aria-current={activeTab === 'implantacao' ? 'page' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                  activeTab === 'implantacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <CheckSquare className="w-5 h-5" />
-                <span className="font-medium">Implantação</span>
-              </button>
-            </SheetClose>
+            {/* Seção Implantação removida */}
 
             {/* Para analista, Dashboard segue aqui; gestor já vê no topo */}
-            {currentUser?.tipo_usuario !== 'consultor' && currentUser?.tipo_usuario !== 'gestor' && (
+            {currentUser?.tipo_usuario !== 'gestor' && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('dashboard')}

@@ -3,7 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { FileText, Target, TrendingUp, RefreshCw, ArrowUpDown, X } from 'lucide-react'
+import { FileText, Target, TrendingUp, RefreshCw, ArrowUpDown, X, Activity, Award, BarChart3 } from 'lucide-react'
+import { useRef } from 'react'
+import { toast } from 'sonner'
 import { formatCurrency, getStatusBadgeClasses } from '@/lib/utils'
 import { STATUS_OPTIONS } from '@/lib/constants'
 import { useEffect, useMemo, useState } from 'react'
@@ -116,7 +118,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   const totalValue = filteredProposals.reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
   const implantedValue = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + parseFloat(p.valor || 0), 0)
   const totalLives = filteredProposals.reduce((sum, p) => sum + Number(p.quantidade_vidas || 0), 0)
-  const implantedLives = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + Number(p.quantidade_vidas || 0), 0)
+  // const implantedLives = filteredProposals.filter(p => p.status === 'implantado').reduce((sum, p) => sum + Number(p.quantidade_vidas || 0), 0)
 
   const statusCounts = useMemo(() =>
     STATUS_OPTIONS.map((status) => {
@@ -133,6 +135,74 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
     return counts
   }, [filteredProposals, operadorasSortAsc])
 
+  // Funil simplificado de conversão
+  const funnel = useMemo(() => {
+    const stages = ['em análise','pendencias seguradora','boleto liberado','implantando','implantado']
+    const counts = stages.map(s => ({ stage: s, count: filteredProposals.filter(p => normalize(p.status) === normalize(s)).length }))
+    const first = counts[0]?.count || 0
+    return counts.map(c => ({ ...c, percOrigem: first > 0 ? (c.count / first) * 100 : 0 }))
+  }, [filteredProposals])
+
+  // Ranking de analistas (somente gestor)
+  const analystRanking = useMemo(() => {
+    if (currentUser.tipo_usuario !== 'gestor') return []
+    const analystUsers = users.filter(u => u.tipo_usuario !== 'gestor')
+    const map = {}
+    filteredProposals.forEach(p => {
+      if (!p.atendido_por) return
+      const id = p.atendido_por
+      if (!map[id]) map[id] = { id, assumidas: 0, implantadas: 0, valorImplantado: 0, totalSlaMs: 0, slaCount: 0 }
+      map[id].assumidas++
+      if (p.status === 'implantado') {
+        map[id].implantadas++
+        map[id].valorImplantado += Number(p.valor || 0)
+      }
+      if (p.atendido_em && p.criado_em) {
+        const created = new Date(p.criado_em).getTime()
+        const attended = new Date(p.atendido_em).getTime()
+        if (!isNaN(created) && !isNaN(attended) && attended >= created) {
+          map[id].totalSlaMs += (attended - created)
+          map[id].slaCount++
+        }
+      }
+    })
+    return Object.values(map).map(m => {
+      const user = analystUsers.find(u => u.id === m.id)
+      const slaHoras = m.slaCount ? (m.totalSlaMs / m.slaCount) / 1000 / 3600 : 0
+      const conversao = m.assumidas ? (m.implantadas / m.assumidas) * 100 : 0
+      return { ...m, nome: user?.nome || '—', slaHoras, conversao }
+    }).sort((a,b) => b.valorImplantado - a.valorImplantado).slice(0,5)
+  }, [filteredProposals, users, currentUser.tipo_usuario])
+
+  // Heatmap Operadora x Status (gestor)
+  const heatmap = useMemo(() => {
+    if (currentUser.tipo_usuario !== 'gestor') return { rows: [], max: 0 }
+    const ops = Array.from(new Set(filteredProposals.map(p => p.operadora))).sort((a,b) => normalize(a).localeCompare(normalize(b)))
+    const statuses = STATUS_OPTIONS
+    const rows = ops.map(op => {
+      const cell = {}
+      statuses.forEach(st => { cell[st] = 0 })
+      filteredProposals.filter(p => p.operadora === op).forEach(p => { if (cell[p.status] !== undefined) cell[p.status]++ })
+      return { operadora: op, ...cell }
+    })
+    let max = 0
+    rows.forEach(r => STATUS_OPTIONS.forEach(st => { if (r[st] > max) max = r[st] }))
+    return { rows, max }
+  }, [filteredProposals, currentUser.tipo_usuario])
+
+  const heatClass = (v, max) => {
+    if (max === 0) return 'bg-muted'
+    const ratio = v / max
+    if (ratio === 0) return 'bg-muted'
+    if (ratio < 0.15) return 'bg-primary/10'
+    if (ratio < 0.30) return 'bg-primary/20'
+    if (ratio < 0.45) return 'bg-primary/30'
+    if (ratio < 0.60) return 'bg-primary/50 text-primary-foreground'
+    if (ratio < 0.75) return 'bg-primary/60 text-primary-foreground'
+    if (ratio < 0.90) return 'bg-primary/70 text-primary-foreground'
+    return 'bg-primary text-primary-foreground'
+  }
+
   // Consultores únicos para dropdown
   const consultores = useMemo(() => {
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
@@ -140,6 +210,9 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   return (
     <div className="space-y-6">
+      {currentUser.tipo_usuario === 'gestor' && (
+        <SLARealTimeWatcher proposals={proposals} currentUser={currentUser} />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Meta</CardTitle>
@@ -426,7 +499,121 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </div>
       )}
 
+      {currentUser.tipo_usuario === 'gestor' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2"><Activity className="w-4 h-4" /> Funil</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {funnel.map(f => (
+                <div key={f.stage} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="capitalize">{f.stage}</span>
+                    <span>{f.count} ({f.percOrigem.toFixed(1)}%)</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded">
+                    <div className="h-2 bg-primary rounded" style={{ width: `${Math.min(100, f.percOrigem)}%` }} />
+                  </div>
+                </div>
+              ))}
+              {funnel.every(f => f.count === 0) && <p className="text-xs text-muted-foreground">Sem dados ainda.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2"><Award className="w-4 h-4" /> Ranking Analistas</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {analystRanking.length === 0 && <p className="text-xs text-muted-foreground">Sem propostas assumidas.</p>}
+              {analystRanking.map((a, idx) => (
+                <div key={a.id} className="flex items-center justify-between text-xs p-2 border rounded-md bg-card/50">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold w-4 text-right">{idx+1}.</span>
+                    <span className="font-medium">{a.nome}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground">{a.implantadas}/{a.assumidas}</span>
+                    <Badge variant="secondary" className="text-emerald-700 bg-emerald-100">{a.conversao.toFixed(0)}%</Badge>
+                    <Badge variant="outline">{a.slaHoras.toFixed(1)}h SLA</Badge>
+                    <Badge className="bg-blue-600 text-white">{formatCurrency(a.valorImplantado)}</Badge>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-4 h-4" /> Heatmap</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {heatmap.rows.length === 0 && <p className="text-xs text-muted-foreground">Sem dados.</p>}
+              {heatmap.rows.length > 0 && (
+                <table className="min-w-full text-[10px] border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1 text-left">Operadora</th>
+                      {STATUS_OPTIONS.map(st => (
+                        <th key={st} className="border px-2 py-1 capitalize whitespace-nowrap">{st.split(' ')[0]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heatmap.rows.map(r => (
+                      <tr key={r.operadora} className="hover:bg-muted/40">
+                        <td className="border px-2 py-1 capitalize font-medium sticky left-0 bg-background/80 backdrop-blur">{r.operadora}</td>
+                        {STATUS_OPTIONS.map(st => (
+                          <td key={st} className={`border px-1 py-1 text-center ${heatClass(r[st], heatmap.max)} transition-colors`}>{r[st] || ''}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
   {/* Meta movida para o topo */}
     </div>
   )
+}
+
+// Componente interno para alertar gestor sobre propostas livres estourando SLA
+function SLARealTimeWatcher({ proposals, currentUser }) {
+  const alertedRef = useRef(new Set())
+  const lastTickRef = useRef(0)
+  useEffect(() => {
+    if (currentUser.tipo_usuario !== 'gestor') return
+    const tick = () => {
+      const nowTs = Date.now()
+      if (nowTs - lastTickRef.current < 5000) return // proteção dupla caso setInterval duplique
+      lastTickRef.current = nowTs
+      const now = Date.now()
+      const thresholdMs = 8 * 3600 * 1000 // 8h
+      proposals.filter(p => !p.atendido_por).forEach(p => {
+        const created = new Date(p.criado_em).getTime()
+        if (isNaN(created)) return
+        const waited = now - created
+        if (waited >= thresholdMs) {
+          if (!alertedRef.current.has(p.id)) {
+            alertedRef.current.add(p.id)
+            const hours = (waited/3600000).toFixed(1)
+            toast.error(`(Gestor) SLA estourado: proposta ${p.codigo || p.id.slice(0,8)} livre há ${hours}h`)
+          }
+        }
+      })
+    }
+    const interval = setInterval(tick, 30_000)
+    tick()
+    return () => clearInterval(interval)
+  }, [proposals, currentUser])
+  return null
 }

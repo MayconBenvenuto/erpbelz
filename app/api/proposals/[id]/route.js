@@ -2,31 +2,100 @@ import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 import { supabase, handleCORS, requireAuth, ensureGestor } from '@/lib/api-helpers'
 import { sendEmail } from '@/lib/email'
-import { sanitizeForLog } from '@/lib/security'
+import { sanitizeForLog, checkRateLimit } from '@/lib/security'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
+import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
 import { z } from 'zod'
 
-// Analista: apenas status
+// Validações endurecidas
+const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
+const validateFutureOrToday = (d) => {
+  if (!isoDateRegex.test(d)) return false
+  const dt = new Date(d + 'T00:00:00Z')
+  if (isNaN(dt.getTime())) return false
+  const today = new Date()
+  const todayUTC = new Date(today.toISOString().slice(0,10) + 'T00:00:00Z')
+  return dt >= todayUTC
+}
+
+// Analista: pode alterar status (opcional) ou realizar claim (claim:true) para assumir
 const analistaPatchSchema = z.object({
-  status: z.string().min(2),
+  status: z.enum([...STATUS_OPTIONS]).optional(),
+  claim: z.boolean().optional(),
+}).refine((data) => typeof data.status !== 'undefined' || data.claim === true, {
+  message: 'Nada para atualizar',
+  path: ['status']
 })
 
-// Gestor: campos ampliados
+// Gestor: campos ampliados (criado_por REMOVIDO - imutável)
 const gestorPatchSchema = z.object({
-  status: z.string().min(2).optional(),
+  status: z.enum([...STATUS_OPTIONS]).optional(),
   quantidade_vidas: z.coerce.number().int().min(0).optional(),
   valor: z.coerce.number().min(0).optional(),
-  previsao_implantacao: z.string().optional(),
-  operadora: z.string().min(1).optional(),
+  previsao_implantacao: z.string().regex(isoDateRegex).refine(validateFutureOrToday, 'Data não pode ser passada').optional(),
+  operadora: z.enum([...OPERADORAS]).optional(),
   consultor: z.string().min(1).optional(),
   consultor_email: z.string().email().optional(),
-  criado_por: z.string().uuid().optional(),
+  observacoes_cliente: z.string().max(5000).optional(),
 }).strict()
 
 export async function OPTIONS(request) {
   const origin = request.headers.get('origin')
   return handleCORS(new NextResponse(null, { status: 200 }), origin)
+}
+
+// GET detalhes de uma proposta específica (retorna também nomes de analista e atendente)
+export async function GET(request, { params }) {
+  const origin = request.headers.get('origin')
+  const auth = await requireAuth(request)
+  if (auth.error) {
+    return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+  }
+  const { id } = params
+  const { data: proposal, error } = await supabase
+    .from('propostas')
+  .select('id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, previsao_implantacao, cliente_nome, cliente_email, criado_em, observacoes_cliente')
+    .eq('id', id)
+    .single()
+  if (error || !proposal) {
+    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+  }
+  const user = auth.user
+  const isGestor = user.tipo_usuario === 'gestor'
+  let allowed = true
+  if (!isGestor) {
+    if (user.tipo_usuario === 'consultor') {
+      allowed = (String(proposal.criado_por) === String(user.id)) || (proposal.consultor_email && proposal.consultor_email.toLowerCase() === String(user.email || '').toLowerCase())
+    } else if (user.tipo_usuario === 'analista') {
+      allowed = (String(proposal.criado_por) === String(user.id)) || (String(proposal.atendido_por) === String(user.id)) || !proposal.atendido_por
+    }
+  }
+  if (!allowed) {
+    return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
+  }
+  const ids = [proposal.criado_por, proposal.atendido_por].filter(Boolean)
+  let userDataMap = {}
+  if (ids.length > 0) {
+    const { data: usuarios } = await supabase.from('usuarios').select('id, nome, tipo_usuario').in('id', ids)
+    if (usuarios) userDataMap = Object.fromEntries(usuarios.map(u => [u.id, { nome: u.nome, tipo: u.tipo_usuario }]))
+  }
+  const criadoUser = userDataMap[proposal.criado_por]
+  const atendenteUser = userDataMap[proposal.atendido_por]
+  const analista_nome = criadoUser?.nome && criadoUser?.tipo === 'analista'
+    ? criadoUser.nome
+    : (String(proposal.criado_por) === String(user.id) && user.tipo_usuario === 'analista' ? user.nome : undefined)
+  const atendido_por_nome = proposal.atendido_por
+    ? (atendenteUser?.nome || (String(proposal.atendido_por) === String(user.id) ? user.nome : undefined))
+    : null
+  const analista_responsavel_nome = atendido_por_nome || analista_nome || null
+  const response = {
+    ...proposal,
+    analista_nome,
+    atendido_por_nome,
+    analista_responsavel_nome,
+  }
+  return handleCORS(NextResponse.json(response), origin)
 }
 
 export async function DELETE(request, { params }) {
@@ -58,16 +127,64 @@ export async function PATCH(request, { params }) {
 
   const { id } = params
   const body = await request.json()
-  const isGestor = auth.user.tipo_usuario === 'gestor'
-  const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
-  if (!parsed.success) {
-    return handleCORS(
-      NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues }, { status: 400 }),
-      origin
-    )
+
+  // Rate limit por usuário (defesa contra abuso)
+  const rlKey = `patch:proposta:${auth.user.id}`
+  const rlOk = checkRateLimit(rlKey)
+  if (!rlOk) {
+    return handleCORS(NextResponse.json({ error: 'Muitas requisições, tente novamente mais tarde' }, { status: 429 }), origin)
   }
 
-  const updates = parsed.data
+  // Bloqueia tentativa de mutação de criado_por (mesmo para gestor)
+  if (Object.prototype.hasOwnProperty.call(body, 'criado_por')) {
+    return handleCORS(NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }), origin)
+  }
+  const isGestor = auth.user.tipo_usuario === 'gestor'
+  // Claim é tratado antes para evitar necessidade de validar status
+  if (body?.claim && auth.user.tipo_usuario === 'analista') {
+    // Busca proposta para verificar assignment
+    const { data: currentProposalPre, error: fetchErrorPre } = await supabase
+      .from('propostas')
+      .select('id, atendido_por, atendido_em')
+      .eq('id', id)
+      .single()
+    if (fetchErrorPre || !currentProposalPre) {
+      return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+    }
+    if (currentProposalPre.atendido_por) {
+      return handleCORS(NextResponse.json({ error: 'Proposta já atribuída' }, { status: 400 }), origin)
+    }
+    const { data: claimed, error: claimErr } = await supabase
+      .from('propostas')
+      .update({ atendido_por: auth.user.id, atendido_em: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (claimErr) {
+      return handleCORS(NextResponse.json({ error: claimErr.message }, { status: 500 }), origin)
+    }
+    // Auditoria claim
+    try {
+      await supabase.from('propostas_auditoria').insert({
+        proposta_id: claimed.id,
+        alterado_por: auth.user.id,
+        changes: { claim: { before: null, after: { atendido_por: auth.user.id, atendido_em: claimed.atendido_em } } }
+      })
+    } catch (_) {}
+    return handleCORS(NextResponse.json(claimed), origin)
+  }
+
+  const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
+  if (!parsed.success) {
+    const payloadErr = process.env.NODE_ENV === 'production'
+      ? { error: 'Dados inválidos' }
+      : { error: 'Dados inválidos', issues: parsed.error.issues }
+    return handleCORS(NextResponse.json(payloadErr, { status: 400 }), origin)
+  }
+
+  const updates = { ...parsed.data }
+  // Normaliza email de consultor se fornecido
+  if (updates.consultor_email) updates.consultor_email = String(updates.consultor_email).trim().toLowerCase()
 
   // Busca a proposta e checa autorização:
   // - Gestor pode alterar qualquer
@@ -75,13 +192,15 @@ export async function PATCH(request, { params }) {
   // - Consultor NÃO pode alterar
   const { data: currentProposal, error: fetchError } = await supabase
     .from('propostas')
-  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao')
+  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente')
     .eq('id', id)
     .single()
   if (fetchError || !currentProposal) {
     try { console.warn('[PROPOSALS] PATCH not found', { id, fetchError: fetchError?.message }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
   }
+  // Claim já tratado no bloco anterior
+
   if (auth.user.tipo_usuario === 'consultor') {
     try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
@@ -101,7 +220,7 @@ export async function PATCH(request, { params }) {
     if (typeof updates.operadora !== 'undefined') updatePayload.operadora = updates.operadora
     if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
     if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
-    if (typeof updates.criado_por !== 'undefined') updatePayload.criado_por = updates.criado_por
+  if (typeof updates.observacoes_cliente !== 'undefined') updatePayload.observacoes_cliente = updates.observacoes_cliente
   }
 
   let updateQuery = supabase
@@ -158,7 +277,7 @@ export async function PATCH(request, { params }) {
   // Auditoria: registra alterações (somente campos realmente alterados)
   try {
     const changed = {}
-  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email','criado_por']
+  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email']
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(updatePayload, k)) {
         const before = currentProposal[k]

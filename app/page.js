@@ -19,7 +19,6 @@ import DashboardSection from '@/app/sections/Dashboard'
 import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
-import ImplantacaoSection from '@/app/sections/Implantacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
 
 export default function App() {
@@ -104,7 +103,7 @@ export default function App() {
   setLastActivity(Date.now())
   setToken(result.token)
   saveSessionToStorage(result.user, result.sessionId, result.token)
-  if (result.user?.tipo_usuario === 'consultor') setActiveTab('movimentacao')
+  if (result.user?.tipo_usuario === 'consultor') setActiveTab('propostas')
   else if (result.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
         toast.success('Login realizado com sucesso!')
       } else {
@@ -141,7 +140,7 @@ export default function App() {
   // Carregar dados
   const loadData = useCallback(async () => {
     try {
-      if (currentUser?.tipo_usuario === 'consultor') return
+  // Consultor agora também carrega propostas (mas não goals e sessions administrativos)
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
       const common = { credentials: 'include' }
       const fetches = []
@@ -150,9 +149,9 @@ export default function App() {
       // Users e Sessions: apenas gestor precisa
       const needsAdminData = currentUser?.tipo_usuario === 'gestor'
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
-      // Metas: analista e gestor (dashboard)
-      const needsGoals = currentUser?.tipo_usuario !== 'consultor'
-      if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
+  // Metas: agora também para consultor (exibe progresso pessoal)
+	const needsGoals = true
+  if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
       if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
 
       const responses = await Promise.all(fetches)
@@ -228,7 +227,7 @@ export default function App() {
   }
   */
 
-  const handleUpdateProposalStatus = async (proposalId, newStatus, proposal) => {
+  const handleUpdateProposalStatus = async (proposalId, newStatus) => {
     try {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
@@ -236,7 +235,8 @@ export default function App() {
         method: 'PATCH',
         headers,
         credentials: 'include',
-        body: JSON.stringify({ status: newStatus, criado_por: proposal.criado_por, valor: proposal.valor })
+  // Envia somente status para evitar 400 (servidor bloqueia criado_por / valor para analista)
+  body: JSON.stringify({ status: String(newStatus).trim().toLowerCase() })
       })
       if (response.ok) {
         toast.success('Status da proposta atualizado com sucesso!')
@@ -361,7 +361,7 @@ export default function App() {
               setSessionId(pseudoSessionId)
               setToken(null) // token não é exposto via cookie HttpOnly
               saveSessionToStorage(data.user, pseudoSessionId, '')
-              if (data.user?.tipo_usuario === 'consultor') setActiveTab('movimentacao')
+              if (data.user?.tipo_usuario === 'consultor') setActiveTab('propostas')
               else if (data.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
             }
           }
@@ -390,14 +390,7 @@ export default function App() {
   }, [currentUser, token])
 
   // Consultor: pode acessar Movimentação e Implantação; redireciona somente se cair em abas proibidas
-  useEffect(() => {
-    if (currentUser?.tipo_usuario === 'consultor') {
-      const forbidden = ['propostas', 'dashboard', 'usuarios', 'relatorios']
-      if (forbidden.includes(activeTab)) {
-        setActiveTab('movimentacao')
-      }
-    }
-  }, [currentUser?.tipo_usuario, activeTab])
+  // Removido redirecionamento restritivo: consultor pode acessar Propostas agora
 
   // Recarrega assim que o token estiver disponível após login
   useEffect(() => {
@@ -488,17 +481,24 @@ export default function App() {
           leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
         />
   <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
-          {/** Para consultor: restringe Propostas/Dashboard; Implantação é aberta a todos */}
+          {/** Para consultor: restringe Propostas/Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {currentUser.tipo_usuario !== 'consultor' && (
+            {true && (
             <TabsContent value="propostas" className="space-y-6">
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
                   ? proposals
-                  : proposals.filter(p => (
-                      String(p.criado_por) === String(currentUser.id) ||
-                      (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                    ))
+                  : currentUser.tipo_usuario === 'consultor'
+                    ? proposals.filter(p => (
+                        String(p.criado_por) === String(currentUser.id) ||
+                        (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                      ))
+                    : proposals.filter(p => (
+                        // Analista: vê as que criou, as que assumiu ou ainda não atribuídas (para poder assumir)
+                        String(p.criado_por) === String(currentUser.id) ||
+                        String(p.atendido_por) === String(currentUser.id) ||
+                        !p.atendido_por
+                      ))
         return (
                   <ProposalsSection
                     currentUser={currentUser}
@@ -517,25 +517,36 @@ export default function App() {
             </TabsContent>
             )}
 
-            {currentUser.tipo_usuario !== 'consultor' && (
-            <TabsContent value="dashboard" className="space-y-6">
-              {(() => {
-                const proposalsForView = currentUser.tipo_usuario === 'gestor'
-                  ? proposals
-                  : proposals.filter(p => (
-                      String(p.criado_por) === String(currentUser.id) ||
-                      (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                    ))
-                return (
-                  <DashboardSection
-                    currentUser={currentUser}
-                    proposals={proposalsForView}
-                    users={users}
-                    userGoals={userGoals}
-                  />
-                )
-              })()}
-            </TabsContent>
+            {true && (
+              <TabsContent value="dashboard" className="space-y-6">
+                {(() => {
+                  const proposalsForView = currentUser.tipo_usuario === 'gestor'
+                    ? proposals
+                    : currentUser.tipo_usuario === 'consultor'
+                      ? proposals.filter(p => (
+                          String(p.criado_por) === String(currentUser.id) ||
+                          (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                        ))
+                      : proposals.filter(p => (
+                          String(p.criado_por) === String(currentUser.id) ||
+                          String(p.atendido_por) === String(currentUser.id) ||
+                          !p.atendido_por
+                        ))
+
+                  if (currentUser.tipo_usuario === 'consultor') {
+                    const ConsultorDashboardSection = require('./sections/ConsultorDashboard.jsx').default
+                    return <ConsultorDashboardSection currentUser={currentUser} proposals={proposalsForView} userGoals={userGoals} />
+                  }
+                  return (
+                    <DashboardSection
+                      currentUser={currentUser}
+                      proposals={proposalsForView}
+                      users={users}
+                      userGoals={userGoals}
+                    />
+                  )
+                })()}
+              </TabsContent>
             )}
 
             {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
@@ -556,10 +567,7 @@ export default function App() {
               </TabsContent>
             )}
 
-            {/* Implantação: todos os perfis */}
-            <TabsContent value="implantacao" className="space-y-6">
-              <ImplantacaoSection />
-            </TabsContent>
+            {/* Seção Implantação removida */}
           </Tabs>
         </main>
       </div>

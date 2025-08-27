@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Clock, Activity, CheckCircle2, XCircle, Pencil, Save, FileDown, Loader2 } from 'lucide-react'
@@ -9,6 +9,7 @@ import { SOLICITACAO_STATUS } from '@/lib/constants'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { NovaSolicitacaoDialog } from '@/components/solicitacoes/NovaSolicitacaoDialog'
+import SimpleTimeline from '@/components/timeline/TimelineComponent'
 
 // Helper para formatar datas
 const fmt = (d) => {
@@ -235,22 +236,44 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
       {/* Dashboard Consultor / Analista */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Total</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Total</CardTitle>
+            <CardDescription className="text-xs">
+              Número total de solicitações criadas no sistema
+            </CardDescription>
+          </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Concluídas</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Concluídas</CardTitle>
+            <CardDescription className="text-xs">
+              Solicitações finalizadas com sucesso
+            </CardDescription>
+          </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.concluidas}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Atrasadas</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Atrasadas</CardTitle>
+            <CardDescription className="text-xs">
+              Solicitações que ultrapassaram o prazo previsto
+            </CardDescription>
+          </CardHeader>
           <CardContent><div className="text-2xl font-bold text-red-600">{stats.atrasadas}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Média dias restante</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Média dias restante</CardTitle>
+            <CardDescription className="text-xs">
+              Tempo médio restante para solicitações em andamento
+            </CardDescription>
+          </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.mediaDias !== null ? stats.mediaDias.toFixed(1) : '—'}</div></CardContent>
         </Card>
       </div>
+
+      
 
       {/* Kanban simples por status */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -277,24 +300,30 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                     </div>
                   )}
                   {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
-                    <div className="flex gap-1 flex-wrap">
+                    <div className="flex gap-1 flex-wrap items-center">
+                      <button
+                        type="button"
+                        onClick={() => openDetails(sol.id)}
+                        disabled={updating[sol.id]}
+                        className="px-2 py-0.5 text-[11px] rounded bg-secondary text-secondary-foreground hover:brightness-105 disabled:opacity-50"
+                        aria-label="Ver detalhes da solicitação"
+                      >
+                        Ver detalhes
+                      </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
+                            type="button"
                             disabled={updating[sol.id]}
                             className="px-2 py-0.5 text-[11px] rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
-                            aria-label="Ações da solicitação"
+                            aria-label="Alterar status da solicitação"
                           >
-                            Ações
+                            Status
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-40">
-                          <DropdownMenuLabel className="text-[11px]">Solicitação</DropdownMenuLabel>
-                          <DropdownMenuItem className="text-[12px]" onClick={() => openDetails(sol.id)}>
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuLabel className="text-[11px]">Alterar status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
                           {SOLICITACAO_STATUS.filter(s => s !== sol.status).map(next => (
                             <DropdownMenuItem
                               key={next}
@@ -325,39 +354,11 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
         ))}
       </div>
 
-      {/* Timeline detalhada (Gestor) */}
+      {/* Timeline Interativa */}
       {currentUser?.tipo_usuario === 'gestor' && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold mt-2">Linhas do tempo</h3>
-          <div className="space-y-4">
-            {solicitacoes.slice(0,25).map(sol => (
-              <Card key={sol.id} className="">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded" title={sol.codigo}>{sol.codigo}</span>
-                    <span className="truncate" title={sol.razao_social}>{sol.razao_social}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{sol.tipo}{sol.subtipo ? `/${sol.subtipo}` : ''}</span>
-                    <div className="ml-auto"><SlaEditor sol={sol} hoje={hoje} canEdit={true} onSave={updateSla} busy={updating[sol.id]} compact /></div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {sol.atendido_por_nome && <div className="text-[10px] mb-1 text-muted-foreground">Analista: {sol.atendido_por_nome}</div>}
-                  <ol className="relative border-l ml-2 pl-4 space-y-3">
-                    {(Array.isArray(sol.historico) ? sol.historico : []).slice(-15).map((ev,i) => (
-                      <li key={i} className="space-y-0.5">
-                        <div className="absolute -left-[9px] bg-background border rounded-full h-4 w-4 flex items-center justify-center">
-                          {statusIcon(ev.status)}
-                        </div>
-                        <div className="text-xs font-medium capitalize">{ev.status}</div>
-                        <div className="text-[11px] text-muted-foreground">{fmt(ev.em)}</div>
-                      </li>
-                    ))}
-                  </ol>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        <SimpleTimeline 
+          solicitacoes={solicitacoes} 
+        />
       )}
 
       <NovaSolicitacaoDialog open={openSolicitacao} onOpenChange={setOpenSolicitacao} token={token} />
