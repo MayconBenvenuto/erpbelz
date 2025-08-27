@@ -19,9 +19,13 @@ const validateFutureOrToday = (d) => {
   return dt >= todayUTC
 }
 
-// Analista: apenas status permitido dentro do conjunto definido
+// Analista: pode alterar status (opcional) ou realizar claim (claim:true) para assumir
 const analistaPatchSchema = z.object({
-  status: z.enum([...STATUS_OPTIONS]),
+  status: z.enum([...STATUS_OPTIONS]).optional(),
+  claim: z.boolean().optional(),
+}).refine((data) => typeof data.status !== 'undefined' || data.claim === true, {
+  message: 'Nada para atualizar',
+  path: ['status']
 })
 
 // Gestor: campos ampliados (criado_por REMOVIDO - imutável)
@@ -33,11 +37,65 @@ const gestorPatchSchema = z.object({
   operadora: z.enum([...OPERADORAS]).optional(),
   consultor: z.string().min(1).optional(),
   consultor_email: z.string().email().optional(),
+  observacoes_cliente: z.string().max(5000).optional(),
 }).strict()
 
 export async function OPTIONS(request) {
   const origin = request.headers.get('origin')
   return handleCORS(new NextResponse(null, { status: 200 }), origin)
+}
+
+// GET detalhes de uma proposta específica (retorna também nomes de analista e atendente)
+export async function GET(request, { params }) {
+  const origin = request.headers.get('origin')
+  const auth = await requireAuth(request)
+  if (auth.error) {
+    return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+  }
+  const { id } = params
+  const { data: proposal, error } = await supabase
+    .from('propostas')
+  .select('id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, previsao_implantacao, cliente_nome, cliente_email, criado_em, observacoes_cliente')
+    .eq('id', id)
+    .single()
+  if (error || !proposal) {
+    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+  }
+  const user = auth.user
+  const isGestor = user.tipo_usuario === 'gestor'
+  let allowed = true
+  if (!isGestor) {
+    if (user.tipo_usuario === 'consultor') {
+      allowed = (String(proposal.criado_por) === String(user.id)) || (proposal.consultor_email && proposal.consultor_email.toLowerCase() === String(user.email || '').toLowerCase())
+    } else if (user.tipo_usuario === 'analista') {
+      allowed = (String(proposal.criado_por) === String(user.id)) || (String(proposal.atendido_por) === String(user.id)) || !proposal.atendido_por
+    }
+  }
+  if (!allowed) {
+    return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
+  }
+  const ids = [proposal.criado_por, proposal.atendido_por].filter(Boolean)
+  let userDataMap = {}
+  if (ids.length > 0) {
+    const { data: usuarios } = await supabase.from('usuarios').select('id, nome, tipo_usuario').in('id', ids)
+    if (usuarios) userDataMap = Object.fromEntries(usuarios.map(u => [u.id, { nome: u.nome, tipo: u.tipo_usuario }]))
+  }
+  const criadoUser = userDataMap[proposal.criado_por]
+  const atendenteUser = userDataMap[proposal.atendido_por]
+  const analista_nome = criadoUser?.nome && criadoUser?.tipo === 'analista'
+    ? criadoUser.nome
+    : (String(proposal.criado_por) === String(user.id) && user.tipo_usuario === 'analista' ? user.nome : undefined)
+  const atendido_por_nome = proposal.atendido_por
+    ? (atendenteUser?.nome || (String(proposal.atendido_por) === String(user.id) ? user.nome : undefined))
+    : null
+  const analista_responsavel_nome = atendido_por_nome || analista_nome || null
+  const response = {
+    ...proposal,
+    analista_nome,
+    atendido_por_nome,
+    analista_responsavel_nome,
+  }
+  return handleCORS(NextResponse.json(response), origin)
 }
 
 export async function DELETE(request, { params }) {
@@ -82,6 +140,40 @@ export async function PATCH(request, { params }) {
     return handleCORS(NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }), origin)
   }
   const isGestor = auth.user.tipo_usuario === 'gestor'
+  // Claim é tratado antes para evitar necessidade de validar status
+  if (body?.claim && auth.user.tipo_usuario === 'analista') {
+    // Busca proposta para verificar assignment
+    const { data: currentProposalPre, error: fetchErrorPre } = await supabase
+      .from('propostas')
+      .select('id, atendido_por, atendido_em')
+      .eq('id', id)
+      .single()
+    if (fetchErrorPre || !currentProposalPre) {
+      return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+    }
+    if (currentProposalPre.atendido_por) {
+      return handleCORS(NextResponse.json({ error: 'Proposta já atribuída' }, { status: 400 }), origin)
+    }
+    const { data: claimed, error: claimErr } = await supabase
+      .from('propostas')
+      .update({ atendido_por: auth.user.id, atendido_em: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (claimErr) {
+      return handleCORS(NextResponse.json({ error: claimErr.message }, { status: 500 }), origin)
+    }
+    // Auditoria claim
+    try {
+      await supabase.from('propostas_auditoria').insert({
+        proposta_id: claimed.id,
+        alterado_por: auth.user.id,
+        changes: { claim: { before: null, after: { atendido_por: auth.user.id, atendido_em: claimed.atendido_em } } }
+      })
+    } catch (_) {}
+    return handleCORS(NextResponse.json(claimed), origin)
+  }
+
   const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
     const payloadErr = process.env.NODE_ENV === 'production'
@@ -100,13 +192,15 @@ export async function PATCH(request, { params }) {
   // - Consultor NÃO pode alterar
   const { data: currentProposal, error: fetchError } = await supabase
     .from('propostas')
-  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao')
+  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente')
     .eq('id', id)
     .single()
   if (fetchError || !currentProposal) {
     try { console.warn('[PROPOSALS] PATCH not found', { id, fetchError: fetchError?.message }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
   }
+  // Claim já tratado no bloco anterior
+
   if (auth.user.tipo_usuario === 'consultor') {
     try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
@@ -126,6 +220,7 @@ export async function PATCH(request, { params }) {
     if (typeof updates.operadora !== 'undefined') updatePayload.operadora = updates.operadora
     if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
     if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
+  if (typeof updates.observacoes_cliente !== 'undefined') updatePayload.observacoes_cliente = updates.observacoes_cliente
   }
 
   let updateQuery = supabase

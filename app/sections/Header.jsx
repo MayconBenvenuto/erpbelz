@@ -21,7 +21,6 @@ export default function Header({ activeTab, currentUser, leftSlot }) {
               {activeTab === 'dashboard' && currentUser.tipo_usuario !== 'consultor' && 'Dashboard'}
               {activeTab === 'usuarios' && 'Gerenciar Usuários'}
               {activeTab === 'relatorios' && 'Relatórios e Monitoramento'}
-              {activeTab === 'implantacao' && 'Implantação'}
               {activeTab === 'movimentacao' && 'Movimentação'}
             </h2>
             <p className="hidden sm:block text-sm text-muted-foreground mt-1">
@@ -29,7 +28,6 @@ export default function Header({ activeTab, currentUser, leftSlot }) {
               {activeTab === 'dashboard' && currentUser.tipo_usuario !== 'consultor' && 'Visão geral das métricas e indicadores'}
               {activeTab === 'usuarios' && 'Controle de usuários e permissões'}
               {activeTab === 'relatorios' && 'Análise de sessões e atividades'}
-              {activeTab === 'implantacao' && 'Área para acompanhar implantações'}
               {activeTab === 'movimentacao' && 'Acompanhe e registre movimentações'}
             </p>
           </div>

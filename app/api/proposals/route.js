@@ -21,8 +21,13 @@ export async function GET(request) {
 
 	const buildBase = () => {
 		let q = supabase.from('propostas').select('*')
-		if (auth.user.tipo_usuario !== 'gestor') {
+		if (auth.user.tipo_usuario === 'consultor') {
+			// Consultor: vê apenas propostas que criou ou cujo email de consultor é o seu
 			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
+		} else if (auth.user.tipo_usuario === 'analista') {
+			// Analista: precisa ver propostas para poder assumir (não atribuídas), as que criou e as que já assumiu
+			// OR com atendido_por.is.null permite visualizar não atribuídas
+			q = q.or(`criado_por.eq.${auth.user.id},atendido_por.eq.${auth.user.id},atendido_por.is.null`)
 		}
 		return q
 	}
@@ -54,8 +59,11 @@ const validateFutureOrToday = (d) => {
 
 const createSchema = z.object({
 	cnpj: z.string().min(14),
-	consultor: z.string().min(2),
-	consultor_email: z.string().email(),
+	// Para analista/gestor continua enviando consultor e consultor_email.
+	consultor: z.string().min(2).optional(),
+	consultor_email: z.string().email().optional(),
+	cliente_nome: z.string().min(2).optional(),
+	cliente_email: z.string().email().optional(),
 	operadora: z.enum([...OPERADORAS]),
 	quantidade_vidas: z.coerce.number().int().min(1),
 	valor: z.coerce.number().min(0.01),
@@ -70,9 +78,8 @@ export async function POST(request) {
 	if (auth.error) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 	}
-	if (auth.user.tipo_usuario === 'consultor') {
-		return handleCORS(NextResponse.json({ error: 'Consultores não podem criar propostas' }, { status: 403 }), origin)
-	}
+	// Antes: consultor não podia criar. Agora permitido (consultor é quem abre a proposta).
+	// Regras adicionais: se for consultor, sempre força status inicial 'em análise' para evitar criação já implantada
 
 	const body = await request.json()
 	const parsed = createSchema.safeParse(body)
@@ -84,12 +91,44 @@ export async function POST(request) {
 	}
 
 	const payload = { ...parsed.data }
-	payload.consultor_email = payload.consultor_email.trim().toLowerCase()
-	// força autor do token
-	if (auth.user.tipo_usuario !== 'gestor' && payload.criado_por !== auth.user.id) {
+	if (auth.user.tipo_usuario === 'consultor') {
+		payload.status = 'em análise'
+		// Garante nome e email do consultor mesmo se user.nome estiver vazio ou null
+		let resolvedNome = (auth.user.nome || '').trim()
+		if (!resolvedNome) {
+			// Tentativa de recuperar do banco
+			try {
+				const { data: u } = await supabase.from('usuarios').select('nome,email').eq('id', auth.user.id).single()
+				if (u?.nome) resolvedNome = u.nome.trim()
+				if (!payload.consultor_email && u?.email) payload.consultor_email = u.email
+			} catch (_) {}
+		}
+		if (!resolvedNome) resolvedNome = 'Consultor'
+		payload.consultor = resolvedNome
+		payload.consultor_email = auth.user.email || payload.consultor_email || ''
+		if (!payload.consultor_email) {
+			return handleCORS(NextResponse.json({ error: 'Email do consultor ausente' }, { status: 400 }), origin)
+		}
+		// Campos de cliente tornam-se obrigatórios nesse fluxo
+		if (!payload.cliente_nome || !payload.cliente_email) {
+			return handleCORS(NextResponse.json({ error: 'Informe nome e email do cliente' }, { status: 400 }), origin)
+		}
+	} else {
+		// Para analista/gestor manter necessidade de consultor e consultor_email
+		if (!payload.consultor || !payload.consultor_email) {
+			return handleCORS(NextResponse.json({ error: 'Consultor e email do consultor são obrigatórios' }, { status: 400 }), origin)
+		}
+	}
+	if (payload.consultor_email) payload.consultor_email = payload.consultor_email.trim().toLowerCase()
+	if (payload.cliente_email) payload.cliente_email = payload.cliente_email.trim().toLowerCase()
+	// força autor do token (para consultor e analista)
+	if (auth.user.tipo_usuario !== 'gestor') {
 		payload.criado_por = auth.user.id
 	}
 
+	// Campos de atendimento (analista que assumir depois)
+	payload.atendido_por = null
+	payload.atendido_em = null
 	const { data, error } = await supabase
 		.from('propostas')
 		.insert(payload)
@@ -131,6 +170,7 @@ export async function POST(request) {
 					<tr><td style="padding:6px 0;"><strong>Operadora:</strong> ${data.operadora}</td></tr>
 					<tr><td style="padding:6px 0;"><strong>Valor:</strong> ${valorFmt}</td></tr>
 					<tr><td style="padding:6px 0;"><strong>Status:</strong> ${data.status}</td></tr>
+					${data.cliente_nome ? `<tr><td style="padding:6px 0;"><strong>Cliente:</strong> ${data.cliente_nome}${data.cliente_email ? ' (' + data.cliente_email + ')' : ''}</td></tr>` : ''}
 				</table>
 			`,
 		})
