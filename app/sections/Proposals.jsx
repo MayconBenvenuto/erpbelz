@@ -121,6 +121,36 @@ function ProposalsInner({
     } catch (_) {}
   }, [filters, currentUser?.id])
 
+  // (order fix) efeitos que dependem de filteredProposals movidos para depois da definição
+
+  // SSE eventos de propostas (atualizações leves de status/claim) - somente analista/gestor
+  const [liveUpdates, setLiveUpdates] = useState({})
+  useEffect(() => {
+    if (currentUser.tipo_usuario === 'consultor') return
+    let es
+    try {
+      es = new EventSource('/api/proposals/events')
+      es.addEventListener('proposta_update', (ev) => {
+        try {
+          const data = JSON.parse(ev.data)
+          setLiveUpdates(prev => ({ ...prev, [data.id]: data }))
+        } catch(_){}
+      })
+    } catch(_){}
+    return () => { try { es?.close() } catch(_){} }
+  }, [currentUser.tipo_usuario])
+
+  // Merge live updates em proposals para exibição responsiva sem refetch completo
+  const proposalsMerged = useMemo(() => {
+    const map = new Map(proposals.map(p => [p.id, p]))
+    Object.entries(liveUpdates).forEach(([id, patch]) => {
+      if (map.has(id)) {
+        map.set(id, { ...map.get(id), ...patch })
+      }
+    })
+    return Array.from(map.values())
+  }, [proposals, liveUpdates])
+
   const filteredProposals = useMemo(() => {
     const qn = normalize(filters.q)
     const list = proposalsMerged.filter(p => {
@@ -137,7 +167,6 @@ function ProposalsInner({
       return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor && matchFree
     })
     const sorted = list.slice().sort((a,b) => {
-      // Ordenar livres primeiro para analista
       if (currentUser.tipo_usuario === 'analista') {
         const aFree = !a.atendido_por
         const bFree = !b.atendido_por
@@ -180,34 +209,6 @@ function ProposalsInner({
     const ids = new Set(filteredProposals.map(p=>p.id))
     slaAlertedRef.current.forEach(id => { if(!ids.has(id)) slaAlertedRef.current.delete(id) })
   }, [filteredProposals])
-
-  // SSE eventos de propostas (atualizações leves de status/claim) - somente analista/gestor
-  const [liveUpdates, setLiveUpdates] = useState({})
-  useEffect(() => {
-    if (currentUser.tipo_usuario === 'consultor') return
-    let es
-    try {
-      es = new EventSource('/api/proposals/events')
-      es.addEventListener('proposta_update', (ev) => {
-        try {
-          const data = JSON.parse(ev.data)
-          setLiveUpdates(prev => ({ ...prev, [data.id]: data }))
-        } catch(_){}
-      })
-    } catch(_){}
-    return () => { try { es?.close() } catch(_){} }
-  }, [currentUser.tipo_usuario])
-
-  // Merge live updates em proposals para exibição responsiva sem refetch completo
-  const proposalsMerged = useMemo(() => {
-    const map = new Map(proposals.map(p => [p.id, p]))
-    Object.entries(liveUpdates).forEach(([id, patch]) => {
-      if (map.has(id)) {
-        map.set(id, { ...map.get(id), ...patch })
-      }
-    })
-    return Array.from(map.values())
-  }, [proposals, liveUpdates])
 
   const activeFilters = useMemo(() => {
     const items = []
