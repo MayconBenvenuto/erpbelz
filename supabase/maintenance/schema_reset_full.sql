@@ -28,7 +28,8 @@ CREATE TABLE usuarios (
   nome TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   senha TEXT NOT NULL,
-  tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('gestor','analista')),
+  -- Inclui consultor já na criação
+  tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('gestor','analista','consultor')),
   ultimo_refresh TIMESTAMPTZ,
   status_presenca TEXT CHECK (status_presenca IN ('online','ausente')),
   atualizado_em TIMESTAMPTZ,
