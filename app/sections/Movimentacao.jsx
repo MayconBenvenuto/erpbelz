@@ -300,24 +300,30 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                     </div>
                   )}
                   {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
-                    <div className="flex gap-1 flex-wrap">
+                    <div className="flex gap-1 flex-wrap items-center">
+                      <button
+                        type="button"
+                        onClick={() => openDetails(sol.id)}
+                        disabled={updating[sol.id]}
+                        className="px-2 py-0.5 text-[11px] rounded bg-secondary text-secondary-foreground hover:brightness-105 disabled:opacity-50"
+                        aria-label="Ver detalhes da solicitação"
+                      >
+                        Ver detalhes
+                      </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
+                            type="button"
                             disabled={updating[sol.id]}
                             className="px-2 py-0.5 text-[11px] rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
-                            aria-label="Ações da solicitação"
+                            aria-label="Alterar status da solicitação"
                           >
-                            Ações
+                            Status
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-40">
-                          <DropdownMenuLabel className="text-[11px]">Solicitação</DropdownMenuLabel>
-                          <DropdownMenuItem className="text-[12px]" onClick={() => openDetails(sol.id)}>
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuLabel className="text-[11px]">Alterar status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
                           {SOLICITACAO_STATUS.filter(s => s !== sol.status).map(next => (
                             <DropdownMenuItem
                               key={next}

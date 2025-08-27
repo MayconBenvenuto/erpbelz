@@ -15,7 +15,6 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat } from 'lucide-react'
-import { CheckSquare } from 'lucide-react'
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
@@ -46,7 +45,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <span className="font-medium">Dashboard</span>
           </button>
 
-          {currentUser.tipo_usuario !== 'consultor' && (
+          {/* Propostas agora acessível para consultor (cria propostas) */}
+          {true && (
             <button
               onClick={() => setActiveTab('propostas')}
               aria-current={activeTab === 'propostas' ? 'page' : undefined}
@@ -59,17 +59,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             </button>
           )}
 
-          {/* Implantação (todos os perfis) */}
-          <button
-            onClick={() => setActiveTab('implantacao')}
-            aria-current={activeTab === 'implantacao' ? 'page' : undefined}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-              activeTab === 'implantacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <CheckSquare className="w-5 h-5" />
-            <span className="font-medium">Implantação</span>
-          </button>
+          {/* Seção Implantação removida */}
 
           {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
             <button
