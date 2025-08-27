@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -154,7 +154,7 @@ export default function App() {
   if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
       if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
 
-      const responses = await Promise.all(fetches)
+  const responses = await Promise.all(fetches)
       let idx = 0
       const proposalsRes = responses[idx++]
       if (proposalsRes?.ok) setProposals(await proposalsRes.json())
@@ -175,6 +175,26 @@ export default function App() {
     }
   }, [token, currentUser?.tipo_usuario])
 
+  // Debounce simples para evitar múltiplos loadData encadeados (ex: criar + atualizar status)
+  const loadDataDebouncedRef = useRef({ timer: null, pending: false })
+  const scheduleLoadData = useCallback((immediate = false) => {
+    const ref = loadDataDebouncedRef.current
+    if (immediate) {
+      if (ref.timer) { clearTimeout(ref.timer); ref.timer = null }
+      loadData()
+      return
+    }
+    ref.pending = true
+    if (ref.timer) return
+    ref.timer = setTimeout(() => {
+      ref.timer = null
+      if (ref.pending) {
+        ref.pending = false
+        loadData()
+      }
+    }, 250)
+  }, [loadData])
+
   // Handlers de propostas
   const handleCreateProposal = async (payload) => {
     setIsLoading(true)
@@ -194,7 +214,15 @@ export default function App() {
       if (response.ok) {
         toast.success('Proposta criada com sucesso!')
         afterSuccess && afterSuccess()
-        await loadData()
+        // Otimista: insere nova proposta imediatamente sem esperar round-trip completo
+        if (result && result.id) {
+          setProposals(prev => {
+            // evita duplicar se já vier do SSE
+            if (prev.some(p => p.id === result.id)) return prev
+            return [...prev, result]
+          })
+        }
+        scheduleLoadData()
       } else {
         toast.error(result.error || 'Erro ao criar proposta')
       }
@@ -231,26 +259,45 @@ export default function App() {
     try {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const response = await fetch(`/api/proposals/${proposalId}`, {
+      const payload = { status: String(newStatus).trim().toLowerCase() }
+      const doPatch = () => fetch(`/api/proposals/${proposalId}`, {
         method: 'PATCH',
         headers,
         credentials: 'include',
-  // Envia somente status para evitar 400 (servidor bloqueia criado_por / valor para analista)
-  body: JSON.stringify({ status: String(newStatus).trim().toLowerCase() })
+        body: JSON.stringify(payload)
       })
+      // Otimista: aplica status local enquanto requisita
+      setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: payload.status } : p))
+      let response = await doPatch()
+      if (!response.ok && response.status === 404) {
+        // pequena espera para caso de claim implícito
+        await new Promise(r => setTimeout(r, 180))
+        const retry = await doPatch()
+        if (retry.ok) response = retry
+      }
       if (response.ok) {
         toast.success('Status da proposta atualizado com sucesso!')
-        await loadData()
-      } else {
-        if (response.status === 403) {
-          toast.error('Ação não permitida para esta proposta')
-        } else {
-          const result = await response.json().catch(() => ({}))
-          toast.error(result.error || 'Erro ao atualizar status')
-        }
+        scheduleLoadData()
+        return
       }
+      if (response.status === 404) {
+        const result = await response.json().catch(() => ({}))
+        toast.error(result.error || 'Proposta não encontrada. Recarregando...')
+        scheduleLoadData(true)
+        return
+      }
+      if (response.status === 403) {
+        toast.error('Ação não permitida (verifique se você assumiu a proposta)')
+        // Reverte otimista se proibido
+        scheduleLoadData(true)
+        return
+      }
+      const result = await response.json().catch(() => ({}))
+      toast.error(result.error || 'Erro ao atualizar status')
+      scheduleLoadData()
     } catch {
       toast.error('Erro ao conectar com o servidor')
+      scheduleLoadData()
     }
   }
 
@@ -266,18 +313,46 @@ export default function App() {
       })
       if (response.ok) {
         toast.success('Proposta atualizada com sucesso!')
-        await loadData()
+        // Atualização otimista básica (merge campos conhecidos)
+        setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, ...payload } : p))
+        scheduleLoadData()
         return { ok: true }
       } else {
         const result = await response.json().catch(() => ({}))
         toast.error(result.error || 'Erro ao atualizar proposta')
+        scheduleLoadData()
         return { ok: false, error: result.error }
       }
     } catch {
       toast.error('Erro ao conectar com o servidor')
+      scheduleLoadData()
       return { ok: false, error: 'network' }
     }
   }
+
+  // SSE incremental (se disponível) para reduzir full reload
+  useEffect(() => {
+    if (!currentUser) return
+    let es
+    try {
+      es = new EventSource('/api/proposals/events')
+      es.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data)
+          if (msg?.type === 'proposal_updated' && msg?.data?.id) {
+            setProposals(prev => {
+              const exists = prev.some(p => p.id === msg.data.id)
+              return exists ? prev.map(p => p.id === msg.data.id ? { ...p, ...msg.data } : p) : [...prev, msg.data]
+            })
+          }
+        } catch (_) {}
+      }
+      es.onerror = () => {
+        try { es.close() } catch {}
+      }
+    } catch {}
+    return () => { try { es && es.close() } catch {} }
+  }, [currentUser])
 
   // Handlers de usuários
   const handleCreateUser = async (payload) => {
@@ -346,28 +421,7 @@ export default function App() {
 
   // Effects
   useEffect(() => {
-    const hadSession = loadSessionFromStorage()
-    if (!hadSession) {
-      // tenta bootstrapping via cookie HttpOnly
-      ;(async () => {
-        try {
-          const res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' })
-          if (res.ok) {
-            const data = await res.json()
-            if (data?.user) {
-              // cria nova sessão local baseada no cookie (sem sessionId do backend)
-              const pseudoSessionId = `cookie-${Date.now()}`
-              setCurrentUser(data.user)
-              setSessionId(pseudoSessionId)
-              setToken(null) // token não é exposto via cookie HttpOnly
-              saveSessionToStorage(data.user, pseudoSessionId, '')
-              if (data.user?.tipo_usuario === 'consultor') setActiveTab('propostas')
-              else if (data.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
-            }
-          }
-        } catch {}
-      })()
-    }
+  loadSessionFromStorage()
   }, [])
 
   useEffect(() => {

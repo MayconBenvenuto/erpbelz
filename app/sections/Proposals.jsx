@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, X, ArrowUpDown } from 'lucide-react'
+import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -29,6 +29,23 @@ function ProposalsInner({
   users = [],
   // userGoals = [],
 }) {
+  // Máscaras e formatação ----------------------------------
+  const maskCNPJ = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0,14)
+    let out = digits
+    if (digits.length > 2) out = digits.slice(0,2) + '.' + digits.slice(2)
+    if (digits.length > 5) out = out.slice(0,6) + '.' + out.slice(6)
+    if (digits.length > 8) out = out.slice(0,10) + '/' + out.slice(10)
+    if (digits.length > 12) out = out.slice(0,15) + '-' + out.slice(15)
+    return out
+  }
+  const moneyDigits = (value) => String(value || '').replace(/\D/g, '').slice(0, 15) // até 13 inteiros + 2 decimais
+  const formatMoneyBR = (value) => {
+    const digits = moneyDigits(value)
+    if (!digits) return ''
+    const number = parseInt(digits, 10) / 100
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
+  }
   // SLA & resumo com polling + alertas
   const [slaSummary, setSlaSummary] = useState(null)
   const SLA_THRESHOLD_HOURS = 8
@@ -62,6 +79,12 @@ function ProposalsInner({
   // Resultado detalhado (somente gestor exibe após criação) - removido do layout por enquanto
   const [_cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, fetched, razao_social, nome_fantasia, error } }
+  // Flag derivada para saber se o botão deve ficar desabilitado (validação em andamento)
+  const isCnpjValidating = (() => {
+    const digits = String(proposalForm.cnpj || '').replace(/\D/g, '')
+    if (digits.length !== 14) return false
+    return !!cnpjInfoCache[digits]?.loading
+  })()
   // Filtros
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   // Filtro extra: somente propostas livres (não atribuídas) para analista
@@ -79,12 +102,7 @@ function ProposalsInner({
   const [detailLoading, setDetailLoading] = useState(false)
   const [detail, setDetail] = useState(null)
 
-  const formatMoneyBR = (value) => {
-    const digits = String(value || '').replace(/\D/g, '')
-    if (!digits) return ''
-    const number = parseInt(digits, 10) / 100
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
-  }
+  // (formatMoneyBR redefinido acima com limites)
 
   // normalize com cache simples para performance em filtros grandes
   const normalizeCacheRef = useRef(new Map())
@@ -276,7 +294,18 @@ function ProposalsInner({
 
   const fetchCnpjInfo = async (cnpjRaw) => {
     const cnpj = String(cnpjRaw || '').replace(/\D/g, '')
-    if (!cnpj || cnpjInfoCache[cnpj]?.loading || cnpjInfoCache[cnpj]?.fetched) return
+    if (!cnpj) return
+    // Se já temos em cache (fetched) apenas tentar preencher o nome se estiver vazio e sair
+    const cached = cnpjInfoCache[cnpj]
+    if (cached?.fetched && !cached?.loading) {
+      if ((cached.nome_fantasia || cached.razao_social) && currentUser?.tipo_usuario === 'consultor') {
+        const fantasia = cached.nome_fantasia || cached.razao_social || ''
+        setProposalForm(prev => prev.cliente_nome?.trim() ? prev : ({ ...prev, cliente_nome: fantasia }))
+      }
+      // Evita nova chamada de rede
+      return
+    }
+    if (cached?.loading) return
     setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { ...(prev[cnpj] || {}), loading: true } }))
     try {
       const res = await fetch('/api/validate-cnpj', {
@@ -290,6 +319,11 @@ function ProposalsInner({
           ...prev,
           [cnpj]: { loading: false, fetched: true, razao_social: data.data.razao_social, nome_fantasia: data.data.nome_fantasia }
         }))
+        // Auto-preenche nome do cliente para consultor se ainda vazio
+        if (currentUser?.tipo_usuario === 'consultor') {
+          const fantasia = data.data.nome_fantasia || data.data.razao_social || ''
+          if (fantasia) setProposalForm(prev => prev.cliente_nome?.trim() ? prev : ({ ...prev, cliente_nome: fantasia }))
+        }
       } else {
         setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { loading: false, fetched: true, error: data?.error || 'Não encontrado' } }))
       }
@@ -308,14 +342,22 @@ function ProposalsInner({
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) { toast.error(currentUser.tipo_usuario === 'consultor' ? 'Informe um email de cliente válido' : 'Informe um email de consultor válido'); return }
     if (currentUser.tipo_usuario === 'consultor' && !proposalForm.cliente_nome.trim()) {
-      toast.error('Informe o nome do cliente');
+      toast.error('Valide o CNPJ para carregar o Nome do Cliente');
       return
     }
-    const valorNumber = parseMoneyToNumber(proposalForm.valor)
-    if (!valorNumber || valorNumber <= 0) { toast.error('Informe um valor válido maior que zero'); return }
-    const resp = await fetch('/api/validate-cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj: proposalForm.cnpj }) })
-    const cnpjResult = await resp.json()
-    if (!cnpjResult.valid) { throw new Error(cnpjResult.error || 'CNPJ inválido') }
+  const valorNumber = parseMoneyToNumber(proposalForm.valor)
+  if (!valorNumber || valorNumber <= 0) { toast.error('Informe um valor válido maior que zero'); return }
+    const cnpjDigits = String(proposalForm.cnpj || '').replace(/\D/g,'')
+    if (cnpjDigits.length !== 14) { toast.error('CNPJ deve ter 14 dígitos'); return }
+    let cnpjResult
+    try {
+      const resp = await fetch('/api/validate-cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj: cnpjDigits }) })
+      cnpjResult = await resp.json()
+    } catch (err) {
+      toast.error('Erro ao validar CNPJ');
+      return
+    }
+    if (!cnpjResult?.valid) { toast.error(cnpjResult?.error || 'CNPJ inválido'); return }
     if (currentUser.tipo_usuario === 'gestor') setCnpjValidationResult(cnpjResult.data)
     const forcedStatus = currentUser.tipo_usuario === 'consultor' ? 'em análise' : proposalForm.status
     const payload = {
@@ -324,6 +366,8 @@ function ProposalsInner({
       valor: valorNumber,
       criado_por: currentUser.id,
     }
+    // Garante que o backend receba apenas dígitos do CNPJ
+    payload.cnpj = cnpjDigits
     // Para consultor, limpar campos de consultor (serão inferidos no backend) e garantir cliente_*
     if (currentUser.tipo_usuario === 'consultor') {
       delete payload.consultor
@@ -416,11 +460,44 @@ function ProposalsInner({
                     <Label>CNPJ</Label>
                     <Input
                       value={proposalForm.cnpj}
-                      onChange={(e) => setProposalForm(prev => ({ ...prev, cnpj: e.target.value }))}
+                      maxLength={18}
+                      inputMode="numeric"
+                      onChange={(e) => {
+                        const masked = maskCNPJ(e.target.value)
+                        setProposalForm(prev => ({ ...prev, cnpj: masked }))
+                        const digits = masked.replace(/\D/g,'')
+                        if (digits.length === 14) fetchCnpjInfo(masked)
+                      }}
                       onBlur={(e) => fetchCnpjInfo(e.target.value)}
                       placeholder="00.000.000/0000-00"
                       required
                     />
+                    {(() => {
+                      const digits = String(proposalForm.cnpj || '').replace(/\D/g, '')
+                      if (digits.length !== 14) return null
+                      const info = cnpjInfoCache[digits]
+                      if (!info) return null
+                      if (info.loading) return (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Validando CNPJ…</span>
+                        </div>
+                      )
+                      if (info.error) return (
+                        <div className="flex items-center gap-1 text-xs text-destructive mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{info.error}</span>
+                        </div>
+                      )
+                      const nome = info?.nome_fantasia || info?.razao_social
+                      if (nome) return (
+                        <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span className="truncate max-w-[220px]" title={nome}>{nome}</span>
+                        </div>
+                      )
+                      return null
+                    })()}
                   </div>
                   <div className="space-y-2">
                     <Label>Operadora</Label>
@@ -439,7 +516,14 @@ function ProposalsInner({
                   </div>
                   <div className="space-y-2">
                     <Label>Valor do Plano</Label>
-                    <Input type="text" inputMode="decimal" value={proposalForm.valor} onChange={(e) => setProposalForm(prev => ({ ...prev, valor: formatMoneyBR(e.target.value) }))} required />
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={proposalForm.valor}
+                      onChange={(e) => setProposalForm(prev => ({ ...prev, valor: formatMoneyBR(e.target.value) }))}
+                      placeholder="0,00"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -462,7 +546,7 @@ function ProposalsInner({
                     <>
                       <div className="space-y-2">
                         <Label>Nome do Cliente</Label>
-                        <Input value={proposalForm.cliente_nome} onChange={(e) => setProposalForm(prev => ({ ...prev, cliente_nome: e.target.value }))} required />
+                        <Input value={proposalForm.cliente_nome} readOnly disabled placeholder="Preencha o CNPJ para carregar" />
                       </div>
                       <div className="space-y-2">
                         <Label>Email do Cliente</Label>
@@ -484,7 +568,10 @@ function ProposalsInner({
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit" disabled={isCnpjValidating}>
+                    {isCnpjValidating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Salvar
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -595,11 +682,9 @@ function ProposalsInner({
                 </div>
                 <div className="p-2 space-y-2 overflow-y-auto">
                   {groupedByStatus[status]?.map(p => {
+                    const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
-                      currentUser.tipo_usuario !== 'consultor' && (
-                        currentUser.tipo_usuario === 'gestor' ||
-                        String(p.criado_por) === String(currentUser.id)
-                      )
+                      currentUser.tipo_usuario === 'gestor' || (currentUser.tipo_usuario === 'analista' && isHandler)
                     )
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
@@ -675,11 +760,20 @@ function ProposalsInner({
                               Assumir
                             </button>
                           )}
-                          {p.atendido_por && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {`Atendido por: ${users.find(u => u.id === p.atendido_por)?.nome || '—'}`}
-                            </span>
-                          )}
+                          {(() => {
+                            // Fallback: se ainda não há atendido_por mas a proposta está implantada, usar criador se for analista
+                            let handlerId = p.atendido_por
+                            if (!handlerId && p.status === 'implantado') {
+                              const creatorIsAnalyst = users.some(u => u.id === p.criado_por && u.tipo_usuario === 'analista')
+                              if (creatorIsAnalyst) handlerId = p.criado_por
+                            }
+                            const nome = handlerId ? (users.find(u => u.id === handlerId)?.nome || '—') : '—'
+                            return (
+                              <span className="text-[10px] text-muted-foreground">
+                                {`Atendido por: ${nome}`}
+                              </span>
+                            )
+                          })()}
                         </div>
                         {currentUser.tipo_usuario === 'gestor' && (
                           <div className="text-[10px] text-muted-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
@@ -775,7 +869,7 @@ function ProposalsInner({
                   <div><span className="font-medium">Email Consultor:</span> {detail.consultor_email || '—'}</div>
                     <div><span className="font-medium">Cliente:</span> {detail.cliente_nome || '—'}</div>
                     <div><span className="font-medium">Email Cliente:</span> {detail.cliente_email || '—'}</div>
-                    <div><span className="font-medium">Responsável Atual:</span> {detail.analista_responsavel_nome || detail.atendido_por_nome || (detail.atendido_por && (users.find(u => u.id === detail.atendido_por)?.nome)) || (users.find(u => u.id === detail.criado_por)?.nome) || '—'}</div>
+                    <div><span className="font-medium">Responsável Atual:</span> {(detail.atendido_por && (users.find(u => u.id === detail.atendido_por)?.nome)) || '—'}</div>
                     <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
                   <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
                   <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>

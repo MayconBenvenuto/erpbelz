@@ -213,12 +213,12 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
       {currentUser.tipo_usuario === 'gestor' && (
         <SLARealTimeWatcher proposals={proposals} currentUser={currentUser} />
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Meta</CardTitle>
-          <CardDescription>Progresso baseado em propostas implantadas</CardDescription>
+      <Card className="max-w-sm border shadow-sm">
+        <CardHeader className="py-3 px-4 space-y-1">
+          <CardTitle className="text-sm font-semibold leading-tight">Meta</CardTitle>
+          <CardDescription className="text-xs leading-snug">Progresso baseado em propostas implantadas</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4 pt-0 text-xs">
           {(() => {
             const DEFAULT_TARGET = 200000
             // users inclui gestores e analistas; consideraremos apenas analistas no agregado
@@ -243,14 +243,14 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
               const progress = totalTarget > 0 ? (totalAchieved / totalTarget) * 100 : 0
               return (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progresso geral (analistas)</span>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-medium">
+                    <span>Progresso geral</span>
                     <span>{formatCurrency(totalAchieved)} / {formatCurrency(totalTarget)}</span>
                   </div>
-                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3" />
-                  <p className="text-xs text-muted-foreground">
-                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, totalTarget - totalAchieved))} para atingir a meta`}
+                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-2" />
+                  <p className="text-[10px] text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, totalTarget - totalAchieved))}`}
                   </p>
                 </div>
               )
@@ -264,14 +264,14 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
               const achieved = Number(goal?.valor_alcancado ?? achievedFallback)
               const progress = target > 0 ? (achieved / target) * 100 : 0
               return (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-medium">
                     <span>Seu progresso</span>
                     <span>{formatCurrency(achieved)} / {formatCurrency(target)}</span>
                   </div>
-                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-3" />
-                  <p className="text-xs text-muted-foreground">
-                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, target - achieved))} para atingir a meta`}
+                  <Progress value={Math.min(Math.max(progress, 0), 100)} className="h-2" />
+                  <p className="text-[10px] text-muted-foreground">
+                    {progress >= 100 ? 'Meta atingida! 🎉' : `Faltam ${formatCurrency(Math.max(0, target - achieved))}`}
                   </p>
                 </div>
               )
