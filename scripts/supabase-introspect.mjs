@@ -18,17 +18,56 @@
 */
 import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
+import path from 'path'
 
 function getEnv(key) {
   return process.env[key] && String(process.env[key]).trim()
 }
 
-const url = getEnv('NEXT_PUBLIC_SUPABASE_URL')
-const serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
-const anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+// =========================
+// CLI ARG PARSING / MODOS
+// =========================
+// Suporte a flags:
+//   --prod        -> Usa variáveis PROD_SUPABASE_URL / PROD_SUPABASE_SERVICE_ROLE_KEY
+//   --url=...     -> Força URL
+//   --key=...     -> Força chave (service role ou anon)
+//   --no-doc      -> Não atualizar DOC_SUPABASE.md
+//   --out=arquivo -> Caminho alternativo da doc
+//   --help        -> Ajuda
+
+const args = process.argv.slice(2)
+const argMap = {}
+for (const a of args) {
+  if (a.startsWith('--')) {
+    const [k, v] = a.replace(/^--/, '').split('=')
+    argMap[k] = v === undefined ? true : v
+  }
+}
+
+if (argMap.help) {
+  console.log(`Uso: node scripts/supabase-introspect.mjs [--prod] [--url=URL] [--key=KEY] [--no-doc] [--out=DOC_SUPABASE.md]\n\nFlags:\n  --prod       Usa PROD_SUPABASE_URL / PROD_SUPABASE_SERVICE_ROLE_KEY\n  --url=       URL Supabase manual\n  --key=       Chave (service role ou anon) manual\n  --no-doc     Apenas imprime, não altera documentação\n  --out=       Caminho do arquivo de documentação (default DOC_SUPABASE.md)\n  --help       Mostra esta ajuda`) 
+  process.exit(0)
+}
+
+const isProd = !!argMap.prod
+// Variáveis padrão (dev/staging)
+let url = getEnv('NEXT_PUBLIC_SUPABASE_URL')
+let serviceKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
+let anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+if (isProd) {
+  // Variáveis dedicadas de produção (não expor chaves reais em repositório)
+  url = argMap.url || getEnv('PROD_SUPABASE_URL') || url
+  serviceKey = argMap.key || getEnv('PROD_SUPABASE_SERVICE_ROLE_KEY') || serviceKey
+  anonKey = getEnv('PROD_SUPABASE_ANON_KEY') || anonKey
+} else {
+  url = argMap.url || url
+  if (argMap.key) serviceKey = argMap.key
+}
 
 if (!url || (!serviceKey && !anonKey)) {
-  console.error('Erro: configure NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (ou NEXT_PUBLIC_SUPABASE_ANON_KEY) no .env')
+  console.error('Erro: faltam variáveis para conectar. Verifique: ' + (isProd ? 'PROD_SUPABASE_URL + PROD_SUPABASE_SERVICE_ROLE_KEY' : 'NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY'))
   process.exit(1)
 }
 
@@ -80,33 +119,153 @@ async function getTableInfo(table) {
   }
 }
 
-async function checkRpcs() {
-  const rpcs = ['atualizar_meta', 'atualizar_meta_usuario']
+async function checkRpcs(existingRoutineNames = []) {
+  const target = ['atualizar_meta', 'atualizar_meta_usuario']
   const results = {}
-  for (const fn of rpcs) {
-    try {
-      const { error } = await supabase.rpc(fn, {})
-      results[fn] = error ? `existe? possivelmente sim, mas erro ao invocar sem args: ${error.message}` : 'ok'
-    } catch (e) {
-      results[fn] = `erro: ${String(e)}`
+  for (const fn of target) {
+    if (existingRoutineNames.includes(fn)) {
+      results[fn] = 'exists'
+    } else {
+      results[fn] = 'missing'
     }
   }
   return results
+}
+
+// =========================
+// DOC UPDATE
+// =========================
+function formatDocSection(summary) {
+  const ts = new Date().toISOString()
+  let out = ''
+  out += `<!-- AUTO_DB_SCHEMA:START -->\n` +
+         `<!-- Gerado por supabase-introspect.mjs em ${ts} (modo: ${isProd ? 'PRODUCAO' : 'PADRAO'}) -->\n`
+  out += `\n## Esquema (Introspecção ${isProd ? 'Produção' : 'Padrão'})\n\n`
+  for (const t of summary.tables) {
+    out += `### ${t.table} (linhas: ${t.count ?? '?'} )\n\n`
+    if (t.columns?.length) {
+      out += `| Coluna | Tipo | Not Null | Default |\n|--------|------|----------|---------|\n`
+      for (const c of t.columns) {
+        out += `| ${c.name} | ${c.type} | ${c.nullable === 'NO' ? 'sim' : 'não'} | ${c.default ?? ''} |\n`
+      }
+      out += '\n'
+    }
+    if (t.sample?.length) {
+      out += '**Amostra de dados (até 3):**\\n\n'
+      for (const row of t.sample) {
+        out += '`' + JSON.stringify(row) + '`\\n\n'
+      }
+    }
+  }
+  out += `\n### Funções RPC\n\n`
+  Object.entries(summary.rpcs).forEach(([fn, status]) => { out += `- ${fn}: ${status}\n` })
+  out += `\n> Nota: Se algum campo ou tabela esperado não aparecer, verifique policies RLS e permissões do service role usado.\n`
+  out += `\n<!-- AUTO_DB_SCHEMA:END -->\n`
+  return out
+}
+
+function updateDocumentation(summary) {
+  const docPath = path.resolve(argMap.out || 'DOC_SUPABASE.md')
+  let existing = ''
+  try { existing = fs.readFileSync(docPath, 'utf8') } catch { /* ignore */ }
+  const newSection = formatDocSection(summary)
+  const startMarker = '<!-- AUTO_DB_SCHEMA:START -->'
+  const endMarker = '<!-- AUTO_DB_SCHEMA:END -->'
+  if (existing.includes(startMarker) && existing.includes(endMarker)) {
+    const updated = existing.replace(new RegExp(startMarker + '[\s\S]*?' + endMarker), newSection)
+    fs.writeFileSync(docPath, updated, 'utf8')
+    console.log(`Documento atualizado (substituída seção existente): ${docPath}`)
+  } else if (existing) {
+    const appended = existing.trimEnd() + '\n\n' + newSection
+    fs.writeFileSync(docPath, appended, 'utf8')
+    console.log(`Documento atualizado (seção anexada): ${docPath}`)
+  } else {
+    fs.writeFileSync(docPath, '# Supabase – Estrutura\n\n' + newSection, 'utf8')
+    console.log(`Documento criado: ${docPath}`)
+  }
 }
 
 async function main() {
   console.log('== Introspecção Supabase ==')
   console.log(`URL: ${url}`)
   console.log(`Auth: ${serviceKey ? 'service_role' : 'anon'}`)
-
-  const tables = ['usuarios', 'propostas', 'sessoes', 'metas']
+  console.log(`Modo: ${isProd ? 'PRODUCAO' : 'PADRAO'}`)
+  // Descoberta dinâmica de tabelas no schema public
+    let tables = []
+    // Primeiro tenta RPC list_public_tables()
+    try {
+      const { data: tblRpc, error: tblErr } = await supabase.rpc('list_public_tables')
+      if (tblErr) throw tblErr
+      tables = (tblRpc || []).map(r => r.table_name || r)
+    } catch (e) {
+      console.warn('Aviso: falha RPC list_public_tables():', e.message || e)
+      // Fallback antigo (pode falhar novamente se policies bloquearem)
+      try {
+        const { data, error } = await supabase
+          .from('information_schema.tables')
+          .select('table_name, table_type')
+          .eq('table_schema', 'public')
+          .order('table_name')
+        if (error) throw error
+        tables = (data || [])
+          .filter(t => t.table_type === 'BASE TABLE')
+          .map(t => t.table_name)
+          .filter(name => !name.startsWith('pg_') && !name.startsWith('_'))
+      } catch (e2) {
+        console.warn('Aviso: fallback information_schema.tables também falhou:', e2.message || e2)
+      }
+    }
+  if (!tables.length) {
+    // Fallback conhecido
+    tables = ['usuarios', 'propostas', 'sessoes', 'metas']
+    console.log('Usando lista fallback de tabelas:', tables.join(', '))
+  } else {
+    console.log('Tabelas descobertas:', tables.join(', '))
+  }
   const infos = []
   for (const t of tables) {
     const info = await getTableInfo(t)
     infos.push(info)
   }
 
-  const rpcs = await checkRpcs()
+  // Rotinas (para checar existência das funcoes de metas)
+  let routineNames = []
+  try {
+    const { data: routines, error: rErr } = await supabase.rpc('list_public_routines')
+    if (!rErr && routines) routineNames = routines.map(r => r.routine_name)
+  } catch (e) {
+    console.warn('Aviso: não foi possível listar rotinas:', e.message || e)
+  }
+
+  const rpcs = await checkRpcs(routineNames)
+
+  // Carregar colunas via RPC se disponível para adicionar tipos reais ao summary
+  try {
+    const { data: colsRpc, error: colsErr } = await supabase.rpc('list_public_table_columns')
+    if (!colsErr && colsRpc) {
+      // Mapear por tabela
+      const byTable = colsRpc.reduce((acc, c) => {
+        (acc[c.table_name] = acc[c.table_name] || []).push(c)
+        return acc
+      }, {})
+      for (const t of infos) {
+        if (byTable[t.table]) {
+          t.columns = byTable[t.table].map(c => ({
+            column_name: c.column_name,
+            data_type: c.data_type,
+            is_nullable: c.is_nullable,
+            column_default: c.column_default || null,
+          }))
+          // Limpa erro antigo de columns (evita ruído se fallback falhou)
+          if (t.errors) t.errors.columns = undefined
+        }
+      }
+    } else if (colsErr) {
+      console.warn('Aviso: RPC list_public_table_columns falhou:', colsErr.message)
+    }
+  } catch (e) {
+    console.warn('Aviso: exceção ao obter colunas por RPC:', e.message || e)
+  }
 
   const summary = {
     tables: infos.map(i => ({
@@ -119,7 +278,17 @@ async function main() {
     rpcs,
   }
 
-  // Saída detalhada
+  // Views (best-effort)
+  try {
+    const { data: views, error: vErr } = await supabase.rpc('list_public_views')
+    if (!vErr && views?.length) {
+      summary.views = views.map(v => v.view_name || v)
+    }
+  } catch (e) {
+    console.warn('Aviso: não foi possível listar views:', e.message || e)
+  }
+
+  // Saída detalhada console
   for (const t of summary.tables) {
     console.log(`\n--- Tabela: ${t.table} (linhas: ${t.count ?? 'desconhecido'}) ---`)
     if (t.columns?.length) {
@@ -142,10 +311,18 @@ async function main() {
   console.log('\nFunções RPC:')
   Object.entries(summary.rpcs).forEach(([fn, status]) => console.log(` - ${fn}: ${status}`))
 
-  // Resumo conciso
   console.log('\n== Resumo Estrutural ==')
   for (const t of summary.tables) {
     console.log(`* ${t.table}: ${t.count ?? '?'} linhas, campos: ${t.columns.map(c => c.name).join(', ')}`)
+  }
+  if (summary.views?.length) {
+    console.log(`Views: ${summary.views.join(', ')}`)
+  }
+
+  if (!argMap['no-doc']) {
+    updateDocumentation(summary)
+  } else {
+    console.log('Flag --no-doc ativa: não atualizando documentação.')
   }
 }
 

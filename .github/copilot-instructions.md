@@ -6,11 +6,15 @@ This is a CRM system for Belz company focused on health insurance proposal manag
 Current architecture:
 - Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
 
-Recent updates (2025-08-19):
-- Proposals have a sequential code (codigo) like PRP0000 (unique, validated, indexed). UI shows this as the first column and lists are ordered by codigo ascending. Emails reference only the codigo (never the UUID).
-- Status editing is inline in the table cell (Select) with per-row loading/disable during updates.
-- Analyst Proposals screen shows a “Meta” progress card (backend metas with fallback to implanted proposals sum).
-- Reports exclude gestor from monitoring; the refresh button shows spinner/disable.
+Recent updates (2025-08-27):
+- Sequential proposal code (codigo) PRP0000 format (unique, indexed); lists ordered asc by codigo; emails reference only codigo.
+- Inline status editing with per-row loading/disable.
+- Meta progress now backed by table metas (mes, ano, quantidade_implantacoes) instead of accumulating valor.
+- Added audit (propostas_auditoria), notes (propostas_notas) and tags (propostas_tags) tables.
+- Added solicitacoes workflow table (tickets) with JSON campos (arquivos, dados, historico) and SLA fields.
+- Added sessoes table storing auth sessions tokens + expirado_em.
+- Added view vw_usuarios_online (derived presence status) used for reports/monitoring.
+- Reports exclude gestor from monitoring; refresh button shows spinner/disable.
 
 ## Tech Stack
 - **Frontend/Backend**: Next.js 14.2.3 with App Router (/api routes)
@@ -208,22 +212,38 @@ CREATE TABLE usuarios (
 );
 ```
 
-### Proposals Table
-```sql
-CREATE TABLE propostas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  cnpj VARCHAR(18) NOT NULL,
-  consultor TEXT NOT NULL,
-  consultor_email TEXT NOT NULL,
-  operadora TEXT NOT NULL,
-  quantidade_vidas INT NOT NULL,
-  valor NUMERIC(12,2) NOT NULL,
-  previsao_implantacao DATE,
-  status TEXT NOT NULL,
-  criado_por UUID REFERENCES usuarios(id),
-  criado_em TIMESTAMPTZ DEFAULT NOW()
-);
-```
+### Proposals Table (propostas)
+Essential columns (full list in DOC_SUPABASE.md auto section):
+id (uuid, PK), codigo (text, sequential PRP format), cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por, arquivado (boolean default false), atendido_por, diversos campos cliente_* (dados cadastrais), timestamps (criado_em, updated_at, atendido_em) e observacoes.
+
+### Audit Table (propostas_auditoria)
+Rastreia mudanças campo a campo: proposta_id, campo, valor_antigo, valor_novo, alterado_por, alterado_em.
+
+### Proposal Notes (propostas_notas)
+Notas livres por proposta: nota, autor_id, criado_em.
+
+### Proposal Tags (propostas_tags)
+Par simples (proposta_id, tag) com aplicado_em.
+
+### Metas Table (metas)
+Modelo mensal por usuário: usuario_id, mes, ano, quantidade_implantacoes (integer default 0).
+Usada para dashboard e cálculo de progresso; alteração de status para/from 'implantado' deve refletir metas (delta controlado no backend).
+
+### Sessions Table (sessoes)
+Tokens ativos: usuario_id, token, criado_em, ultimo_refresh, expirado_em. Use para invalidar / refresh logic. Nunca logar token completo em console.
+
+### Solicitacoes Table (solicitacoes)
+Tickets operacionais: codigo, tipo, subtipo, razao_social, cnpj, apolice_da_belz (bool), acesso_empresa, operadora, observacoes, arquivos(jsonb), dados(jsonb), historico(jsonb), status, sla_previsto, prioridade, atendido_por(+nome), criado_por, criado_em, atualizado_em.
+Histórico e arquivos são arrays/objetos; sempre sanitize antes de armazenar.
+
+### Usuarios Table (usuarios)
+id, nome, email (unique), senha (bcrypt), tipo_usuario ('gestor'|'analista'|possível 'consultor' legado), status_presenca, ultimo_refresh, criado_em, atualizado_em.
+
+### Online Users View (vw_usuarios_online)
+View derivada para presença; NÃO escrever diretamente. Use apenas SELECT.
+
+### RPCs Importantes
+atualizar_meta, atualizar_meta_usuario (existência verificada antes de chamar). Novas funções de introspecção (list_public_tables, list_public_table_columns, list_public_routines, list_public_views) são SECURITY DEFINER e não devem ser expostas ao cliente.
 
 ## Constants
 
@@ -328,3 +348,4 @@ Email/TLS notes:
 - Optional fallback: RESEND_API_KEY
 
 When generating code for this project, always prioritize security, follow the established patterns, and maintain consistency with the existing codebase.
+\n+Schema source of truth: mantenha consultas alinhadas com DOC_SUPABASE.md (bloco AUTO_DB_SCHEMA) gerado pelo script scripts/supabase-introspect.mjs. Evite duplicar DDL manual; se a estrutura mudar, rode o script para atualizar documentação.
