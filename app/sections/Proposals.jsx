@@ -775,7 +775,6 @@ function ProposalsInner({
                   <div><span className="font-medium">Email Consultor:</span> {detail.consultor_email || '—'}</div>
                     <div><span className="font-medium">Cliente:</span> {detail.cliente_nome || '—'}</div>
                     <div><span className="font-medium">Email Cliente:</span> {detail.cliente_email || '—'}</div>
-                    <div><span className="font-medium">Analista Criador:</span> {(users.find(u => u.id === detail.criado_por)?.nome) || detail.analista_nome || '—'}</div>
                     <div><span className="font-medium">Responsável Atual:</span> {detail.analista_responsavel_nome || detail.atendido_por_nome || (detail.atendido_por && (users.find(u => u.id === detail.atendido_por)?.nome)) || (users.find(u => u.id === detail.criado_por)?.nome) || '—'}</div>
                     <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
                   <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
