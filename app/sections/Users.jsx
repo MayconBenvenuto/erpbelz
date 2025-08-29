@@ -14,7 +14,7 @@ import { formatCurrency } from '@/lib/utils'
 
 export default function UsersSection({ currentUser, users, proposals, userGoals, onCreateUser, onUpdateUserGoal, isLoading }) {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
-  const [userForm, setUserForm] = useState({ nome: '', email: '', senha: '', tipo_usuario: 'analista' })
+  const [userForm, setUserForm] = useState({ nome: '', email: '', senha: '', tipo_usuario: 'analista_implantacao' })
   const [metaDialogUser, setMetaDialogUser] = useState(null) // usuário selecionado para edição de meta
   const [metaForm, setMetaForm] = useState({ valor_meta_input: '' })
   // Filtros & ordenação
@@ -46,7 +46,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-  await onCreateUser({ ...userForm, afterSuccess: () => { setUserForm({ nome: '', email: '', senha: '', tipo_usuario: 'analista' }); setIsUserDialogOpen(false) } })
+  await onCreateUser({ ...userForm, afterSuccess: () => { setUserForm({ nome: '', email: '', senha: '', tipo_usuario: 'analista_implantacao' }); setIsUserDialogOpen(false) } })
   }
 
   // Normalização
@@ -125,7 +125,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Novo Usuário</DialogTitle>
-              <DialogDescription>Adicione um novo usuário (analista ou consultor) ao sistema.</DialogDescription>
+              <DialogDescription>Adicione um novo usuário (analista de implantação, analista de movimentação ou consultor).</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -141,13 +141,14 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
                 <Input id="user-senha" type="password" placeholder="Senha do usuário" value={userForm.senha} onChange={(e) => setUserForm(prev => ({ ...prev, senha: e.target.value }))} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="user-tipo">Tipo de Usuário</Label>
-        <Select value={userForm.tipo_usuario} onValueChange={(value) => setUserForm(prev => ({ ...prev, tipo_usuario: value }))}>
+    <Label htmlFor="user-tipo">Tipo de Usuário</Label>
+  <Select value={userForm.tipo_usuario} onValueChange={(value) => setUserForm(prev => ({ ...prev, tipo_usuario: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="analista">Analista</SelectItem>
+        <SelectItem value="analista_implantacao">Analista de Implantação</SelectItem>
+        <SelectItem value="analista_movimentacao">Analista de Movimentação</SelectItem>
                     <SelectItem value="consultor">Consultor</SelectItem>
                   </SelectContent>
                 </Select>
@@ -178,7 +179,9 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
                 <SelectContent>
                   <SelectItem value="todos">Todos os tipos</SelectItem>
                   <SelectItem value="gestor">Gestor</SelectItem>
-                  <SelectItem value="analista">Analista</SelectItem>
+                  <SelectItem value="gerente">Gerente</SelectItem>
+                  <SelectItem value="analista_implantacao">Analista Implantação</SelectItem>
+                  <SelectItem value="analista_movimentacao">Analista Movimentação</SelectItem>
                   <SelectItem value="consultor">Consultor</SelectItem>
                 </SelectContent>
               </Select>
@@ -245,7 +248,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
                             <button onClick={()=>copyEmail(user.email)} title="Copiar email" className="underline-offset-2 hover:underline text-xs">{user.email}</button>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={user.tipo_usuario === 'gestor' ? 'default' : 'secondary'} className="capitalize text-[11px]">{user.tipo_usuario}</Badge>
+                            <Badge variant={['gestor','gerente'].includes(user.tipo_usuario) ? 'default' : 'secondary'} className="capitalize text-[11px]">{user.tipo_usuario.replace(/_/g,' ')}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono text-xs">{user._implantadas}</TableCell>
                           <TableCell className="text-xs">

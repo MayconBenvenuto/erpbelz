@@ -63,11 +63,12 @@ export async function GET(request, { params }) {
   }
   const user = auth.user
   const isGestor = user.tipo_usuario === 'gestor'
+  const isGerente = user.tipo_usuario === 'gerente'
   let allowed = true
-  if (!isGestor) {
+  if (!isGestor && !isGerente) {
     if (user.tipo_usuario === 'consultor') {
       allowed = (String(proposal.criado_por) === String(user.id)) || (proposal.consultor_email && proposal.consultor_email.toLowerCase() === String(user.email || '').toLowerCase())
-    } else if (user.tipo_usuario === 'analista') {
+    } else if (user.tipo_usuario === 'analista_implantacao') {
       allowed = (String(proposal.criado_por) === String(user.id)) || (String(proposal.atendido_por) === String(user.id)) || !proposal.atendido_por
     }
   }
@@ -82,9 +83,9 @@ export async function GET(request, { params }) {
   }
   const criadoUser = userDataMap[proposal.criado_por]
   const atendenteUser = userDataMap[proposal.atendido_por]
-  const analista_nome = criadoUser?.nome && criadoUser?.tipo === 'analista'
+  const analista_nome = criadoUser?.nome && ['analista_implantacao','analista_movimentacao'].includes(criadoUser?.tipo)
     ? criadoUser.nome
-    : (String(proposal.criado_por) === String(user.id) && user.tipo_usuario === 'analista' ? user.nome : undefined)
+  : (String(proposal.criado_por) === String(user.id) && ['analista_implantacao','analista_movimentacao'].includes(user.tipo_usuario) ? user.nome : undefined)
   const atendido_por_nome = proposal.atendido_por
     ? (atendenteUser?.nome || (String(proposal.atendido_por) === String(user.id) ? user.nome : undefined))
     : null
@@ -140,8 +141,9 @@ export async function PATCH(request, { params }) {
     return handleCORS(NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }), origin)
   }
   const isGestor = auth.user.tipo_usuario === 'gestor'
+  const isGerente = auth.user.tipo_usuario === 'gerente'
   // Claim é tratado antes para evitar necessidade de validar status
-  if (body?.claim && auth.user.tipo_usuario === 'analista') {
+  if (body?.claim && auth.user.tipo_usuario === 'analista_implantacao') {
     // Busca proposta para verificar assignment
     const { data: currentProposalPre, error: fetchErrorPre } = await supabase
       .from('propostas')
@@ -241,13 +243,13 @@ export async function PATCH(request, { params }) {
   }
   // Claim já tratado no bloco anterior
 
-  if (auth.user.tipo_usuario === 'consultor') {
+  if (auth.user.tipo_usuario === 'consultor' || auth.user.tipo_usuario === 'analista_movimentacao') {
     try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
   }
-  if (auth.user.tipo_usuario !== 'gestor') {
+  if (!(isGestor || isGerente)) {
     let isHandler = currentProposal.atendido_por === auth.user.id
-    const canImplicitClaim = auth.user.tipo_usuario === 'analista' && !currentProposal.atendido_por && String(currentProposal.criado_por) === String(auth.user.id)
+    const canImplicitClaim = auth.user.tipo_usuario === 'analista_implantacao' && !currentProposal.atendido_por && String(currentProposal.criado_por) === String(auth.user.id)
     if (!isHandler && canImplicitClaim) {
       try {
         const { data: claimAuto } = await supabase
@@ -280,7 +282,7 @@ export async function PATCH(request, { params }) {
   // Constrói update controlado
   const updatePayload = {}
   if (typeof updates.status !== 'undefined') updatePayload.status = updates.status
-  if (isGestor) {
+  if (isGestor || isGerente) {
     if (typeof updates.quantidade_vidas !== 'undefined') updatePayload.quantidade_vidas = updates.quantidade_vidas
     if (typeof updates.valor !== 'undefined') updatePayload.valor = updates.valor
     if (typeof updates.previsao_implantacao !== 'undefined') updatePayload.previsao_implantacao = updates.previsao_implantacao

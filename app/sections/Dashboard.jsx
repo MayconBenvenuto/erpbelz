@@ -204,7 +204,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   // Forecast meta
   const forecastMeta = useMemo(() => {
-    if (currentUser.tipo_usuario !== 'gestor') return null
+  if (!['gestor','gerente'].includes(currentUser.tipo_usuario)) return null
     const now=new Date(); const year=now.getFullYear(); const month=now.getMonth();
     const daysInMonth=new Date(year,month+1,0).getDate(); const today=now.getDate();
     const diasPassados=today; const diasRestantes=Math.max(0, daysInMonth - today)
@@ -223,7 +223,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   // Ranking de analistas (somente gestor)
   const analystRanking = useMemo(() => {
-    if (currentUser.tipo_usuario !== 'gestor') return []
+  if (!['gestor','gerente'].includes(currentUser.tipo_usuario)) return []
     const analystUsers = users.filter(u => u.tipo_usuario !== 'gestor')
     const map = {}
     filteredProposals.forEach(p => {
@@ -254,7 +254,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   // Métricas de movimentações (solicitações) para gestor
   const movStats = useMemo(() => {
-    if (currentUser.tipo_usuario !== 'gestor') return null
+  if (!['gestor','gerente'].includes(currentUser.tipo_usuario)) return null
     const total = solicitacoes.length
     if (!total) return { total:0, abertas:0, andamento:0, concluidas:0, canceladas:0, atrasadas:0, pctAtrasadas:0, slaAssuncaoH:0 }
     let abertas=0,andamento=0,concluidas=0,canceladas=0,atrasadas=0
@@ -343,7 +343,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   return (
     <div className="space-y-6">
-      {currentUser.tipo_usuario === 'gestor' && (
+      {['gestor','gerente'].includes(currentUser.tipo_usuario) && (
         <SLARealTimeWatcher proposals={proposals} currentUser={currentUser} />
       )}
       <Card className="max-w-sm border shadow-sm">
@@ -356,7 +356,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
             const DEFAULT_TARGET = 200000
             // users inclui gestores e analistas; consideraremos apenas analistas no agregado
 
-            if (currentUser.tipo_usuario === 'gestor') {
+            if (['gestor','gerente'].includes(currentUser.tipo_usuario)) {
               // Somar metas/alcance apenas dos analistas
               const analystIds = users.filter(u => u.tipo_usuario !== 'gestor').map(u => u.id)
               let totalTarget = 0
@@ -416,7 +416,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            {currentUser.tipo_usuario === 'gestor' && (
+            {['gestor','gerente'].includes(currentUser.tipo_usuario) && (
               <>
                 <div className="w-48">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -495,7 +495,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </div>
       </div>
 
-      {currentUser.tipo_usuario === 'gestor' ? (
+  {['gestor','gerente'].includes(currentUser.tipo_usuario) ? (
         <div className="space-y-6">
           {/* Assumptions: Linha 1 = desempenho (implantadas & valor implantado). Linha 2 = macro agregados (totais e pipeline). */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
@@ -677,7 +677,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </div>
       )}
 
-      {currentUser.tipo_usuario === 'gestor' && (
+  {['gestor','gerente'].includes(currentUser.tipo_usuario) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           <Card>
             <CardHeader>
@@ -841,7 +841,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
           </Card>
         </div>
       )}
-      {currentUser.tipo_usuario === 'gestor' && (
+  {['gestor','gerente'].includes(currentUser.tipo_usuario) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           {/* Evolução 7 dias */}
           <Card>
@@ -864,7 +864,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </div>
       )}
 
-      {currentUser.tipo_usuario === 'gestor' && movStats && (
+  {['gestor','gerente'].includes(currentUser.tipo_usuario) && movStats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           <Card className="border-l-4 border-l-orange-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -908,7 +908,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
           </Card>
         </div>
       )}
-      {currentUser.tipo_usuario === 'gestor' && movStats && (
+  {['gestor','gerente'].includes(currentUser.tipo_usuario) && movStats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           <Card>
             <CardHeader><CardTitle className="text-lg">Status Movimentações</CardTitle></CardHeader>
