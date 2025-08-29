@@ -5,14 +5,18 @@ on:
     branches: [ testes ]
 
 permissions:
-  contents: read
+  contents: write   # necessário para realizar merge
   pull-requests: write
   issues: write
+  checks: read       # ler status/checks para saber se pode fazer merge
 
 jobs:
   open-pr:
     name: Open PR from testes to dev
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.pr_number }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
     env:
       PR_LABELS: homologacao,auto-pr
       PR_ASSIGNEES: ""
@@ -24,6 +28,7 @@ jobs:
           # Usando apenas GITHUB_TOKEN. Para usar PAT crie secret GH_PAT e substitua manualmente aqui.
           echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
       - name: Create or reuse PR testes -> dev
+        id: pr
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.token.outputs.token }}
@@ -31,11 +36,13 @@ jobs:
             const { owner, repo } = context.repo;
             const head = 'testes';
             const base = 'dev';
-            // Skip if no changes between branches
+            // Verifica se há diferenças
             try {
               const cmp = await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${base}...${head}` });
               if (cmp.data.ahead_by === 0) {
                 core.info('Sem diferenças entre testes e dev. PR não necessário.');
+                core.setOutput('pr_number', '');
+                core.setOutput('head_sha', '');
                 return;
               }
             } catch (e) {
@@ -43,8 +50,10 @@ jobs:
             }
             const existing = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base });
             let prNumber;
+            let headSha;
             if (existing.data.length > 0) {
               prNumber = existing.data[0].number;
+              headSha = existing.data[0].head.sha;
               core.info(`PR já aberto: #${prNumber}`);
             } else {
               const title = 'chore: Merge testes -> dev';
@@ -52,57 +61,112 @@ jobs:
               try {
                 const pr = await github.rest.pulls.create({ owner, repo, head, base, title, body, maintainer_can_modify: true, draft: false });
                 prNumber = pr.data.number;
+                headSha = pr.data.head.sha;
                 core.info(`PR criado: #${prNumber}`);
               } catch (e) {
                 if (e.status === 422) {
                   core.info('Sem commits entre as branches. Nada a fazer.');
+                  core.setOutput('pr_number', '');
+                  core.setOutput('head_sha', '');
                   return;
                 }
                 if (e.status === 403 && /not permitted to create or approve pull requests/i.test(e.message)) {
-                  core.warning('O token não tem permissão para criar PR. Habilite "Allow GitHub Actions to create and approve pull requests" nas configurações ou forneça um PAT em GH_PAT.');
+                  core.warning('Token sem permissão para criar PR. Ajuste permissões ou use PAT em GH_PAT.');
+                  core.setOutput('pr_number', '');
+                  core.setOutput('head_sha', '');
                   return;
                 }
                 throw e;
               }
             }
 
-            // Apply labels, assignees, and reviewers if configured
             if (prNumber) {
+              // Labels
               const labels = (process.env.PR_LABELS || '').split(',').map(s => s.trim()).filter(Boolean);
               if (labels.length) {
-                try {
-                  await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels });
-                } catch (e) {
-                  if (e.status === 403) {
-                    core.warning('Sem permissão para adicionar labels (precisa issues: write).');
-                  } else {
-                    core.warning(`Falha ao adicionar labels: ${e.message}`);
-                  }
-                }
+                try { await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels }); } catch (e) { core.warning(`Falha labels: ${e.message}`); }
               }
-
+              // Assignees
               const assignees = (process.env.PR_ASSIGNEES || '').split(',').map(s => s.trim()).filter(Boolean);
               if (assignees.length) {
-                try {
-                  await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees });
-                } catch (e) {
-                  core.warning(`Falha ao atribuir responsáveis: ${e.message}`);
-                }
+                try { await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees }); } catch (e) { core.warning(`Falha assignees: ${e.message}`); }
               } else {
-                // fallback: assign repo owner
-                try {
-                  await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees: [owner] });
-                } catch (e) {
-                  core.info('Não foi possível atribuir o owner, seguindo sem assignees.');
-                }
+                try { await github.rest.issues.addAssignees({ owner, repo, issue_number: prNumber, assignees: [owner] }); } catch (e) { core.info('Sem assignee padrão.'); }
               }
-
+              // Reviewers
               const reviewers = (process.env.PR_REVIEWERS || '').split(',').map(s => s.trim()).filter(Boolean);
               if (reviewers.length) {
-                try {
-                  await github.rest.pulls.requestReviewers({ owner, repo, pull_number: prNumber, reviewers });
-                } catch (e) {
-                  core.warning(`Falha ao solicitar reviewers: ${e.message}`);
-                }
+                try { await github.rest.pulls.requestReviewers({ owner, repo, pull_number: prNumber, reviewers }); } catch (e) { core.warning(`Falha reviewers: ${e.message}`); }
               }
             }
+
+            core.setOutput('pr_number', prNumber || '');
+            core.setOutput('head_sha', headSha || '');
+
+  auto-merge:
+    name: Auto merge se checks OK
+    needs: open-pr
+    if: ${{ needs.open-pr.outputs.pr_number }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aguardar checks e realizar merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = Number('${{ needs.open-pr.outputs.pr_number }}');
+            const headSha = '${{ needs.open-pr.outputs.head_sha }}';
+            const { owner, repo } = context.repo;
+            if (!prNumber || !headSha) { core.info('Sem PR para merge.'); return; }
+
+            const maxMinutes = 20;
+            const intervalMs = 10000; // 10s
+            const deadline = Date.now() + maxMinutes*60*1000;
+
+            async function checksOk(){
+              // Usa checks API
+              try {
+                const checks = await github.rest.checks.listForRef({ owner, repo, ref: headSha });
+                if (checks.data.total_count === 0) {
+                  core.info('Nenhum check encontrado ainda.');
+                  return false;
+                }
+                const pending = checks.data.check_runs.filter(r => ['queued','in_progress','waiting','requested'].includes(r.status) || r.conclusion === null);
+                if (pending.length){
+                  core.info(`Checks pendentes: ${pending.map(p=>p.name).join(', ')}`);
+                  return false;
+                }
+                const failures = checks.data.check_runs.filter(r => !['success','skipped','neutral'].includes(r.conclusion));
+                if (failures.length){
+                  core.warning(`Falhas detectadas: ${failures.map(f=>f.name+':'+f.conclusion).join(', ')}`);
+                  return 'failed';
+                }
+                return true;
+              } catch(e){
+                core.warning('Erro ao obter checks: '+e.message+' (continuando tentativa)');
+                return false;
+              }
+            }
+
+            while(Date.now() < deadline){
+              const status = await checksOk();
+              if (status === true){
+                core.info('Todos os checks concluídos com sucesso. Tentando merge.');
+                try {
+                  await github.rest.pulls.merge({ owner, repo, pull_number: prNumber, merge_method: 'merge' });
+                  core.info('Merge concluído.');
+                } catch(e){
+                  if (e.status === 405 || e.status === 409){
+                    core.warning('Não foi possível fazer merge automático (conflitos ou proteção). PR permanece aberto.');
+                    return;
+                  }
+                  throw e;
+                }
+                return;
+              } else if (status === 'failed') {
+                core.warning('Checks falharam. Não será feito merge.');
+                return;
+              }
+              await new Promise(r=>setTimeout(r, intervalMs));
+            }
+            core.warning('Timeout aguardando checks. PR permanece aberto.');

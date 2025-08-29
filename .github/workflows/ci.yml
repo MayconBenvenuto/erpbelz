@@ -12,31 +12,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-test:
+  lint-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
-
       - name: Yarn version
         run: yarn --version
-
       - name: Install deps
         run: yarn install --frozen-lockfile
-
+      - name: Type check
+        run: npx tsc --noEmit
       - name: Lint
         run: yarn lint
-
-      - name: Test
-        run: yarn test
-
+      - name: Tests (coverage)
+        run: npx vitest run --coverage --reporter=dot
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+            name: coverage
+            path: coverage
+  build:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+      - name: Install deps
+        run: yarn install --frozen-lockfile
+      - name: Restore Next cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ hashFiles('yarn.lock', 'app/**/*.[jt]s*', 'components/**/*.[jt]s*', 'lib/**/*.[jt]s*') }}
       - name: Build
         run: yarn build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next
