@@ -28,8 +28,13 @@ jobs:
         run: yarn --version
       - name: Install deps
         run: yarn install --frozen-lockfile
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Type check (se houver arquivos TS)
+        run: |
+          if git ls-files '*.ts' '*.tsx' | grep -q '.'; then
+            npx tsc --noEmit
+          else
+            echo 'Sem arquivos TypeScript, pulando type-check.'
+          fi
       - name: Lint
         run: yarn lint
       - name: Tests (coverage)
