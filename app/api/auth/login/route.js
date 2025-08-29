@@ -39,14 +39,19 @@ export async function POST(request) {
 			return handleCORS(NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 }), origin)
 		}
 
-		const token = generateToken(user)
-		const sessionId = crypto.randomUUID()
-		await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, data_login: new Date().toISOString() })
+				const token = generateToken(user)
+				const sessionId = crypto.randomUUID()
+				const nowIso = new Date().toISOString()
+				const expiresIso = new Date(Date.now() + 24*60*60*1000).toISOString()
+				// Inserção compatível com schema produção (sem data_login/data_logout)
+				try {
+					await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, token, criado_em: nowIso, ultimo_refresh: nowIso, expirado_em: expiresIso })
+				} catch (e) {
+					// fallback silencioso
+				}
 
-		// Marca presença inicial do usuário no login (produção usa coluna ultimo_refresh)
-		try {
-			await supabase.from('usuarios').update({ ultimo_refresh: new Date().toISOString() }).eq('id', user.id)
-		} catch {}
+	// Marca presença inicial do usuário no login (produção usa coluna usuarios.ultimo_refresh)
+	try { await supabase.from('usuarios').update({ ultimo_refresh: nowIso }).eq('id', user.id) } catch {}
 
 				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
 

@@ -11,7 +11,7 @@ export async function GET(request) {
 	const auth = await requireAuth(request)
 	if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 
-	let query = supabase.from('sessoes').select('*').order('data_login', { ascending: false })
+	let query = supabase.from('sessoes').select('*').order('criado_em', { ascending: false })
 	if (auth.user.tipo_usuario !== 'gestor') query = query.eq('usuario_id', auth.user.id)
 
 	const { data, error } = await query

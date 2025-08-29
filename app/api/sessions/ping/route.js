@@ -17,21 +17,31 @@ export async function POST(request) {
 
     // Verifica se a sessão ainda está aberta; se já tiver logout, ignora ping
     // Busca sessão explicitamente (evita optional chaining que retorna undefined em produção)
-    const { data: sess } = await supabase
+    let { data: sess } = await supabase
       .from('sessoes')
-      .select('id, data_logout')
+      .select('id, expirado_em')
       .eq('id', sessionId)
       .eq('usuario_id', auth.user.id)
       .single()
 
-  if (!sess || sess.data_logout) {
+    // Fallback: se não existir sessão (edge case produção), cria registro inicial
+    if (!sess) {
+      try {
+        const now = new Date().toISOString()
+        const exp = new Date(Date.now() + 24*60*60*1000).toISOString()
+        const ins = await supabase.from('sessoes').insert({ id: sessionId, usuario_id: auth.user.id, criado_em: now, ultimo_refresh: now, expirado_em: exp }).select('id, expirado_em').single()
+        if (!ins.error) sess = ins.data
+      } catch {}
+    }
+
+	if (!sess || (sess.expirado_em && new Date(sess.expirado_em).getTime() < Date.now())) {
       return handleCORS(NextResponse.json({ ok: false, skipped: true, reason: 'session_closed' }), origin)
     }
 
     const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('sessoes')
-      .update({ ultimo_ping: nowIso })
+      .update({ ultimo_refresh: nowIso })
       .eq('id', sessionId)
       .eq('usuario_id', auth.user.id)
 
