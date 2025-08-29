@@ -4,13 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Clock, TrendingUp, RefreshCw, Target, Activity, BarChart3, AlertTriangle, Layers, TimerReset, LineChart, Bell, Play } from 'lucide-react'
+import { Users, Clock, TrendingUp, RefreshCw, Target, AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh, currentUser, token }) {
   const [refreshing, setRefreshing] = useState(false)
@@ -22,7 +22,15 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
   // Heurística de sessão ativa ainda usada para blocos detalhados (fallback)
   const isSessionActive = useCallback((s) => {
     const now = Date.now()
-    return !s.data_logout && (!s.ultimo_ping || (now - new Date(s.ultimo_ping).getTime()) < 5 * 60 * 1000)
+    // Schema legado: data_logout / ultimo_ping
+    if (s.data_logout) return false
+    if (s.ultimo_ping && (now - new Date(s.ultimo_ping).getTime()) < 5*60*1000) return true
+    // Schema produção: expirado_em / ultimo_refresh
+    if (s.expirado_em && new Date(s.expirado_em).getTime() < now) return false
+    if (s.ultimo_refresh && (now - new Date(s.ultimo_refresh).getTime()) < 5*60*1000) return true
+    // Considerar ativo se não há indicadores de término e criado_em recente (<8h)
+    if (s.criado_em && (now - new Date(s.criado_em).getTime()) < 8*60*60*1000) return true
+    return false
   }, [])
   const [loadingPerf, setLoadingPerf] = useState(false)
   const [start, setStart] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10))
@@ -522,8 +530,14 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())
 
               const calculateSessionTime = (session) => {
-                const start = new Date(session.data_login)
-                const end = session.data_logout ? new Date(session.data_logout) : new Date()
+                const startRaw = session.data_login || session.criado_em || new Date().toISOString()
+                const start = new Date(startRaw)
+                // Fim: data_logout (legado) ou expirado_em passado ou ultimo_refresh enquanto ativa
+                let end
+                if (session.data_logout) end = new Date(session.data_logout)
+                else if (session.expirado_em && new Date(session.expirado_em).getTime() < Date.now()) end = new Date(session.expirado_em)
+                else if (session.ultimo_refresh) end = new Date(session.ultimo_refresh)
+                else end = new Date()
                 const diffMs = end - start
                 const hours = Math.floor(diffMs / (1000 * 60 * 60))
                 const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
@@ -531,8 +545,12 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               }
 
               const totalTimeToday = todaySessions.reduce((acc, session) => {
-                const start = new Date(session.data_login)
-                const end = session.data_logout ? new Date(session.data_logout) : new Date()
+                const start = new Date(session.data_login || session.criado_em || Date.now())
+                let end
+                if (session.data_logout) end = new Date(session.data_logout)
+                else if (session.expirado_em && new Date(session.expirado_em).getTime() < Date.now()) end = new Date(session.expirado_em)
+                else if (session.ultimo_refresh) end = new Date(session.ultimo_refresh)
+                else end = new Date()
                 return acc + (end - start)
               }, 0)
 
@@ -560,11 +578,16 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                       <p className="font-medium text-muted-foreground">Última Sessão</p>
                       {userSessions.length > 0 ? (
                         <div>
-                          <p>{new Date(userSessions[userSessions.length - 1].data_login).toLocaleString('pt-BR')}</p>
+                          <p>{new Date(userSessions[userSessions.length - 1].data_login || userSessions[userSessions.length - 1].criado_em).toLocaleString('pt-BR')}</p>
                           <p className="text-xs text-muted-foreground">Duração: {calculateSessionTime(userSessions[userSessions.length - 1])}</p>
                         </div>
                       ) : (
-                        <p className="text-muted-foreground">Nunca logou</p>
+                        <div className="text-muted-foreground space-y-0.5">
+                          <p>Nunca logou (sem registro em &apos;sessoes&apos;)</p>
+                          {user.ultimo_refresh && (
+                            <p className="text-xs">Atividade recente: {new Date(user.ultimo_refresh).toLocaleString('pt-BR')}</p>
+                          )}
+                        </div>
                       )}
                     </div>
 
