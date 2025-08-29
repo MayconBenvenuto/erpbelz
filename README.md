@@ -1,58 +1,13 @@
 ﻿# Sistema de Gestão - Belz
 
-![CI](https://github.com/MayconBenvenuto/admbelz/actions/workflows/ci.yml/badge.svg)
-![CodeQL](https://github.com/MayconBenvenuto/admbelz/actions/workflows/codeql.yml/badge.svg)
-
-> Segurança: Code Scanning (CodeQL) habilitado. Alertas podem ser vistos em Security > Code scanning alerts. Mantenha o workflow sem `continue-on-error` para quebrar o build em falhas de análise crítica se desejar no futuro.
-
-## 🛠️ CI/CD Profissional e Segurança
-
-Esta base inclui agora um pipeline mais robusto.
-
-### Workflows
-
-| Workflow | Objetivo | Frequência |
-|----------|----------|------------|
-| CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
-| Auto PR (`auto-pr-testes-to-dev.yml`) | Abre PR de `testes` para `dev` e realiza merge automático se checks passarem | Push em `testes` |
-| CodeQL (`codeql.yml`) | Análise SAST de vulnerabilidades | PR / push / semanal |
-| Gitleaks (`gitleaks.yml`) | Varredura de segredos | PR / push main / manual |
-| Alerta Propostas (`stale-proposals-alert.yml`) | Verificação de propostas estagnadas | Diário 09:00 BRT |
-
-### Artefatos e Relatórios
-
-| Item | Local |
-|------|-------|
-| Coverage testes | Artifact `coverage/` (Vitest) |
-| Build Next | Artifact `next-build/` |
-| Scan segredos | SARIF (Security tab) |
-| CodeQL findings | Security > Code scanning |
-
-### Futuras Melhorias Sugeridas
-
-1. Adicionar job de migrações em container Postgres efêmero.
-2. Gerar SBOM (cyclonedx-npm) e publicar como artifact.
-3. Enforce conventional commits (commitlint action).
-4. Medir tamanho de bundle (next build --analyze) e alertar regressões.
-5. Adicionar limites de cobertura (ex. 70%).
-6. Pipeline de deploy (preview em `dev`, produção em `main`).
-
-### Dependabot
-
-Configuração semanal para npm e GitHub Actions em `.github/dependabot.yml` mantendo dependências atualizadas com prefixos de commit padrão.
-
-### Segurança (Pipeline)
-
-Integração CodeQL + Gitleaks reforça análise estática e detecção de segredos antes do merge.
-
-### Como Consumir Cobertura Localmente
+// Documentação de pipelines automatizados removida (workflows GitHub excluídos). Gerar cobertura local:
 
 ```powershell
 npm run test -- --coverage
 Start-Process .\coverage\index.html
 ```
 
-> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
+> Rotacione chaves sensíveis periodicamente; mantenha apenas variáveis necessárias.
 
 ```sql
 -- Atualização de sessões órfãs
@@ -394,13 +349,7 @@ Para melhorar a visibilidade de propostas antigas para analistas e a performance
 
 ## 🌐 Deploy
 
-### Vercel (Recomendado)
-
-```bash
-# 1. Configure as variáveis de ambiente no painel da Vercel
-# 2. Deploy
-vercel --prod
-```
+Recomendado: Vercel (configurar variáveis no painel e usar deploy padrão) ou outra plataforma Node. Não há pipeline automatizado versionado neste momento.
 
 ## Variáveis de ambiente para produção
 
@@ -426,17 +375,17 @@ O sistema inclui:
 
 ## 🤝 Contribuindo
 
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
+Fluxo sugerido:
 
-### 📘 Guias
+1. Branch a partir de `testes`.
+2. Commits pequenos e descritivos.
+3. PR para revisão.
 
-- Guia do Copilot detalhado: `COPILOT_GUIDE.md`
-- Instruções para o Copilot e padrões do projeto: `COPILOT_INSTRUCTIONS.md`
-- Processos de contribuição: `CONTRIBUTING.md`
+Guias:
+
+- `COPILOT_GUIDE.md`
+- `COPILOT_INSTRUCTIONS.md`
+- (Opcional se existir) `CONTRIBUTING.md`
 
 ## 📄 Licença
 
@@ -467,77 +416,6 @@ ALTER TABLE public.sessoes
   ADD COLUMN IF NOT EXISTS ultimo_ping TIMESTAMPTZ;
 
 -- Backfill básico
-
-## 🛠️ CI/CD Profissional e Segurança
-
-Esta base inclui agora um pipeline mais robusto.
-
-### Workflows
-
-| Workflow | Objetivo | Frequência |
-|----------|----------|------------|
-| CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
-## 🛠️ CI/CD Profissional e Segurança
-
-Esta base inclui agora um pipeline mais robusto:
-
-### Workflows
-
-| Workflow | Objetivo | Frequência |
-|----------|----------|------------|
-| CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
-| Auto PR (`auto-pr-testes-to-dev.yml`) | Abre PR de `testes` para `dev` e realiza merge automático se checks passarem | Push em `testes` |
-| CodeQL (`codeql.yml`) | Análise SAST de vulnerabilidades | PR / push / semanal |
-| Gitleaks (`gitleaks.yml`) | Varredura de segredos | PR / push main / manual |
-| Alerta Propostas (`stale-proposals-alert.yml`) | Verificação de propostas estagnadas | Diário 09:00 BRT |
-
-### Artefatos e Relatórios
-
-| Item | Local |
-|------|-------|
-| Coverage testes | Artifact `coverage/` (Vitest) |
-| Build Next | Artifact `next-build/` |
-| Scan segredos | SARIF (Security tab) |
-| CodeQL findings | Security > Code scanning |
-
-### Futuras Melhorias Sugeridas (CI/CD)
-
-1. Adicionar job de migrações em container Postgres efêmero.
-2. Gerar SBOM (cyclonedx-npm) e publicar como artifact.
-3. Enforce conventional commits (commitlint action).
-4. Medir tamanho de bundle (next build --analyze) e alertar regressões.
-5. Adicionar limites de cobertura (ex. 70%).
-6. Pipeline de deploy (preview em `dev`, produção em `main`).
-
-### Dependabot
-
-Configuração semanal para npm e GitHub Actions em `.github/dependabot.yml` mantendo dependências atualizadas.
-
-### Segurança (Pipelines)
-
-Integração CodeQL + Gitleaks reforça análise estática e detecção de segredos antes do merge.
-
-### Reabrir Relatório de Cobertura
-
-```powershell
-Start-Process .\coverage\index.html
-```
-
-> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
-
-```sql
-UPDATE public.sessoes
-SET ultimo_ping = data_logout
-WHERE ultimo_ping IS NULL AND data_logout IS NOT NULL;
-
-UPDATE public.sessoes
-SET ultimo_ping = data_login
-WHERE ultimo_ping IS NULL;
-
--- Índices úteis
-CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_ping DESC NULLS LAST);
-CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
-```
 
 ### Cálculo de usuários “online”
 

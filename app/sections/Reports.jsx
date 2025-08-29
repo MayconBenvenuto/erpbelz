@@ -247,8 +247,8 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               )}
 
               <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
-                <strong>Funcionamento automático:</strong> O sistema executa verificação diária às 9:00 BRT via GitHub Actions. 
-                Propostas em análise entre 48h-72h recebem notificação por e-mail para todos os gestores.
+                <strong>Agendamento:</strong> A verificação pode ser disparada manualmente aqui ou por um serviço de cron externo (ex.: cron-job.org) configurado para 09:00 BRT.
+                Propostas em análise entre 48h-72h geram notificação por e-mail para todos os gestores.
               </div>
             </CardContent>
           </Card>
