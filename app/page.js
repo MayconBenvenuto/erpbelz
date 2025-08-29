@@ -171,7 +171,7 @@ export default function App() {
         // endpoint retorna { data: [], ... }
         if (Array.isArray(json.data)) setSolicitacoes(json.data)
       }
-      if (needsAdminData) {
+  if (needsAdminData) {
         const usersRes = responses[idx++]
         if (usersRes?.ok) setUsers(await usersRes.json())
       }
@@ -182,11 +182,28 @@ export default function App() {
       if (needsAdminData) {
         const sessionsRes = responses[idx++]
         if (sessionsRes?.ok) setSessions(await sessionsRes.json())
+        // Carrega presença (online) imediatamente após dados administrativos
+        try {
+          const onlineRes = await fetch('/api/users/online', { headers: authHeaders, ...common })
+          if (onlineRes.ok) {
+            const onlineJson = await onlineRes.json()
+            // Anexa campo transient isOnline aos usuarios (não persiste)
+            if (Array.isArray(onlineJson.data)) {
+              setUsers(prev => prev.map(u => ({ ...u, isOnline: onlineJson.data.some(o => String(o.id) === String(u.id)) })))
+            }
+          }
+        } catch {}
       }
+    // Atualiza ultimo_refresh otimista no cliente para refletir atividade (será consolidado via ping)
+      try {
+        if (currentUser) {
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ultimo_refresh: new Date().toISOString() } : u))
+        }
+      } catch {}
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     }
-  }, [token, currentUser?.tipo_usuario])
+  }, [token, currentUser])
 
   // Debounce simples para evitar múltiplos loadData encadeados (ex: criar + atualizar status)
   const loadDataDebouncedRef = useRef({ timer: null, pending: false })
@@ -377,6 +394,25 @@ export default function App() {
       es.onerror = () => {
         try { es.close() } catch {}
       }
+    } catch {}
+    return () => { try { es && es.close() } catch {} }
+  }, [currentUser])
+
+  // SSE presença online em tempo quase real (gestor)
+  useEffect(() => {
+    if (!currentUser || currentUser.tipo_usuario !== 'gestor') return
+    let es
+    try {
+      es = new EventSource('/api/users/online/events')
+      es.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data)
+          if (msg?.type === 'online_presence' && Array.isArray(msg.ids)) {
+            setUsers(prev => prev.map(u => ({ ...u, isOnline: msg.ids.some(id => String(id) === String(u.id)) })))
+          }
+        } catch {}
+      }
+      es.onerror = () => { try { es.close() } catch {} }
     } catch {}
     return () => { try { es && es.close() } catch {} }
   }, [currentUser])

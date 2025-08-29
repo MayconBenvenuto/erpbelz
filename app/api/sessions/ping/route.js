@@ -16,14 +16,15 @@ export async function POST(request) {
     if (!sessionId) return handleCORS(NextResponse.json({ error: 'sessionId requerido' }, { status: 400 }), origin)
 
     // Verifica se a sessão ainda está aberta; se já tiver logout, ignora ping
+    // Busca sessão explicitamente (evita optional chaining que retorna undefined em produção)
     const { data: sess } = await supabase
       .from('sessoes')
       .select('id, data_logout')
       .eq('id', sessionId)
       .eq('usuario_id', auth.user.id)
-      .maybeSingle?.() || {}
+      .single()
 
-    if (!sess || sess.data_logout) {
+  if (!sess || sess.data_logout) {
       return handleCORS(NextResponse.json({ ok: false, skipped: true, reason: 'session_closed' }), origin)
     }
 
@@ -34,8 +35,8 @@ export async function POST(request) {
       .eq('id', sessionId)
       .eq('usuario_id', auth.user.id)
 
-    // Atualiza last_active_at do usuário (presença)
-    try { await supabase.from('usuarios').update({ last_active_at: nowIso }).eq('id', auth.user.id) } catch {}
+  // Atualiza presença do usuário usando coluna ultimo_refresh (schema produção)
+  try { await supabase.from('usuarios').update({ ultimo_refresh: nowIso }).eq('id', auth.user.id) } catch {}
 
     if (error) {
       return handleCORS(NextResponse.json({ ok: false, skipped: true }), origin)
