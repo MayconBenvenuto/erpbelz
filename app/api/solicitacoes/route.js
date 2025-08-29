@@ -30,13 +30,13 @@ export async function GET(req) {
     let data = []
     let count = 0
     let error = null
-    if (user.tipo === 'gestor') {
+    if (user.tipo === 'gestor' || user.tipo === 'gerente') {
       const r = await supabase.from('solicitacoes').select('*', { count: 'exact' }).order('codigo', { ascending: true }).range(from, to)
       data = r.data || []; count = r.count || 0; error = r.error
     } else if (user.tipo === 'consultor') {
       const r = await supabase.from('solicitacoes').select('*', { count: 'exact' }).eq('criado_por', user.userId).order('codigo', { ascending: true }).range(from, to)
       data = r.data || []; count = r.count || 0; error = r.error
-    } else if (user.tipo === 'analista') {
+    } else if (user.tipo === 'analista_movimentacao') {
       // Unassigned + assigned to me
       const r1 = await supabase.from('solicitacoes').select('*').is('atendido_por', null)
       const r2 = await supabase.from('solicitacoes').select('*').eq('atendido_por', user.userId)
@@ -46,6 +46,8 @@ export async function GET(req) {
       const arr = Array.from(map.values()).sort((a,b)=> (a.codigo||'') > (b.codigo||'') ? 1 : -1)
       count = arr.length
       data = arr.slice(from, to+1)
+    } else if (user.tipo === 'analista_implantacao') {
+      return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
     }
     if (error) throw error
     return NextResponse.json({ data, page, pageSize, total: count })

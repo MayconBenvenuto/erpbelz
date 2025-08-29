@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import { z } from 'zod'
 import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
 import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
+import { hasPermission } from '@/lib/rbac'
 import { sendEmail } from '@/lib/email'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -18,16 +19,22 @@ export async function GET(request) {
 	if (auth.error) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 	}
+	// Bloqueia papéis sem permissão de visualizar propostas
+	if (!hasPermission(auth.user,'viewPropostas')) {
+		return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
+	}
 
 	const buildBase = () => {
 		let q = supabase.from('propostas').select('*')
 		if (auth.user.tipo_usuario === 'consultor') {
 			// Consultor: vê apenas propostas que criou ou cujo email de consultor é o seu
 			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
-		} else if (auth.user.tipo_usuario === 'analista') {
-			// Analista: precisa ver propostas para poder assumir (não atribuídas), as que criou e as que já assumiu
-			// OR com atendido_por.is.null permite visualizar não atribuídas
-			q = q.or(`criado_por.eq.${auth.user.id},atendido_por.eq.${auth.user.id},atendido_por.is.null`)
+		} else if (auth.user.tipo_usuario === 'analista_implantacao') {
+		// Analista de implantação: mesma lógica do antigo analista
+		q = q.or(`criado_por.eq.${auth.user.id},atendido_por.eq.${auth.user.id},atendido_por.is.null`)
+		} else if (auth.user.tipo_usuario === 'gerente') {
+		// Gerente enxerga tudo (como gestor porém sem permissão de gestão de usuários)
+		// nada a adicionar
 		}
 		return q
 	}
@@ -91,6 +98,9 @@ export async function POST(request) {
 	const auth = await requireAuth(request)
 	if (auth.error) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+	}
+	if (!hasPermission(auth.user,'viewPropostas')) {
+		return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
 	}
 	// Antes: consultor não podia criar. Agora permitido (consultor é quem abre a proposta).
 	// Regras adicionais: se for consultor, sempre força status inicial 'em análise' para evitar criação já implantada

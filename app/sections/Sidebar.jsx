@@ -3,7 +3,7 @@
 /**
  * Sidebar
  * @param {{
- *  currentUser: { id: string, nome: string, tipo_usuario: 'gestor'|'analista'|'consultor' },
+ *  currentUser: { id: string, nome: string, tipo_usuario: string },
  *  activeTab: 'propostas'|'dashboard'|'usuarios'|'relatorios',
  *  setActiveTab: (tab: string) => void,
  *  onRefresh: () => void,
@@ -15,6 +15,7 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat } from 'lucide-react'
+import { hasPermission } from '@/lib/rbac'
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
@@ -45,8 +46,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <span className="font-medium">Dashboard</span>
           </button>
 
-          {/* Propostas agora acessível para consultor (cria propostas) */}
-          {true && (
+          {/* Propostas */}
+          {hasPermission(currentUser,'viewPropostas') && (
             <button
               onClick={() => setActiveTab('propostas')}
               aria-current={activeTab === 'propostas' ? 'page' : undefined}
@@ -61,7 +62,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
 
           {/* Seção Implantação removida */}
 
-          {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
+          {hasPermission(currentUser,'viewMovimentacao') && (
             <button
               onClick={() => setActiveTab('movimentacao')}
               aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
@@ -74,7 +75,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             </button>
           )}
 
-          {currentUser.tipo_usuario === 'gestor' && (
+          {hasPermission(currentUser,'manageUsers') && (
             <>
               <button
                 onClick={() => setActiveTab('usuarios')}
