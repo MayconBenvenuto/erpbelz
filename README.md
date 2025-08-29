@@ -1,4 +1,73 @@
-# Sistema de Gestão - Belz
+﻿# Sistema de Gestão - Belz
+
+![CI](https://github.com/MayconBenvenuto/admbelz/actions/workflows/ci.yml/badge.svg)
+![CodeQL](https://github.com/MayconBenvenuto/admbelz/actions/workflows/codeql.yml/badge.svg)
+
+> Segurança: Code Scanning (CodeQL) habilitado. Alertas podem ser vistos em Security > Code scanning alerts. Mantenha o workflow sem `continue-on-error` para quebrar o build em falhas de análise crítica se desejar no futuro.
+
+## 🛠️ CI/CD Profissional e Segurança
+
+Esta base inclui agora um pipeline mais robusto.
+
+### Workflows
+
+| Workflow | Objetivo | Frequência |
+|----------|----------|------------|
+| CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
+| Auto PR (`auto-pr-testes-to-dev.yml`) | Abre PR de `testes` para `dev` e realiza merge automático se checks passarem | Push em `testes` |
+| CodeQL (`codeql.yml`) | Análise SAST de vulnerabilidades | PR / push / semanal |
+| Gitleaks (`gitleaks.yml`) | Varredura de segredos | PR / push main / manual |
+| Alerta Propostas (`stale-proposals-alert.yml`) | Verificação de propostas estagnadas | Diário 09:00 BRT |
+
+### Artefatos e Relatórios
+
+| Item | Local |
+|------|-------|
+| Coverage testes | Artifact `coverage/` (Vitest) |
+| Build Next | Artifact `next-build/` |
+| Scan segredos | SARIF (Security tab) |
+| CodeQL findings | Security > Code scanning |
+
+### Futuras Melhorias Sugeridas
+
+1. Adicionar job de migrações em container Postgres efêmero.
+2. Gerar SBOM (cyclonedx-npm) e publicar como artifact.
+3. Enforce conventional commits (commitlint action).
+4. Medir tamanho de bundle (next build --analyze) e alertar regressões.
+5. Adicionar limites de cobertura (ex. 70%).
+6. Pipeline de deploy (preview em `dev`, produção em `main`).
+
+### Dependabot
+
+Configuração semanal para npm e GitHub Actions em `.github/dependabot.yml` mantendo dependências atualizadas com prefixos de commit padrão.
+
+### Segurança (Pipeline)
+
+Integração CodeQL + Gitleaks reforça análise estática e detecção de segredos antes do merge.
+
+### Como Consumir Cobertura Localmente
+
+```powershell
+npm run test -- --coverage
+Start-Process .\coverage\index.html
+```
+
+> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
+
+```sql
+-- Atualização de sessões órfãs
+UPDATE public.sessoes
+SET ultimo_ping = data_logout
+WHERE ultimo_ping IS NULL AND data_logout IS NOT NULL;
+
+UPDATE public.sessoes
+SET ultimo_ping = data_login
+WHERE ultimo_ping IS NULL;
+
+-- Índices úteis
+CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_ping DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
+```
 
 Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
 
@@ -408,44 +477,12 @@ Esta base inclui agora um pipeline mais robusto.
 | Workflow | Objetivo | Frequência |
 |----------|----------|------------|
 | CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
-| Auto PR (`auto-pr-testes-to-dev.yml`) | Abre PR `testes` -> `dev` e auto-merge se checks passarem | Push em `testes` |
-| CodeQL (`codeql.yml`) | Análise SAST | PR / push / semanal |
-| Gitleaks (`gitleaks.yml`) | Scan de segredos | PR / push main / manual |
-| Alerta Propostas (`stale-proposals-alert.yml`) | Propostas estagnadas | Diário 09:00 BRT |
+## 🛠️ CI/CD Profissional e Segurança
 
-### Artefatos e Relatórios
+Esta base inclui agora um pipeline mais robusto:
 
-| Item | Local |
-|------|-------|
-| Coverage testes | Artifact `coverage/` |
-| Build Next | Artifact `next-build/` |
-| Scan segredos | SARIF (Security tab) |
-| CodeQL Findings | Security > Code scanning |
+### Workflows
 
-### Futuras Melhorias Sugeridas
-
-1. Migrações em Postgres efêmero
-2. SBOM (cyclonedx-npm) como artifact
-3. Conventional commits (commitlint) + changelog automatizado
-4. Gate de cobertura (≥70%)
-5. Análise de bundle (next build --analyze)
-6. Pipeline de deploy preview/prod
-
-### Segurança Complementar
-
-CodeQL + Gitleaks reforçam análise estática e evitam vazamento de segredos.
-
-### Como Consumir Cobertura Localmente
-
-```powershell
-npm run test -- --coverage
-Start-Process .\\coverage\\index.html
-```
-
-> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
-\n+## 🛠️ CI/CD Profissional e Segurança
-\n+Esta base inclui agora um pipeline mais robusto:
-\n+### Workflows
 | Workflow | Objetivo | Frequência |
 |----------|----------|------------|
 | CI (`ci.yml`) | Lint, type-check, testes com coverage, build e artefatos | PR / push / manual |
@@ -453,30 +490,42 @@ Start-Process .\\coverage\\index.html
 | CodeQL (`codeql.yml`) | Análise SAST de vulnerabilidades | PR / push / semanal |
 | Gitleaks (`gitleaks.yml`) | Varredura de segredos | PR / push main / manual |
 | Alerta Propostas (`stale-proposals-alert.yml`) | Verificação de propostas estagnadas | Diário 09:00 BRT |
-\n+### Artefatos e Relatórios
+
+### Artefatos e Relatórios
+
 | Item | Local |
 |------|-------|
 | Coverage testes | Artifact `coverage/` (Vitest) |
 | Build Next | Artifact `next-build/` |
 | Scan segredos | SARIF (Security tab) |
 | CodeQL findings | Security > Code scanning |
-\n+### Futuras Melhorias Sugeridas
+
+### Futuras Melhorias Sugeridas (CI/CD)
+
 1. Adicionar job de migrações em container Postgres efêmero.
 2. Gerar SBOM (cyclonedx-npm) e publicar como artifact.
 3. Enforce conventional commits (commitlint action).
 4. Medir tamanho de bundle (next build --analyze) e alertar regressões.
 5. Adicionar limites de cobertura (ex. 70%).
 6. Pipeline de deploy (preview em `dev`, produção em `main`).
-\n+### Dependabot
-Configuração semanal para npm e GitHub Actions em `.github/dependabot.yml` mantendo dependências atualizadas com prefixos de commit padrão.
-\n+### Segurança
+
+### Dependabot
+
+Configuração semanal para npm e GitHub Actions em `.github/dependabot.yml` mantendo dependências atualizadas.
+
+### Segurança (Pipelines)
+
 Integração CodeQL + Gitleaks reforça análise estática e detecção de segredos antes do merge.
-\n+### Como Consumir Cobertura Localmente
+
+### Reabrir Relatório de Cobertura
+
 ```powershell
-npm run test -- --coverage
 Start-Process .\coverage\index.html
 ```
-\n+> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
+
+> Mantenha os secrets mínimos e rotacione chaves sensíveis periodicamente.
+
+```sql
 UPDATE public.sessoes
 SET ultimo_ping = data_logout
 WHERE ultimo_ping IS NULL AND data_logout IS NOT NULL;
