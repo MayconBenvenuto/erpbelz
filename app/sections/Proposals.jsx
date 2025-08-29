@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -49,6 +49,8 @@ function ProposalsInner({
   // SLA & resumo com polling + alertas
   const [slaSummary, setSlaSummary] = useState(null)
   const SLA_THRESHOLD_HOURS = 8
+  const AGE_ALERT_HOURS = 24
+  const AGE_STRONG_ALERT_HOURS = 48
   const slaAlertedRef = useRef(new Set())
   useEffect(() => {
     let stopped = false
@@ -172,19 +174,20 @@ function ProposalsInner({
   const filteredProposals = useMemo(() => {
     const qn = normalize(filters.q)
     const list = proposalsMerged.filter(p => {
-      const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
-      const cnpjFmt = formatCNPJ(p.cnpj)
-      const consultor = normalize(p.consultor)
-      const matchText = !qn || normalize(cnpjFmt).includes(qn) || cnpjDigits.includes(filters.q.replace(/\D/g, '')) || consultor.includes(qn)
-      const matchStatus = filters.status === 'todos' || normalize(p.status) === normalize(filters.status)
-      const matchOperadora = filters.operadora === 'todas' || normalize(p.operadora) === normalize(filters.operadora)
-      const matchAnalista = currentUser.tipo_usuario !== 'gestor' || filters.analista === 'todos' || String(p.criado_por) === String(filters.analista)
-      const matchConsultor = currentUser.tipo_usuario !== 'gestor' || filters.consultor === 'todos' || normalize(p.consultor) === normalize(filters.consultor)
-      const matchCodigo = !qn || (p.codigo && String(p.codigo).toLowerCase().includes(qn))
-      const matchFree = !onlyFree || !p.atendido_por
-      return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor && matchFree
+      // Busca
+      if (qn) {
+        const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
+        const haystack = [cnpjDigits, p.consultor, p.codigo, p.operadora, p.cliente_nome].filter(Boolean).map(normalize)
+        if (!haystack.some(h => h.includes(qn))) return false
+      }
+      if (filters.status !== 'todos' && p.status !== filters.status) return false
+      if (filters.operadora !== 'todas' && p.operadora !== filters.operadora) return false
+      if (currentUser.tipo_usuario === 'gestor' && filters.analista !== 'todos' && String(p.criado_por) !== String(filters.analista)) return false
+      if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos' && p.consultor !== filters.consultor) return false
+      if (onlyFree && currentUser.tipo_usuario === 'analista' && p.atendido_por) return false
+      return true
     })
-    const sorted = list.slice().sort((a,b) => {
+    const sorted = list.slice().sort((a, b) => {
       if (currentUser.tipo_usuario === 'analista') {
         const aFree = !a.atendido_por
         const bFree = !b.atendido_por
@@ -195,9 +198,10 @@ function ProposalsInner({
       if (va !== vb) return vidasSortAsc ? va - vb : vb - va
       const ca = a?.codigo || ''
       const cb = b?.codigo || ''
-      if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
-      if (ca) return -1
-      if (cb) return 1
+      if (ca && cb) {
+        const cmp = ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
+        if (cmp !== 0) return cmp
+      }
       const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
       const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
       return da - db
@@ -210,16 +214,40 @@ function ProposalsInner({
     if (!filteredProposals.length) return
     if (currentUser.tipo_usuario === 'consultor') return
     const now = Date.now()
+    // Persistência leve para não repetir alertas em page reload: sessionStorage
+    let persisted = {}
+    try { persisted = JSON.parse(sessionStorage.getItem('crm:proposalAlerts')||'{}') } catch {}
+    let changed = false
     filteredProposals.forEach(p => {
       if (p.atendido_por) return
       const created = new Date(p.criado_em).getTime()
       if (isNaN(created)) return
       const hours = (now - created)/1000/3600
+      // SLA básico
       if (hours >= SLA_THRESHOLD_HOURS && !slaAlertedRef.current.has(p.id)) {
         slaAlertedRef.current.add(p.id)
         toast.error(`SLA estourado: proposta ${p.codigo || p.id.slice(0,8)} aguardando há ${hours.toFixed(1)}h`)
+        persisted[p.id] = { lastAlert: Date.now(), type: 'sla' }
+        changed = true
+      }
+      // Aging > 24h informativo
+      if (hours >= AGE_ALERT_HOURS && !slaAlertedRef.current.has('age:'+p.id)) {
+        slaAlertedRef.current.add('age:'+p.id)
+        toast.info(`Proposta ${p.codigo || p.id.slice(0,8)} parada há ${Math.floor(hours)}h`)        
+        persisted[p.id] = { lastAlert: Date.now(), type: 'age24' }
+        changed = true
+      }
+      // Aging forte > 48h
+      if (hours >= AGE_STRONG_ALERT_HOURS && !slaAlertedRef.current.has('ageStrong:'+p.id)) {
+        slaAlertedRef.current.add('ageStrong:'+p.id)
+        toast.error(`Proposta ${p.codigo || p.id.slice(0,8)} parada há ${Math.floor(hours)}h (atenção)`)        
+        persisted[p.id] = { lastAlert: Date.now(), type: 'age48' }
+        changed = true
       }
     })
+    if (changed) {
+      try { sessionStorage.setItem('crm:proposalAlerts', JSON.stringify(persisted)) } catch {}
+  }
   }, [filteredProposals, currentUser.tipo_usuario])
 
   // Limpa cache de alertas para propostas removidas
@@ -672,16 +700,21 @@ function ProposalsInner({
             </div>
           </div>
 
-          {/* Kanban */}
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          {/* Kanban melhorado */}
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
             {statusOptions.map(status => (
-              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px]">
-                <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize">
+              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden">
+                <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 bg-card z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border">
                   <span>{status}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{groupedByStatus[status]?.length || 0}</span>
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{groupedByStatus[status]?.length || 0}</span>
                 </div>
-                <div className="p-2 space-y-2 overflow-y-auto">
-                  {groupedByStatus[status]?.map(p => {
+                <div className="p-2 space-y-2 overflow-y-auto custom-scrollbar">
+                  {(!groupedByStatus[status] || groupedByStatus[status].length === 0) && (
+                    <div className="text-[11px] text-muted-foreground italic px-2 py-4 border border-dashed rounded bg-background/40">
+                      Nenhuma proposta
+                    </div>
+                  )}
+                  {groupedByStatus[status]?.map((p) => {
                     const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
                       currentUser.tipo_usuario === 'gestor' || (currentUser.tipo_usuario === 'analista' && isHandler)
@@ -689,10 +722,29 @@ function ProposalsInner({
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
                     const isLate = isWaiting && ageHours(p) > SLA_THRESHOLD_HOURS
+                    const ageClass = p.horas_em_analise >= 48 ? 'before:bg-gradient-to-b before:from-red-500 before:to-red-700' : p.horas_em_analise >= 24 ? 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600' : 'before:bg-gradient-to-b before:from-transparent before:to-transparent'
                     return (
-                      <div key={p.id} className={`rounded p-2 bg-background text-xs space-y-1 border relative group ${isWaiting ? (isLate ? 'border-red-400 shadow-[0_0_0_1px_rgba(248,113,113,0.45)]' : 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]') : p.status === 'implantado' ? 'border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]' : 'border-border'}`}>
+                      <div key={p.id} className={`rounded p-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'border-red-400 shadow-[0_0_0_1px_rgba(248,113,113,0.45)]' : 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]') : p.status === 'implantado' ? 'border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]' : 'border-border'} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}>
+                        {/* zebra effect via idx */}
+                        <div className="absolute inset-0 pointer-events-none rounded opacity-0 group-hover:opacity-5 transition-opacity bg-primary" />
                         <div className="font-medium truncate flex items-center gap-1" title={p.consultor}>
-                          <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded">{p.codigo || '—'}</span>
+                          <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded flex items-center gap-1">
+                            {p.codigo || '—'}
+                            {typeof p.horas_em_analise === 'number' && (
+                              <span
+                                title={`Horas em análise: ${p.horas_em_analise}`}
+                                className={
+                                  `inline-flex items-center gap-0.5 rounded px-1 text-[9px] font-semibold border `+
+                                  (p.horas_em_analise >= AGE_STRONG_ALERT_HOURS ? 'bg-red-600 text-white border-red-700' :
+                                   p.horas_em_analise >= AGE_ALERT_HOURS ? 'bg-amber-500 text-black border-amber-600' :
+                                   'bg-gray-200 text-gray-700 border-gray-300')
+                                }
+                              >
+                                <Clock className="w-3 h-3" />
+                                {p.horas_em_analise >= 48 ? `${Math.floor(p.horas_em_analise/24)}d` : `${p.horas_em_analise}h`}
+                              </span>
+                            )}
+                          </span>
                           <span className="truncate capitalize">{p.operadora}</span>
                           {isWaiting && (
                             <span className={`ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded ${isLate ? 'bg-red-600' : 'bg-amber-500'} text-white font-semibold tracking-wide uppercase`}>
@@ -719,7 +771,7 @@ function ProposalsInner({
                             {p.cliente_email && <span className="truncate max-w-[140px]" title={p.cliente_email}>({p.cliente_email})</span>}
                           </div>
                         )}
-                        {/* Tags placeholder (carregadas no modal) */}
+                        {/* Ações */}
                         <div className="flex gap-1 flex-wrap items-center pt-1">
                           <button type="button" onClick={() => openDetails(p.id)} className="px-2 py-0.5 text-[11px] rounded bg-secondary text-secondary-foreground hover:brightness-105">Ver detalhes</button>
                           {canEdit && (
@@ -744,7 +796,6 @@ function ProposalsInner({
                           {currentUser.tipo_usuario === 'gestor' && (
                             <button type="button" onClick={() => openEditDialog(p)} className="px-2 py-0.5 text-[11px] rounded border bg-background hover:bg-muted">Editar</button>
                           )}
-                          {/* Claim para analista: aparece se não houver atendido_por */}
                           {currentUser.tipo_usuario === 'analista' && !p.atendido_por && (
                             <button
                               type="button"
@@ -761,7 +812,6 @@ function ProposalsInner({
                             </button>
                           )}
                           {(() => {
-                            // Fallback: se ainda não há atendido_por mas a proposta está implantada, usar criador se for analista
                             let handlerId = p.atendido_por
                             if (!handlerId && p.status === 'implantado') {
                               const creatorIsAnalyst = users.some(u => u.id === p.criado_por && u.tipo_usuario === 'analista')
@@ -781,9 +831,6 @@ function ProposalsInner({
                       </div>
                     )
                   })}
-                  {groupedByStatus[status]?.length === 0 && (
-                    <p className="text-[11px] text-muted-foreground text-center py-4">Sem propostas</p>
-                  )}
                 </div>
               </div>
             ))}
@@ -861,23 +908,43 @@ function ProposalsInner({
             </div>
             {detailLoading && <p className="text-sm">Carregando...</p>}
             {!detailLoading && detail && (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div><span className="font-medium">CNPJ:</span> {formatCNPJ(detail.cnpj)}</div>
-                  <div><span className="font-medium">Operadora:</span> {detail.operadora}</div>
-                  <div><span className="font-medium">Consultor:</span> {detail.consultor}</div>
-                  <div><span className="font-medium">Email Consultor:</span> {detail.consultor_email || '—'}</div>
+              <div className="space-y-6 text-sm">
+                {/* Blocos superiores: Consultor / Analista */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-md border bg-muted/20 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Consultor</h4>
+                    <div><span className="font-medium">Nome:</span> {detail.consultor || '—'}</div>
+                    <div><span className="font-medium">Email:</span> {detail.consultor_email || '—'}</div>
                     <div><span className="font-medium">Cliente:</span> {detail.cliente_nome || '—'}</div>
                     <div><span className="font-medium">Email Cliente:</span> {detail.cliente_email || '—'}</div>
-                    <div><span className="font-medium">Responsável Atual:</span> {(detail.atendido_por && (users.find(u => u.id === detail.atendido_por)?.nome)) || '—'}</div>
-                    <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
-                  <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
-                  <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>
-                  <div><span className="font-medium">Status:</span> {detail.status}</div>
-                  <div className="col-span-2"><span className="font-medium">Previsão Implantação:</span> {detail.previsao_implantacao ? new Date(detail.previsao_implantacao).toLocaleDateString('pt-BR') : '—'}</div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Observações do Cliente:</span>
-                    <p className="text-xs mt-1 whitespace-pre-wrap border rounded p-2 bg-muted/30 min-h-[40px]">{detail.observacoes_cliente || '—'}</p>
+                  </div>
+                  <div className="p-4 rounded-md border bg-muted/20 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Analista</h4>
+                    {(() => {
+                      const nomeResp = detail.atendido_por ? (users.find(u => u.id === detail.atendido_por)?.nome || '—') : '—'
+                      return (
+                        <>
+                          <div><span className="font-medium">Responsável Atual:</span> {nomeResp}</div>
+                          <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
+                          <div><span className="font-medium">Status:</span> {detail.status}</div>
+                          <div><span className="font-medium">Previsão Implantação:</span> {detail.previsao_implantacao ? new Date(detail.previsao_implantacao).toLocaleDateString('pt-BR') : '—'}</div>
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+                {/* Dados gerais */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-md border bg-background/50 space-y-1">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Dados da Proposta</h4>
+                    <div><span className="font-medium">CNPJ:</span> {formatCNPJ(detail.cnpj)}</div>
+                    <div><span className="font-medium">Operadora:</span> {detail.operadora}</div>
+                    <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
+                    <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>
+                  </div>
+                  <div className="p-4 rounded-md border bg-background/50 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Observações Cliente</h4>
+                    <p className="text-xs whitespace-pre-wrap border rounded p-2 bg-muted/30 min-h-[60px]">{detail.observacoes_cliente || '—'}</p>
                   </div>
                 </div>
                 {/* Tags & Notas */}

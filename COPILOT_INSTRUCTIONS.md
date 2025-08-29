@@ -10,7 +10,7 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## Atualizações recentes (20/08/2025)
+## Atualizações recentes (29/08/2025)
 
 - Backend Next-only: todas as rotas `/api/*` são servidas pelo App Router; não há mais proxy ou servidor Nest separado.
 - Propostas com Código sequencial no formato `PRP0000`:
@@ -23,6 +23,11 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 - E-mails de notificação de mudança de status incluem apenas o Código da proposta (PRP...), nunca o UUID.
 - Mantido: API padronizada para PATCH; analista só altera status das próprias propostas; tooltip de Razão Social no CNPJ via `/api/validate-cnpj`; filtros persistentes por usuário.
 - Migration anterior: `scripts/migrations/2025-08-18-add-consultor-email.sql` adiciona `consultor_email` obrigatório às propostas.
+- Alerta automático de propostas em análise ≥24h (endpoint `/api/alerts/proposals/stale`) com configuração de horas (`STALE_PROPOSAL_ALERT_HOURS`) e e-mail gestor primário (`PRIMARY_GESTOR_EMAIL`).
+- Enriquecimento de `/api/proposals` com `horas_em_analise` e `dias_em_analise` (reduz recomputo no cliente).
+- Board de propostas: badges de idade (24h / 48h), destaque visual progressivo e toasts de SLA.
+- Dashboard gestor: remoção de funil e heatmap; adição de novos cards (Status ABS/% toggle, Top Operadoras com conversão, Aging Buckets, SLA Assunção, Evolução 7 Dias, Value Buckets, Forecast Meta, Ranking Analistas).
+- Dashboard gestor: métricas macro de Movimentações (total, abertas/andamento, concluídas/canceladas, atrasadas, distribuição de status e SLA médio de assunção) adicionadas.
 
 ### Sessão do Navegador e Heartbeat
 
@@ -416,16 +421,30 @@ Notas de UI:
 - Edição de status inline via Select na própria célula com spinner por linha: analistas apenas nas próprias propostas; gestores em todas.
 - Tela Propostas (analista): exibe card de “Meta” com progresso e valor faltante.
 
-### 📈 Dashboard e Métricas
+### 📈 Dashboard e Métricas (Visão Atual)
 
-- **Cards de resumo**: Total de propostas, por status, valores
-- **Gráficos**: Distribuição por operadora e status
-- **Progresso**: Metas individuais vs atingido
-- **Auto-refresh**: Atualização automática dos dados
+Cards/Gráficos Ativos (gestor):
 
-- **Ordenação**: Alternar asc/desc em “Propostas por Status” e “Top Operadoras”.
-- **Filtros persistentes**: Status e Consultor com chips removíveis e botão “Limpar filtros”.
-- **UI**: Card “Usuários Ativos” removido; grid ajustada; meta com rótulo “Meta - R$ 200.000,00”.
+- Status (ABS/% toggle) – barras horizontais com contagem e proporção.
+- Top Operadoras (ABS/% + Conversão) – inclui taxa `implantado / total`.
+- Aging Buckets – distribuição de propostas por faixas de idade em análise.
+- SLA Assunção – média, p95, % ≤8h, % ≤24h até primeira ação.
+- Evolução 7 Dias – sparkline de novos registros / implantações.
+- Value Buckets – distribuição de faixas de `valor` (ticket mix).
+- Forecast Meta – projeção linear mês corrido vs meta alvo.
+- Ranking Analistas – desempenho (implantações / conversão / destaque visual).
+- Movimentações: total, abertas/andamento, concluídas, canceladas, atrasadas (%), distribuição de status e SLA médio de assunção.
+
+Removidos/Substituídos:
+
+- Funil estático → substituído pelo conjunto Status + Conversão + Forecast.
+- Heatmap → substituído por Aging + Evolução 7 Dias (mais acionável).
+
+Padrões:
+
+- Toggle ABS/% persistido (localStorage)
+- Todos os cálculos client-side usando o payload atual de propostas (evitar round trips)
+- Evitar loops aninhados: usar agregações lineares O(n)
 
 ### 👥 Gestão de Usuários (Gestor)
 
@@ -756,9 +775,17 @@ git push origin main
 
 ### ✉️ Notificações por e-mail
 
-- Envio disparado no backend NestJS ao atualizar status.
+- Disparo na atualização de status (PATCH) e no alerta de propostas paradas (stale ≥24h).
 - Assunto/corpo mostram apenas o Código PRP (nunca o UUID).
-- Configure SMTP no `.env`. Em dev, `SMTP_DEBUG=true` ajuda na verificação.
+- Configure SMTP ou fallback (RESEND_API_KEY). Em dev, use `SMTP_DEBUG=true`.
+
+### 🔔 Alerta de Propostas Paradas
+
+- Endpoint: `GET /api/alerts/proposals/stale`
+- Critério: status `em análise` e idade ≥ `STALE_PROPOSAL_ALERT_HOURS` (default 24)
+- Destinatários: todos gestores + `PRIMARY_GESTOR_EMAIL`
+- Autorização: header `X-Cron-Key` (cron) OU usuário gestor autenticado
+- Evite duplicidade reduzindo frequência do cron ou implementando dedupe futuro (não implementado ainda)
 
 ---
 
@@ -775,6 +802,6 @@ Este CRM da Belz é um sistema robusto e seguro para gestão de propostas de pla
 
 ---
 
-*Última atualização: 19 de agosto de 2025*
-*Versão: 1.2.0*
+*Última atualização: 29 de agosto de 2025*
+*Versão: 1.3.0*
 *Autor: GitHub Copilot*

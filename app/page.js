@@ -20,6 +20,8 @@ import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
+import { FileText, BarChart3, Users, TrendingUp, Repeat, LogOut, PlusCircle, Search } from 'lucide-react'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -35,8 +37,11 @@ export default function App() {
   // Dados
   const [proposals, setProposals] = useState([])
   const [users, setUsers] = useState([])
+  const [solicitacoes, setSolicitacoes] = useState([]) // movimentações para métricas macro no dashboard gestor
   const [userGoals, setUserGoals] = useState([])
   const [sessions, setSessions] = useState([])
+  // Command palette
+  const [commandOpen, setCommandOpen] = useState(false)
 
   // Constantes importadas de lib/constants.js
 
@@ -145,7 +150,9 @@ export default function App() {
       const common = { credentials: 'include' }
       const fetches = []
       // Propostas: gestor e analista usam
-      fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+  fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+  // Solicitações: sempre trazer (gestor usa macro; analista/consultor podem reutilizar futuramente)
+  fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
       const needsAdminData = currentUser?.tipo_usuario === 'gestor'
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
@@ -157,7 +164,13 @@ export default function App() {
   const responses = await Promise.all(fetches)
       let idx = 0
       const proposalsRes = responses[idx++]
+      const solicitacoesRes = responses[idx++]
       if (proposalsRes?.ok) setProposals(await proposalsRes.json())
+      if (solicitacoesRes?.ok) {
+        const json = await solicitacoesRes.json()
+        // endpoint retorna { data: [], ... }
+        if (Array.isArray(json.data)) setSolicitacoes(json.data)
+      }
       if (needsAdminData) {
         const usersRes = responses[idx++]
         if (usersRes?.ok) setUsers(await usersRes.json())
@@ -194,6 +207,20 @@ export default function App() {
       }
     }, 250)
   }, [loadData])
+
+  // Atalho de teclado para abrir palette (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const onKey = (e) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC')
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandOpen(o => !o)
+      }
+      if (e.key === 'Escape') setCommandOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Handlers de propostas
   const handleCreateProposal = async (payload) => {
@@ -535,6 +562,14 @@ export default function App() {
           leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
         />
   <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
+          {/* Command Palette Trigger Hint */}
+          <div className="hidden md:flex justify-end -mt-2 mb-2 pr-1">
+            <button onClick={()=>setCommandOpen(true)} className="group inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border px-2 py-1 rounded-md bg-background/50">
+              <Search className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
+              <span>Comandos</span>
+              <kbd className="font-mono text-[9px] px-1 py-0.5 rounded bg-muted">Ctrl+K</kbd>
+            </button>
+          </div>
           {/** Para consultor: restringe Propostas/Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {true && (
@@ -597,6 +632,7 @@ export default function App() {
                       proposals={proposalsForView}
                       users={users}
                       userGoals={userGoals}
+                      solicitacoes={solicitacoes}
                     />
                   )
                 })()}
@@ -625,6 +661,53 @@ export default function App() {
           </Tabs>
         </main>
       </div>
+      {/* Command Palette */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} description="Digite para filtrar ações ou navegue com setas.">
+        <CommandInput placeholder="Buscar ações, abas ou comandos..." autoFocus />
+        <CommandList>
+          <CommandEmpty>Nenhum resultado.</CommandEmpty>
+          <CommandGroup heading="Navegação">
+            <CommandItem onSelect={() => { setActiveTab('dashboard'); setCommandOpen(false) }} value="dashboard">
+              <BarChart3 className="mr-2" /> Dashboard
+            </CommandItem>
+            <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
+              <FileText className="mr-2" /> Propostas
+            </CommandItem>
+            <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
+              <Repeat className="mr-2" /> Movimentação
+            </CommandItem>
+            {currentUser.tipo_usuario === 'gestor' && (
+              <>
+                <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false) }} value="usuarios">
+                  <Users className="mr-2" /> Usuários
+                </CommandItem>
+                <CommandItem onSelect={() => { setActiveTab('relatorios'); setCommandOpen(false) }} value="relatorios">
+                  <TrendingUp className="mr-2" /> Relatórios
+                </CommandItem>
+              </>
+            )}
+          </CommandGroup>
+          <CommandSeparator />
+          <CommandGroup heading="Ações Rápidas">
+            <CommandItem onSelect={() => { scheduleLoadData(true); setCommandOpen(false) }} value="recarregar">
+              <Repeat className="mr-2" /> Recarregar Dados
+            </CommandItem>
+            {currentUser.tipo_usuario !== 'consultor' && (
+              <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-proposal-btn]')?.click() }, 50) }} value="nova-proposta">
+                <PlusCircle className="mr-2" /> Nova Proposta
+              </CommandItem>
+            )}
+            {currentUser.tipo_usuario === 'gestor' && (
+              <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-user-btn]')?.click() }, 50) }} value="novo-usuario">
+                <PlusCircle className="mr-2" /> Novo Usuário
+              </CommandItem>
+            )}
+            <CommandItem onSelect={() => { handleLogout(); setCommandOpen(false) }} value="logout">
+              <LogOut className="mr-2" /> Sair
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </div>
   )
 }
