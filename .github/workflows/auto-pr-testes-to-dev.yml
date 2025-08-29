@@ -17,6 +17,7 @@ jobs:
     outputs:
       pr_number: ${{ steps.pr.outputs.pr_number }}
       head_sha: ${{ steps.pr.outputs.head_sha }}
+      base_branch: ${{ steps.pr.outputs.base_branch }}
     env:
       PR_LABELS: homologacao,auto-pr
       PR_ASSIGNEES: ""
@@ -102,11 +103,13 @@ jobs:
 
             core.setOutput('pr_number', prNumber || '');
             core.setOutput('head_sha', headSha || '');
+            core.setOutput('base_branch', base);
 
   auto-merge:
     name: Auto merge se checks OK
     needs: open-pr
-    if: ${{ needs.open-pr.outputs.pr_number }}
+    # Garante que nunca fará merge automático em PR cujo base seja main
+    if: ${{ needs.open-pr.outputs.pr_number && needs.open-pr.outputs.base_branch != 'main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Aguardar checks e realizar merge
