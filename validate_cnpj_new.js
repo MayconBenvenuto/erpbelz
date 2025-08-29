@@ -1,3 +1,20 @@
+// Helper para fetch com timeout
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 6000) {
+  return Promise.race([
+    fetch(url, opts),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs))
+  ])
+}
+
+async function tryFetch(url, opts, retries = 2, timeoutMs = 6000) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fetchWithTimeout(url, opts, timeoutMs)
+    } catch (err) {
+      if (i === retries) throw err
+    }
+  }
+}
 /* eslint-disable no-console */
 // CNPJ validation: ReceitaWS → BrasilAPI → CNPJA (cascata simples)
 export async function validateCNPJ(cnpj) {
@@ -10,9 +27,9 @@ export async function validateCNPJ(cnpj) {
   // 1ª tentativa: ReceitaWS
   try {
     console.log('🔍 Tentando ReceitaWS...')
-    const response = await fetch(`https://receitaws.com.br/v1/cnpj/${cleanCNPJ}`, {
+    const response = await tryFetch(`https://receitaws.com.br/v1/cnpj/${cleanCNPJ}`, {
       headers: { 'User-Agent': 'CRM-Propostas/1.0' }
-    })
+    }, 2, 6000)
 
     if (response.ok) {
       const data = await response.json()
@@ -49,7 +66,7 @@ export async function validateCNPJ(cnpj) {
   // 2ª tentativa: BrasilAPI
   try {
     console.log('🔍 Tentando BrasilAPI...')
-    const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`)
+  const response = await tryFetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`, {}, 2, 6000)
 
     if (response.ok) {
       const data = await response.json()
@@ -62,8 +79,10 @@ export async function validateCNPJ(cnpj) {
         }
       }
     } else if (response.status === 404) {
-      console.log('❌ BrasilAPI: CNPJ não encontrado (404)')
-      return { valid: false, error: 'CNPJ não encontrado' }
+      console.log('❌ BrasilAPI: CNPJ não encontrado (404) - continuando para próximos provedores')
+      // Não retornamos ainda: pode ser que outro provedor encontre
+    } else {
+      console.log('❌ BrasilAPI: erro HTTP', response.status)
     }
   } catch (error) {
     console.log('❌ BrasilAPI falhou:', error.message)
@@ -72,12 +91,12 @@ export async function validateCNPJ(cnpj) {
   // 3ª tentativa: CNPJA API
   try {
     console.log('🔍 Tentando CNPJA...')
-    const response = await fetch(`https://api.cnpja.com/office/${cleanCNPJ}`, {
+    const response = await tryFetch(`https://api.cnpja.com/office/${cleanCNPJ}`, {
       headers: { 
         'User-Agent': 'CRM-Propostas/1.0',
         'Accept': 'application/json'
       }
-    })
+    }, 2, 6000)
 
     if (response.ok) {
       const data = await response.json()

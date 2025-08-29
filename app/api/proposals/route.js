@@ -33,7 +33,9 @@ export async function GET(request) {
 	}
 
 	// 1) Tentativa com ordenação por código (preferencial)
-	let { data, error } = await buildBase().order('codigo', { ascending: true })
+	let { data, error } = await buildBase()
+		.order('codigo', { ascending: true })
+		.order('criado_em', { ascending: true })
 	if (error) {
 		// 2) Fallback: ordena por criado_em (asc)
 		const fallback = await buildBase().order('criado_em', { ascending: true })
@@ -44,7 +46,19 @@ export async function GET(request) {
 	if (error) {
 		return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
 	}
-	return handleCORS(NextResponse.json(data || []), origin)
+	// Enriquecimento leve: dias/horas em análise (desde criado_em até agora)
+	const now = Date.now()
+	const enriched = (data || []).map(p => {
+		const createdTs = p?.criado_em ? new Date(p.criado_em).getTime() : null
+		let horas = null, dias = null
+		if (createdTs && !isNaN(createdTs)) {
+			const diffH = (now - createdTs) / 1000 / 3600
+			horas = Math.floor(diffH)
+			dias = Math.floor(diffH / 24)
+		}
+		return { ...p, horas_em_analise: horas, dias_em_analise: dias }
+	})
+	return handleCORS(NextResponse.json(enriched), origin)
 }
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/

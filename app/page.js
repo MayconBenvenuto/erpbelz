@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +20,8 @@ import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
+import { FileText, BarChart3, Users, TrendingUp, Repeat, LogOut, PlusCircle, Search } from 'lucide-react'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -35,8 +37,11 @@ export default function App() {
   // Dados
   const [proposals, setProposals] = useState([])
   const [users, setUsers] = useState([])
+  const [solicitacoes, setSolicitacoes] = useState([]) // movimentações para métricas macro no dashboard gestor
   const [userGoals, setUserGoals] = useState([])
   const [sessions, setSessions] = useState([])
+  // Command palette
+  const [commandOpen, setCommandOpen] = useState(false)
 
   // Constantes importadas de lib/constants.js
 
@@ -145,7 +150,9 @@ export default function App() {
       const common = { credentials: 'include' }
       const fetches = []
       // Propostas: gestor e analista usam
-      fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+  fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+  // Solicitações: sempre trazer (gestor usa macro; analista/consultor podem reutilizar futuramente)
+  fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
       const needsAdminData = currentUser?.tipo_usuario === 'gestor'
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
@@ -154,10 +161,16 @@ export default function App() {
   if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
       if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
 
-      const responses = await Promise.all(fetches)
+  const responses = await Promise.all(fetches)
       let idx = 0
       const proposalsRes = responses[idx++]
+      const solicitacoesRes = responses[idx++]
       if (proposalsRes?.ok) setProposals(await proposalsRes.json())
+      if (solicitacoesRes?.ok) {
+        const json = await solicitacoesRes.json()
+        // endpoint retorna { data: [], ... }
+        if (Array.isArray(json.data)) setSolicitacoes(json.data)
+      }
       if (needsAdminData) {
         const usersRes = responses[idx++]
         if (usersRes?.ok) setUsers(await usersRes.json())
@@ -174,6 +187,40 @@ export default function App() {
       console.error('Erro ao carregar dados:', error)
     }
   }, [token, currentUser?.tipo_usuario])
+
+  // Debounce simples para evitar múltiplos loadData encadeados (ex: criar + atualizar status)
+  const loadDataDebouncedRef = useRef({ timer: null, pending: false })
+  const scheduleLoadData = useCallback((immediate = false) => {
+    const ref = loadDataDebouncedRef.current
+    if (immediate) {
+      if (ref.timer) { clearTimeout(ref.timer); ref.timer = null }
+      loadData()
+      return
+    }
+    ref.pending = true
+    if (ref.timer) return
+    ref.timer = setTimeout(() => {
+      ref.timer = null
+      if (ref.pending) {
+        ref.pending = false
+        loadData()
+      }
+    }, 250)
+  }, [loadData])
+
+  // Atalho de teclado para abrir palette (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const onKey = (e) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC')
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandOpen(o => !o)
+      }
+      if (e.key === 'Escape') setCommandOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Handlers de propostas
   const handleCreateProposal = async (payload) => {
@@ -194,7 +241,15 @@ export default function App() {
       if (response.ok) {
         toast.success('Proposta criada com sucesso!')
         afterSuccess && afterSuccess()
-        await loadData()
+        // Otimista: insere nova proposta imediatamente sem esperar round-trip completo
+        if (result && result.id) {
+          setProposals(prev => {
+            // evita duplicar se já vier do SSE
+            if (prev.some(p => p.id === result.id)) return prev
+            return [...prev, result]
+          })
+        }
+        scheduleLoadData()
       } else {
         toast.error(result.error || 'Erro ao criar proposta')
       }
@@ -231,26 +286,45 @@ export default function App() {
     try {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const response = await fetch(`/api/proposals/${proposalId}`, {
+      const payload = { status: String(newStatus).trim().toLowerCase() }
+      const doPatch = () => fetch(`/api/proposals/${proposalId}`, {
         method: 'PATCH',
         headers,
         credentials: 'include',
-  // Envia somente status para evitar 400 (servidor bloqueia criado_por / valor para analista)
-  body: JSON.stringify({ status: String(newStatus).trim().toLowerCase() })
+        body: JSON.stringify(payload)
       })
+      // Otimista: aplica status local enquanto requisita
+      setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: payload.status } : p))
+      let response = await doPatch()
+      if (!response.ok && response.status === 404) {
+        // pequena espera para caso de claim implícito
+        await new Promise(r => setTimeout(r, 180))
+        const retry = await doPatch()
+        if (retry.ok) response = retry
+      }
       if (response.ok) {
         toast.success('Status da proposta atualizado com sucesso!')
-        await loadData()
-      } else {
-        if (response.status === 403) {
-          toast.error('Ação não permitida para esta proposta')
-        } else {
-          const result = await response.json().catch(() => ({}))
-          toast.error(result.error || 'Erro ao atualizar status')
-        }
+        scheduleLoadData()
+        return
       }
+      if (response.status === 404) {
+        const result = await response.json().catch(() => ({}))
+        toast.error(result.error || 'Proposta não encontrada. Recarregando...')
+        scheduleLoadData(true)
+        return
+      }
+      if (response.status === 403) {
+        toast.error('Ação não permitida (verifique se você assumiu a proposta)')
+        // Reverte otimista se proibido
+        scheduleLoadData(true)
+        return
+      }
+      const result = await response.json().catch(() => ({}))
+      toast.error(result.error || 'Erro ao atualizar status')
+      scheduleLoadData()
     } catch {
       toast.error('Erro ao conectar com o servidor')
+      scheduleLoadData()
     }
   }
 
@@ -266,18 +340,46 @@ export default function App() {
       })
       if (response.ok) {
         toast.success('Proposta atualizada com sucesso!')
-        await loadData()
+        // Atualização otimista básica (merge campos conhecidos)
+        setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, ...payload } : p))
+        scheduleLoadData()
         return { ok: true }
       } else {
         const result = await response.json().catch(() => ({}))
         toast.error(result.error || 'Erro ao atualizar proposta')
+        scheduleLoadData()
         return { ok: false, error: result.error }
       }
     } catch {
       toast.error('Erro ao conectar com o servidor')
+      scheduleLoadData()
       return { ok: false, error: 'network' }
     }
   }
+
+  // SSE incremental (se disponível) para reduzir full reload
+  useEffect(() => {
+    if (!currentUser) return
+    let es
+    try {
+      es = new EventSource('/api/proposals/events')
+      es.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data)
+          if (msg?.type === 'proposal_updated' && msg?.data?.id) {
+            setProposals(prev => {
+              const exists = prev.some(p => p.id === msg.data.id)
+              return exists ? prev.map(p => p.id === msg.data.id ? { ...p, ...msg.data } : p) : [...prev, msg.data]
+            })
+          }
+        } catch (_) {}
+      }
+      es.onerror = () => {
+        try { es.close() } catch {}
+      }
+    } catch {}
+    return () => { try { es && es.close() } catch {} }
+  }, [currentUser])
 
   // Handlers de usuários
   const handleCreateUser = async (payload) => {
@@ -346,28 +448,7 @@ export default function App() {
 
   // Effects
   useEffect(() => {
-    const hadSession = loadSessionFromStorage()
-    if (!hadSession) {
-      // tenta bootstrapping via cookie HttpOnly
-      ;(async () => {
-        try {
-          const res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' })
-          if (res.ok) {
-            const data = await res.json()
-            if (data?.user) {
-              // cria nova sessão local baseada no cookie (sem sessionId do backend)
-              const pseudoSessionId = `cookie-${Date.now()}`
-              setCurrentUser(data.user)
-              setSessionId(pseudoSessionId)
-              setToken(null) // token não é exposto via cookie HttpOnly
-              saveSessionToStorage(data.user, pseudoSessionId, '')
-              if (data.user?.tipo_usuario === 'consultor') setActiveTab('propostas')
-              else if (data.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
-            }
-          }
-        } catch {}
-      })()
-    }
+  loadSessionFromStorage()
   }, [])
 
   useEffect(() => {
@@ -481,6 +562,14 @@ export default function App() {
           leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
         />
   <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
+          {/* Command Palette Trigger Hint */}
+          <div className="hidden md:flex justify-end -mt-2 mb-2 pr-1">
+            <button onClick={()=>setCommandOpen(true)} className="group inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border px-2 py-1 rounded-md bg-background/50">
+              <Search className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
+              <span>Comandos</span>
+              <kbd className="font-mono text-[9px] px-1 py-0.5 rounded bg-muted">Ctrl+K</kbd>
+            </button>
+          </div>
           {/** Para consultor: restringe Propostas/Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {true && (
@@ -543,6 +632,7 @@ export default function App() {
                       proposals={proposalsForView}
                       users={users}
                       userGoals={userGoals}
+                      solicitacoes={solicitacoes}
                     />
                   )
                 })()}
@@ -571,6 +661,53 @@ export default function App() {
           </Tabs>
         </main>
       </div>
+      {/* Command Palette */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} description="Digite para filtrar ações ou navegue com setas.">
+        <CommandInput placeholder="Buscar ações, abas ou comandos..." autoFocus />
+        <CommandList>
+          <CommandEmpty>Nenhum resultado.</CommandEmpty>
+          <CommandGroup heading="Navegação">
+            <CommandItem onSelect={() => { setActiveTab('dashboard'); setCommandOpen(false) }} value="dashboard">
+              <BarChart3 className="mr-2" /> Dashboard
+            </CommandItem>
+            <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
+              <FileText className="mr-2" /> Propostas
+            </CommandItem>
+            <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
+              <Repeat className="mr-2" /> Movimentação
+            </CommandItem>
+            {currentUser.tipo_usuario === 'gestor' && (
+              <>
+                <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false) }} value="usuarios">
+                  <Users className="mr-2" /> Usuários
+                </CommandItem>
+                <CommandItem onSelect={() => { setActiveTab('relatorios'); setCommandOpen(false) }} value="relatorios">
+                  <TrendingUp className="mr-2" /> Relatórios
+                </CommandItem>
+              </>
+            )}
+          </CommandGroup>
+          <CommandSeparator />
+          <CommandGroup heading="Ações Rápidas">
+            <CommandItem onSelect={() => { scheduleLoadData(true); setCommandOpen(false) }} value="recarregar">
+              <Repeat className="mr-2" /> Recarregar Dados
+            </CommandItem>
+            {currentUser.tipo_usuario !== 'consultor' && (
+              <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-proposal-btn]')?.click() }, 50) }} value="nova-proposta">
+                <PlusCircle className="mr-2" /> Nova Proposta
+              </CommandItem>
+            )}
+            {currentUser.tipo_usuario === 'gestor' && (
+              <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-user-btn]')?.click() }, 50) }} value="novo-usuario">
+                <PlusCircle className="mr-2" /> Novo Usuário
+              </CommandItem>
+            )}
+            <CommandItem onSelect={() => { handleLogout(); setCommandOpen(false) }} value="logout">
+              <LogOut className="mr-2" /> Sair
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </div>
   )
 }
