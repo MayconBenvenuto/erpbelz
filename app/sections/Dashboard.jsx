@@ -290,6 +290,57 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
   }, [proposals])
 
+  // Helpers / timelines para analista
+  const formatDateTime = (dt) => {
+    if (!dt) return '—'
+    try { return new Date(dt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '—' }
+  }
+
+  const analystProposalTimeline = useMemo(() => {
+    if (currentUser.tipo_usuario !== 'analista') return []
+    return proposals
+      .map(p => ({
+        id: p.id,
+        codigo: p.codigo || p.id?.slice(0,8),
+        status: p.status,
+        criado_em: p.criado_em,
+        atendido_em: p.atendido_em,
+        implantado: p.status === 'implantado',
+        valor: p.valor,
+        atendido_por: p.atendido_por,
+      }))
+      .sort((a,b)=> new Date(b.criado_em) - new Date(a.criado_em))
+      .slice(0,12)
+  }, [proposals, currentUser.tipo_usuario])
+
+  const analystMovTimeline = useMemo(() => {
+    if (currentUser.tipo_usuario !== 'analista') return []
+    return (solicitacoes || [])
+      .filter(s => String(s.criado_por) === String(currentUser.id) || String(s.atendido_por) === String(currentUser.id))
+      .map(s => ({
+        id: s.id,
+        codigo: s.codigo || s.id?.slice(0,8),
+        status: s.status || 'aberta',
+        criado_em: s.criado_em,
+        atualizado_em: s.atualizado_em,
+        tipo: s.tipo,
+        subtipo: s.subtipo,
+      }))
+      .sort((a,b)=> new Date(b.criado_em) - new Date(a.criado_em))
+      .slice(0,12)
+  }, [solicitacoes, currentUser])
+
+  const movStatusColor = (st) => {
+    switch(st){
+      case 'aberta': return 'bg-blue-500'
+      case 'em validação': return 'bg-amber-500'
+      case 'em execução': return 'bg-purple-500'
+      case 'concluída': return 'bg-green-500'
+      case 'cancelada': return 'bg-red-500'
+      default: return 'bg-amber-500'
+    }
+  }
+
   return (
     <div className="space-y-6">
       {currentUser.tipo_usuario === 'gestor' && (
@@ -552,6 +603,75 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
             <CardContent>
               <div className="text-2xl font-bold text-accent">{formatCurrency(implantedValue)}</div>
               <p className="text-xs text-muted-foreground">{totalValue > 0 ? Math.round((implantedValue / totalValue) * 100) : 0}% do total</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Timelines específicas para analista (visual do consultor) */}
+      {currentUser.tipo_usuario === 'analista' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Linha do Tempo - Propostas</CardTitle>
+              <CardDescription>Últimas movimentações das propostas que você acompanha</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {analystProposalTimeline.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhuma proposta ainda.</p>
+              )}
+              <ul className="space-y-3">
+                {analystProposalTimeline.map(item => (
+                  <li key={item.id} className="p-3 rounded-md border bg-card/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${item.status === 'implantado' ? 'bg-green-500' : item.atendido_por ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                      <div>
+                        <p className="text-sm font-medium">{item.codigo}</p>
+                        <p className="text-xs text-muted-foreground">Criado {formatDateTime(item.criado_em)}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col md:items-end gap-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge>
+                        {item.atendido_em && <Badge variant="outline" className="text-xs">Assumida {formatDateTime(item.atendido_em)}</Badge>}
+                        {item.implantado && <Badge className="text-xs bg-green-600 text-white">Implantado</Badge>}
+                        {item.valor ? <Badge variant="outline" className="text-xs">{formatCurrency(item.valor)}</Badge> : null}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Linha do Tempo - Movimentações</CardTitle>
+              <CardDescription>Últimas movimentações que você abriu ou assumiu</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {analystMovTimeline.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhuma movimentação ainda.</p>
+              )}
+              <ul className="space-y-3">
+                {analystMovTimeline.map(item => (
+                  <li key={item.id} className="p-3 rounded-md border bg-card/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${movStatusColor(item.status)}`} />
+                      <div>
+                        <p className="text-sm font-medium">{item.codigo}</p>
+                        <p className="text-xs text-muted-foreground">Criado {formatDateTime(item.criado_em)}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col md:items-end gap-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge>
+                        {item.atualizado_em && item.atualizado_em !== item.criado_em && (<Badge variant="outline" className="text-xs">Atualizado {formatDateTime(item.atualizado_em)}</Badge>)}
+                        {item.tipo && <Badge variant="outline" className="text-xs capitalize">{item.tipo}{item.subtipo ? `/${item.subtipo}` : ''}</Badge>}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </div>

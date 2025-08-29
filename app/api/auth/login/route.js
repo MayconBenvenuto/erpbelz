@@ -43,9 +43,9 @@ export async function POST(request) {
 		const sessionId = crypto.randomUUID()
 		await supabase.from('sessoes').insert({ id: sessionId, usuario_id: user.id, data_login: new Date().toISOString() })
 
-		// Marca presença inicial do usuário no login
+		// Marca presença inicial do usuário no login (produção usa coluna ultimo_refresh)
 		try {
-			await supabase.from('usuarios').update({ last_active_at: new Date().toISOString(), last_logout_at: null }).eq('id', user.id)
+			await supabase.from('usuarios').update({ ultimo_refresh: new Date().toISOString() }).eq('id', user.id)
 		} catch {}
 
 				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
