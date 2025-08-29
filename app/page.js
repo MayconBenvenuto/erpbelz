@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +42,7 @@ export default function App() {
   const [solicitacoes, setSolicitacoes] = useState([]) // movimentações para métricas macro no dashboard gestor
   const [userGoals, setUserGoals] = useState([])
   const [sessions, setSessions] = useState([])
+
   // Command palette
   const [commandOpen, setCommandOpen] = useState(false)
 

@@ -10,6 +10,16 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/**/*.test.*'],
+    coverage: {
+      provider: 'v8',
+      reports: ['text', 'json-summary', 'lcov'],
+      exclude: [
+        '**/node_modules/**',
+        'tests/**',
+        '**/*.config.*',
+        'scripts/**'
+      ],
+    },
   },
   resolve: {
     alias: {

@@ -247,8 +247,8 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               )}
 
               <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded text-xs">
-                <strong>Funcionamento automático:</strong> O sistema executa verificação diária às 9:00 BRT via GitHub Actions. 
-                Propostas em análise entre 48h-72h recebem notificação por e-mail para todos os gestores.
+                <strong>Agendamento:</strong> A verificação pode ser disparada manualmente aqui ou por um serviço de cron externo (ex.: cron-job.org) configurado para 09:00 BRT.
+                Propostas em análise entre 48h-72h geram notificação por e-mail para todos os gestores.
               </div>
             </CardContent>
           </Card>
@@ -473,7 +473,12 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               <Clock className="w-5 h-5 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Sessões Hoje</p>
-                <p className="text-2xl font-bold text-blue-600">{filteredSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString()).length}</p>
+                <p className="text-2xl font-bold text-blue-600">{filteredSessions.filter(s => {
+                  const base = s.data_login || s.criado_em || s.ultimo_refresh
+                  if (!base) return false
+                  const d = new Date(base)
+                  return !isNaN(d) && d.toDateString() === new Date().toDateString()
+                }).length}</p>
               </div>
             </div>
           </CardContent>
@@ -527,10 +532,15 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
             {sortedAnalystUsers.map((user) => {
               const userSessions = sessions.filter(s => s.usuario_id === user.id)
               const currentSession = userSessions.find(s => isSessionActive(s))
-              const todaySessions = userSessions.filter(s => new Date(s.data_login).toDateString() === new Date().toDateString())
+              const todaySessions = userSessions.filter(s => {
+                const base = s.data_login || s.criado_em || s.ultimo_refresh
+                if (!base) return false
+                const d = new Date(base)
+                return !isNaN(d) && d.toDateString() === new Date().toDateString()
+              })
 
               const calculateSessionTime = (session) => {
-                const startRaw = session.data_login || session.criado_em || new Date().toISOString()
+                const startRaw = session.data_login || session.criado_em || session.ultimo_refresh || new Date().toISOString()
                 const start = new Date(startRaw)
                 // Fim: data_logout (legado) ou expirado_em passado ou ultimo_refresh enquanto ativa
                 let end
@@ -545,7 +555,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
               }
 
               const totalTimeToday = todaySessions.reduce((acc, session) => {
-                const start = new Date(session.data_login || session.criado_em || Date.now())
+                const start = new Date(session.data_login || session.criado_em || session.ultimo_refresh || Date.now())
                 let end
                 if (session.data_logout) end = new Date(session.data_logout)
                 else if (session.expirado_em && new Date(session.expirado_em).getTime() < Date.now()) end = new Date(session.expirado_em)
@@ -578,7 +588,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                       <p className="font-medium text-muted-foreground">Última Sessão</p>
                       {userSessions.length > 0 ? (
                         <div>
-                          <p>{new Date(userSessions[userSessions.length - 1].data_login || userSessions[userSessions.length - 1].criado_em).toLocaleString('pt-BR')}</p>
+                          <p>{(() => { const last = userSessions[userSessions.length - 1]; const base = last.data_login || last.criado_em || last.ultimo_refresh; const d = base ? new Date(base) : null; return d && !isNaN(d) ? d.toLocaleString('pt-BR') : '—'; })()}</p>
                           <p className="text-xs text-muted-foreground">Duração: {calculateSessionTime(userSessions[userSessions.length - 1])}</p>
                         </div>
                       ) : (
@@ -610,7 +620,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                       {userSessions.slice(-5).reverse().map((session) => (
                         <div key={session.id} className="text-xs bg-muted/50 p-2 rounded">
                           <div className="flex justify-between">
-                            <span>{new Date(session.data_login).toLocaleString('pt-BR')}</span>
+                            <span>{(() => { const base = session.data_login || session.criado_em || session.ultimo_refresh; const d = base ? new Date(base) : null; return d && !isNaN(d) ? d.toLocaleString('pt-BR') : '—'; })()}</span>
                             <span>{session.data_logout ? new Date(session.data_logout).toLocaleString('pt-BR') : 'Em andamento'}</span>
                             <span className="font-medium">{calculateSessionTime(session)}</span>
                           </div>
