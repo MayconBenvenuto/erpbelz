@@ -18,46 +18,32 @@ export async function POST(request) {
 			if (!auth.error) authUser = auth.user
 		} catch {}
 
-		let targetSessionId = sessionId || null
-		// Se não veio sessionId ou não existir, tentar achar a última sessão aberta do usuário (se autenticado)
-		if (!targetSessionId && authUser?.id) {
-			const { data: lastOpen } = await supabase
-				.from('sessoes')
-				.select('id, data_login')
-				.eq('usuario_id', authUser.id)
-				.is('data_logout', null)
-				.order('data_login', { ascending: false })
-				.limit(1)
-				.maybeSingle?.() || {}
+				let targetSessionId = sessionId || null
+				// Buscar última sessão não expirada
+				if (!targetSessionId && authUser?.id) {
+					try {
+						const { data: lastOpen } = await supabase
+							.from('sessoes')
+							.select('id, expirado_em')
+							.eq('usuario_id', authUser.id)
+							.order('criado_em', { ascending: false })
+							.limit(1)
+						if (lastOpen && lastOpen.length && lastOpen[0].id) targetSessionId = lastOpen[0].id
+					} catch {}
+				}
 
-			if (lastOpen?.id) targetSessionId = lastOpen.id
-		}
+				if (targetSessionId) {
+					try {
+						await supabase
+							.from('sessoes')
+							.update({ expirado_em: new Date().toISOString(), ultimo_refresh: new Date().toISOString() })
+							.eq('id', targetSessionId)
+					} catch {}
+				}
 
-		if (targetSessionId) {
-			// Busca a sessão e encerra
-			const { data: sess } = await supabase
-				.from('sessoes')
-				.select('data_login')
-				.eq('id', targetSessionId)
-				.maybeSingle?.() || {}
-
-			if (sess?.data_login) {
-				const loginTime = new Date(sess.data_login)
-				const now = new Date()
-				const diff = now - loginTime
-				const hours = Math.floor(diff / (1000 * 60 * 60))
-				const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-				await supabase
-					.from('sessoes')
-					.update({ data_logout: now.toISOString(), tempo_total: `${hours}:${minutes}:00` })
-					.eq('id', targetSessionId)
-			}
-		}
-
-		// Marca last_logout_at para presença
-		if (authUser?.id) {
-			try { await supabase.from('usuarios').update({ last_logout_at: new Date().toISOString() }).eq('id', authUser.id) } catch {}
-		}
+				if (authUser?.id) {
+					try { await supabase.from('usuarios').update({ ultimo_refresh: new Date().toISOString() }).eq('id', authUser.id) } catch {}
+				}
 
 			const response = NextResponse.json({ success: true })
 			const isProd = process.env.NODE_ENV === 'production'
