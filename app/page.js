@@ -22,13 +22,14 @@ import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
+import { hasPermission } from '@/lib/rbac'
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
 import { FileText, BarChart3, Users, TrendingUp, Repeat, LogOut, PlusCircle, Search } from 'lucide-react'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('propostas')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [sessionId, setSessionId] = useState(null)
   const [_lastActivity, setLastActivity] = useState(Date.now())
   const [token, setToken] = useState(null)
@@ -111,8 +112,11 @@ export default function App() {
   setLastActivity(Date.now())
   setToken(result.token)
   saveSessionToStorage(result.user, result.sessionId, result.token)
-  if (result.user?.tipo_usuario === 'consultor') setActiveTab('propostas')
-  else if (result.user?.tipo_usuario === 'gestor') setActiveTab('dashboard')
+  // Define aba inicial conforme permissões
+  const u = result.user
+  if (hasPermission(u,'viewPropostas')) setActiveTab('propostas')
+  else if (hasPermission(u,'viewMovimentacao')) setActiveTab('movimentacao')
+  else setActiveTab('dashboard')
         toast.success('Login realizado com sucesso!')
       } else {
         toast.error(result.error || 'Erro no login')
@@ -157,10 +161,10 @@ export default function App() {
   // Solicitações: sempre trazer (gestor usa macro; analista/consultor podem reutilizar futuramente)
   fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
-      const needsAdminData = currentUser?.tipo_usuario === 'gestor'
+  const needsAdminData = currentUser && (currentUser.tipo_usuario === 'gestor')
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
   // Metas: agora também para consultor (exibe progresso pessoal)
-	const needsGoals = true
+  const needsGoals = true
   if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
       if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
 
@@ -282,7 +286,10 @@ export default function App() {
 
   /*
   const handleDeleteProposal = async (proposalId) => {
-    if (currentUser?.tipo_usuario !== 'gestor') {
+    if (currentUser?.tipo_usuario === 'consultor') setActiveTab('propostas')
+    else if (currentUser?.tipo_usuario === 'gestor') setActiveTab('dashboard')
+    else if (currentUser && !hasPermission(currentUser,'viewPropostas') && hasPermission(currentUser,'viewMovimentacao')) setActiveTab('movimentacao')
+    else setActiveTab('dashboard')
       toast.error('Apenas gestores podem excluir propostas')
       return
     }
@@ -648,18 +655,25 @@ export default function App() {
             {true && (
               <TabsContent value="dashboard" className="space-y-6">
                 {(() => {
-                  const proposalsForView = currentUser.tipo_usuario === 'gestor'
-                    ? proposals
-                    : currentUser.tipo_usuario === 'consultor'
-                      ? proposals.filter(p => (
-                          String(p.criado_por) === String(currentUser.id) ||
-                          (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                        ))
-                      : proposals.filter(p => (
-                          String(p.criado_por) === String(currentUser.id) ||
-                          String(p.atendido_por) === String(currentUser.id) ||
-                          !p.atendido_por
-                        ))
+                  const proposalsForView = (() => {
+                    const role = currentUser.tipo_usuario
+                    if (role === 'gestor' || role === 'gerente') return proposals
+                    if (role === 'consultor') {
+                      return proposals.filter(p => (
+                        String(p.criado_por) === String(currentUser.id) ||
+                        (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
+                      ))
+                    }
+                    if (role === 'analista_implantacao') {
+                      return proposals.filter(p => (
+                        String(p.criado_por) === String(currentUser.id) ||
+                        String(p.atendido_por) === String(currentUser.id) ||
+                        !p.atendido_por
+                      ))
+                    }
+                    // analista_movimentacao não deveria ver propostas
+                    return []
+                  })()
 
                   if (currentUser.tipo_usuario === 'consultor') {
                     const ConsultorDashboardSection = require('./sections/ConsultorDashboard.jsx').default
@@ -678,7 +692,7 @@ export default function App() {
               </TabsContent>
             )}
 
-            {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor' || currentUser.tipo_usuario === 'gestor') && (
+            {(['gestor','gerente','analista_movimentacao','consultor'].includes(currentUser.tipo_usuario)) && (
               <TabsContent value="movimentacao" className="space-y-6">
                 <MovimentacaoSection currentUser={currentUser} token={token} />
               </TabsContent>
