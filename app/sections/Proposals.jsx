@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { PlusCircle, X, ArrowUpDown } from 'lucide-react'
+import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -29,9 +29,28 @@ function ProposalsInner({
   users = [],
   // userGoals = [],
 }) {
+  // Máscaras e formatação ----------------------------------
+  const maskCNPJ = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0,14)
+    let out = digits
+    if (digits.length > 2) out = digits.slice(0,2) + '.' + digits.slice(2)
+    if (digits.length > 5) out = out.slice(0,6) + '.' + out.slice(6)
+    if (digits.length > 8) out = out.slice(0,10) + '/' + out.slice(10)
+    if (digits.length > 12) out = out.slice(0,15) + '-' + out.slice(15)
+    return out
+  }
+  const moneyDigits = (value) => String(value || '').replace(/\D/g, '').slice(0, 15) // até 13 inteiros + 2 decimais
+  const formatMoneyBR = (value) => {
+    const digits = moneyDigits(value)
+    if (!digits) return ''
+    const number = parseInt(digits, 10) / 100
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
+  }
   // SLA & resumo com polling + alertas
   const [slaSummary, setSlaSummary] = useState(null)
   const SLA_THRESHOLD_HOURS = 8
+  const AGE_ALERT_HOURS = 24
+  const AGE_STRONG_ALERT_HOURS = 48
   const slaAlertedRef = useRef(new Set())
   useEffect(() => {
     let stopped = false
@@ -62,6 +81,12 @@ function ProposalsInner({
   // Resultado detalhado (somente gestor exibe após criação) - removido do layout por enquanto
   const [_cnpjValidationResult, setCnpjValidationResult] = useState(null)
   const [cnpjInfoCache, setCnpjInfoCache] = useState({}) // { [cnpj]: { loading, fetched, razao_social, nome_fantasia, error } }
+  // Flag derivada para saber se o botão deve ficar desabilitado (validação em andamento)
+  const isCnpjValidating = (() => {
+    const digits = String(proposalForm.cnpj || '').replace(/\D/g, '')
+    if (digits.length !== 14) return false
+    return !!cnpjInfoCache[digits]?.loading
+  })()
   // Filtros
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
   // Filtro extra: somente propostas livres (não atribuídas) para analista
@@ -79,12 +104,7 @@ function ProposalsInner({
   const [detailLoading, setDetailLoading] = useState(false)
   const [detail, setDetail] = useState(null)
 
-  const formatMoneyBR = (value) => {
-    const digits = String(value || '').replace(/\D/g, '')
-    if (!digits) return ''
-    const number = parseInt(digits, 10) / 100
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(number)
-  }
+  // (formatMoneyBR redefinido acima com limites)
 
   // normalize com cache simples para performance em filtros grandes
   const normalizeCacheRef = useRef(new Map())
@@ -154,19 +174,20 @@ function ProposalsInner({
   const filteredProposals = useMemo(() => {
     const qn = normalize(filters.q)
     const list = proposalsMerged.filter(p => {
-      const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
-      const cnpjFmt = formatCNPJ(p.cnpj)
-      const consultor = normalize(p.consultor)
-      const matchText = !qn || normalize(cnpjFmt).includes(qn) || cnpjDigits.includes(filters.q.replace(/\D/g, '')) || consultor.includes(qn)
-      const matchStatus = filters.status === 'todos' || normalize(p.status) === normalize(filters.status)
-      const matchOperadora = filters.operadora === 'todas' || normalize(p.operadora) === normalize(filters.operadora)
-      const matchAnalista = currentUser.tipo_usuario !== 'gestor' || filters.analista === 'todos' || String(p.criado_por) === String(filters.analista)
-      const matchConsultor = currentUser.tipo_usuario !== 'gestor' || filters.consultor === 'todos' || normalize(p.consultor) === normalize(filters.consultor)
-      const matchCodigo = !qn || (p.codigo && String(p.codigo).toLowerCase().includes(qn))
-      const matchFree = !onlyFree || !p.atendido_por
-      return matchText && matchCodigo && matchStatus && matchOperadora && matchAnalista && matchConsultor && matchFree
+      // Busca
+      if (qn) {
+        const cnpjDigits = String(p.cnpj || '').replace(/\D/g, '')
+        const haystack = [cnpjDigits, p.consultor, p.codigo, p.operadora, p.cliente_nome].filter(Boolean).map(normalize)
+        if (!haystack.some(h => h.includes(qn))) return false
+      }
+      if (filters.status !== 'todos' && p.status !== filters.status) return false
+      if (filters.operadora !== 'todas' && p.operadora !== filters.operadora) return false
+      if (currentUser.tipo_usuario === 'gestor' && filters.analista !== 'todos' && String(p.criado_por) !== String(filters.analista)) return false
+      if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos' && p.consultor !== filters.consultor) return false
+      if (onlyFree && currentUser.tipo_usuario === 'analista' && p.atendido_por) return false
+      return true
     })
-    const sorted = list.slice().sort((a,b) => {
+    const sorted = list.slice().sort((a, b) => {
       if (currentUser.tipo_usuario === 'analista') {
         const aFree = !a.atendido_por
         const bFree = !b.atendido_por
@@ -177,9 +198,10 @@ function ProposalsInner({
       if (va !== vb) return vidasSortAsc ? va - vb : vb - va
       const ca = a?.codigo || ''
       const cb = b?.codigo || ''
-      if (ca && cb) return ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
-      if (ca) return -1
-      if (cb) return 1
+      if (ca && cb) {
+        const cmp = ca.localeCompare(cb, undefined, { numeric: true, sensitivity: 'base' })
+        if (cmp !== 0) return cmp
+      }
       const da = a?.criado_em ? new Date(a.criado_em).getTime() : 0
       const db = b?.criado_em ? new Date(b.criado_em).getTime() : 0
       return da - db
@@ -192,16 +214,40 @@ function ProposalsInner({
     if (!filteredProposals.length) return
     if (currentUser.tipo_usuario === 'consultor') return
     const now = Date.now()
+    // Persistência leve para não repetir alertas em page reload: sessionStorage
+    let persisted = {}
+    try { persisted = JSON.parse(sessionStorage.getItem('crm:proposalAlerts')||'{}') } catch {}
+    let changed = false
     filteredProposals.forEach(p => {
       if (p.atendido_por) return
       const created = new Date(p.criado_em).getTime()
       if (isNaN(created)) return
       const hours = (now - created)/1000/3600
+      // SLA básico
       if (hours >= SLA_THRESHOLD_HOURS && !slaAlertedRef.current.has(p.id)) {
         slaAlertedRef.current.add(p.id)
         toast.error(`SLA estourado: proposta ${p.codigo || p.id.slice(0,8)} aguardando há ${hours.toFixed(1)}h`)
+        persisted[p.id] = { lastAlert: Date.now(), type: 'sla' }
+        changed = true
+      }
+      // Aging > 24h informativo
+      if (hours >= AGE_ALERT_HOURS && !slaAlertedRef.current.has('age:'+p.id)) {
+        slaAlertedRef.current.add('age:'+p.id)
+        toast.info(`Proposta ${p.codigo || p.id.slice(0,8)} parada há ${Math.floor(hours)}h`)        
+        persisted[p.id] = { lastAlert: Date.now(), type: 'age24' }
+        changed = true
+      }
+      // Aging forte > 48h
+      if (hours >= AGE_STRONG_ALERT_HOURS && !slaAlertedRef.current.has('ageStrong:'+p.id)) {
+        slaAlertedRef.current.add('ageStrong:'+p.id)
+        toast.error(`Proposta ${p.codigo || p.id.slice(0,8)} parada há ${Math.floor(hours)}h (atenção)`)        
+        persisted[p.id] = { lastAlert: Date.now(), type: 'age48' }
+        changed = true
       }
     })
+    if (changed) {
+      try { sessionStorage.setItem('crm:proposalAlerts', JSON.stringify(persisted)) } catch {}
+  }
   }, [filteredProposals, currentUser.tipo_usuario])
 
   // Limpa cache de alertas para propostas removidas
@@ -276,7 +322,18 @@ function ProposalsInner({
 
   const fetchCnpjInfo = async (cnpjRaw) => {
     const cnpj = String(cnpjRaw || '').replace(/\D/g, '')
-    if (!cnpj || cnpjInfoCache[cnpj]?.loading || cnpjInfoCache[cnpj]?.fetched) return
+    if (!cnpj) return
+    // Se já temos em cache (fetched) apenas tentar preencher o nome se estiver vazio e sair
+    const cached = cnpjInfoCache[cnpj]
+    if (cached?.fetched && !cached?.loading) {
+      if ((cached.nome_fantasia || cached.razao_social) && currentUser?.tipo_usuario === 'consultor') {
+        const fantasia = cached.nome_fantasia || cached.razao_social || ''
+        setProposalForm(prev => prev.cliente_nome?.trim() ? prev : ({ ...prev, cliente_nome: fantasia }))
+      }
+      // Evita nova chamada de rede
+      return
+    }
+    if (cached?.loading) return
     setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { ...(prev[cnpj] || {}), loading: true } }))
     try {
       const res = await fetch('/api/validate-cnpj', {
@@ -290,6 +347,11 @@ function ProposalsInner({
           ...prev,
           [cnpj]: { loading: false, fetched: true, razao_social: data.data.razao_social, nome_fantasia: data.data.nome_fantasia }
         }))
+        // Auto-preenche nome do cliente para consultor se ainda vazio
+        if (currentUser?.tipo_usuario === 'consultor') {
+          const fantasia = data.data.nome_fantasia || data.data.razao_social || ''
+          if (fantasia) setProposalForm(prev => prev.cliente_nome?.trim() ? prev : ({ ...prev, cliente_nome: fantasia }))
+        }
       } else {
         setCnpjInfoCache(prev => ({ ...prev, [cnpj]: { loading: false, fetched: true, error: data?.error || 'Não encontrado' } }))
       }
@@ -308,14 +370,22 @@ function ProposalsInner({
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) { toast.error(currentUser.tipo_usuario === 'consultor' ? 'Informe um email de cliente válido' : 'Informe um email de consultor válido'); return }
     if (currentUser.tipo_usuario === 'consultor' && !proposalForm.cliente_nome.trim()) {
-      toast.error('Informe o nome do cliente');
+      toast.error('Valide o CNPJ para carregar o Nome do Cliente');
       return
     }
-    const valorNumber = parseMoneyToNumber(proposalForm.valor)
-    if (!valorNumber || valorNumber <= 0) { toast.error('Informe um valor válido maior que zero'); return }
-    const resp = await fetch('/api/validate-cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj: proposalForm.cnpj }) })
-    const cnpjResult = await resp.json()
-    if (!cnpjResult.valid) { throw new Error(cnpjResult.error || 'CNPJ inválido') }
+  const valorNumber = parseMoneyToNumber(proposalForm.valor)
+  if (!valorNumber || valorNumber <= 0) { toast.error('Informe um valor válido maior que zero'); return }
+    const cnpjDigits = String(proposalForm.cnpj || '').replace(/\D/g,'')
+    if (cnpjDigits.length !== 14) { toast.error('CNPJ deve ter 14 dígitos'); return }
+    let cnpjResult
+    try {
+      const resp = await fetch('/api/validate-cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj: cnpjDigits }) })
+      cnpjResult = await resp.json()
+    } catch (err) {
+      toast.error('Erro ao validar CNPJ');
+      return
+    }
+    if (!cnpjResult?.valid) { toast.error(cnpjResult?.error || 'CNPJ inválido'); return }
     if (currentUser.tipo_usuario === 'gestor') setCnpjValidationResult(cnpjResult.data)
     const forcedStatus = currentUser.tipo_usuario === 'consultor' ? 'em análise' : proposalForm.status
     const payload = {
@@ -324,6 +394,8 @@ function ProposalsInner({
       valor: valorNumber,
       criado_por: currentUser.id,
     }
+    // Garante que o backend receba apenas dígitos do CNPJ
+    payload.cnpj = cnpjDigits
     // Para consultor, limpar campos de consultor (serão inferidos no backend) e garantir cliente_*
     if (currentUser.tipo_usuario === 'consultor') {
       delete payload.consultor
@@ -416,11 +488,44 @@ function ProposalsInner({
                     <Label>CNPJ</Label>
                     <Input
                       value={proposalForm.cnpj}
-                      onChange={(e) => setProposalForm(prev => ({ ...prev, cnpj: e.target.value }))}
+                      maxLength={18}
+                      inputMode="numeric"
+                      onChange={(e) => {
+                        const masked = maskCNPJ(e.target.value)
+                        setProposalForm(prev => ({ ...prev, cnpj: masked }))
+                        const digits = masked.replace(/\D/g,'')
+                        if (digits.length === 14) fetchCnpjInfo(masked)
+                      }}
                       onBlur={(e) => fetchCnpjInfo(e.target.value)}
                       placeholder="00.000.000/0000-00"
                       required
                     />
+                    {(() => {
+                      const digits = String(proposalForm.cnpj || '').replace(/\D/g, '')
+                      if (digits.length !== 14) return null
+                      const info = cnpjInfoCache[digits]
+                      if (!info) return null
+                      if (info.loading) return (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Validando CNPJ…</span>
+                        </div>
+                      )
+                      if (info.error) return (
+                        <div className="flex items-center gap-1 text-xs text-destructive mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{info.error}</span>
+                        </div>
+                      )
+                      const nome = info?.nome_fantasia || info?.razao_social
+                      if (nome) return (
+                        <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span className="truncate max-w-[220px]" title={nome}>{nome}</span>
+                        </div>
+                      )
+                      return null
+                    })()}
                   </div>
                   <div className="space-y-2">
                     <Label>Operadora</Label>
@@ -439,7 +544,14 @@ function ProposalsInner({
                   </div>
                   <div className="space-y-2">
                     <Label>Valor do Plano</Label>
-                    <Input type="text" inputMode="decimal" value={proposalForm.valor} onChange={(e) => setProposalForm(prev => ({ ...prev, valor: formatMoneyBR(e.target.value) }))} required />
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={proposalForm.valor}
+                      onChange={(e) => setProposalForm(prev => ({ ...prev, valor: formatMoneyBR(e.target.value) }))}
+                      placeholder="0,00"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -462,7 +574,7 @@ function ProposalsInner({
                     <>
                       <div className="space-y-2">
                         <Label>Nome do Cliente</Label>
-                        <Input value={proposalForm.cliente_nome} onChange={(e) => setProposalForm(prev => ({ ...prev, cliente_nome: e.target.value }))} required />
+                        <Input value={proposalForm.cliente_nome} readOnly disabled placeholder="Preencha o CNPJ para carregar" />
                       </div>
                       <div className="space-y-2">
                         <Label>Email do Cliente</Label>
@@ -484,7 +596,10 @@ function ProposalsInner({
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit">Salvar</Button>
+                  <Button type="submit" disabled={isCnpjValidating}>
+                    {isCnpjValidating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Salvar
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -585,29 +700,51 @@ function ProposalsInner({
             </div>
           </div>
 
-          {/* Kanban */}
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          {/* Kanban melhorado */}
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
             {statusOptions.map(status => (
-              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px]">
-                <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize">
+              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden">
+                <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 bg-card z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border">
                   <span>{status}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{groupedByStatus[status]?.length || 0}</span>
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{groupedByStatus[status]?.length || 0}</span>
                 </div>
-                <div className="p-2 space-y-2 overflow-y-auto">
-                  {groupedByStatus[status]?.map(p => {
+                <div className="p-2 space-y-2 overflow-y-auto custom-scrollbar">
+                  {(!groupedByStatus[status] || groupedByStatus[status].length === 0) && (
+                    <div className="text-[11px] text-muted-foreground italic px-2 py-4 border border-dashed rounded bg-background/40">
+                      Nenhuma proposta
+                    </div>
+                  )}
+                  {groupedByStatus[status]?.map((p) => {
+                    const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
-                      currentUser.tipo_usuario !== 'consultor' && (
-                        currentUser.tipo_usuario === 'gestor' ||
-                        String(p.criado_por) === String(currentUser.id)
-                      )
+                      currentUser.tipo_usuario === 'gestor' || (currentUser.tipo_usuario === 'analista' && isHandler)
                     )
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
                     const isLate = isWaiting && ageHours(p) > SLA_THRESHOLD_HOURS
+                    const ageClass = p.horas_em_analise >= 48 ? 'before:bg-gradient-to-b before:from-red-500 before:to-red-700' : p.horas_em_analise >= 24 ? 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600' : 'before:bg-gradient-to-b before:from-transparent before:to-transparent'
                     return (
-                      <div key={p.id} className={`rounded p-2 bg-background text-xs space-y-1 border relative group ${isWaiting ? (isLate ? 'border-red-400 shadow-[0_0_0_1px_rgba(248,113,113,0.45)]' : 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]') : p.status === 'implantado' ? 'border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]' : 'border-border'}`}>
+                      <div key={p.id} className={`rounded p-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'border-red-400 shadow-[0_0_0_1px_rgba(248,113,113,0.45)]' : 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]') : p.status === 'implantado' ? 'border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]' : 'border-border'} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}>
+                        {/* zebra effect via idx */}
+                        <div className="absolute inset-0 pointer-events-none rounded opacity-0 group-hover:opacity-5 transition-opacity bg-primary" />
                         <div className="font-medium truncate flex items-center gap-1" title={p.consultor}>
-                          <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded">{p.codigo || '—'}</span>
+                          <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded flex items-center gap-1">
+                            {p.codigo || '—'}
+                            {typeof p.horas_em_analise === 'number' && (
+                              <span
+                                title={`Horas em análise: ${p.horas_em_analise}`}
+                                className={
+                                  `inline-flex items-center gap-0.5 rounded px-1 text-[9px] font-semibold border `+
+                                  (p.horas_em_analise >= AGE_STRONG_ALERT_HOURS ? 'bg-red-600 text-white border-red-700' :
+                                   p.horas_em_analise >= AGE_ALERT_HOURS ? 'bg-amber-500 text-black border-amber-600' :
+                                   'bg-gray-200 text-gray-700 border-gray-300')
+                                }
+                              >
+                                <Clock className="w-3 h-3" />
+                                {p.horas_em_analise >= 48 ? `${Math.floor(p.horas_em_analise/24)}d` : `${p.horas_em_analise}h`}
+                              </span>
+                            )}
+                          </span>
                           <span className="truncate capitalize">{p.operadora}</span>
                           {isWaiting && (
                             <span className={`ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded ${isLate ? 'bg-red-600' : 'bg-amber-500'} text-white font-semibold tracking-wide uppercase`}>
@@ -634,7 +771,7 @@ function ProposalsInner({
                             {p.cliente_email && <span className="truncate max-w-[140px]" title={p.cliente_email}>({p.cliente_email})</span>}
                           </div>
                         )}
-                        {/* Tags placeholder (carregadas no modal) */}
+                        {/* Ações */}
                         <div className="flex gap-1 flex-wrap items-center pt-1">
                           <button type="button" onClick={() => openDetails(p.id)} className="px-2 py-0.5 text-[11px] rounded bg-secondary text-secondary-foreground hover:brightness-105">Ver detalhes</button>
                           {canEdit && (
@@ -659,7 +796,6 @@ function ProposalsInner({
                           {currentUser.tipo_usuario === 'gestor' && (
                             <button type="button" onClick={() => openEditDialog(p)} className="px-2 py-0.5 text-[11px] rounded border bg-background hover:bg-muted">Editar</button>
                           )}
-                          {/* Claim para analista: aparece se não houver atendido_por */}
                           {currentUser.tipo_usuario === 'analista' && !p.atendido_por && (
                             <button
                               type="button"
@@ -675,11 +811,19 @@ function ProposalsInner({
                               Assumir
                             </button>
                           )}
-                          {p.atendido_por && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {`Atendido por: ${users.find(u => u.id === p.atendido_por)?.nome || '—'}`}
-                            </span>
-                          )}
+                          {(() => {
+                            let handlerId = p.atendido_por
+                            if (!handlerId && p.status === 'implantado') {
+                              const creatorIsAnalyst = users.some(u => u.id === p.criado_por && u.tipo_usuario === 'analista')
+                              if (creatorIsAnalyst) handlerId = p.criado_por
+                            }
+                            const nome = handlerId ? (users.find(u => u.id === handlerId)?.nome || '—') : '—'
+                            return (
+                              <span className="text-[10px] text-muted-foreground">
+                                {`Atendido por: ${nome}`}
+                              </span>
+                            )
+                          })()}
                         </div>
                         {currentUser.tipo_usuario === 'gestor' && (
                           <div className="text-[10px] text-muted-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
@@ -687,9 +831,6 @@ function ProposalsInner({
                       </div>
                     )
                   })}
-                  {groupedByStatus[status]?.length === 0 && (
-                    <p className="text-[11px] text-muted-foreground text-center py-4">Sem propostas</p>
-                  )}
                 </div>
               </div>
             ))}
@@ -767,23 +908,43 @@ function ProposalsInner({
             </div>
             {detailLoading && <p className="text-sm">Carregando...</p>}
             {!detailLoading && detail && (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div><span className="font-medium">CNPJ:</span> {formatCNPJ(detail.cnpj)}</div>
-                  <div><span className="font-medium">Operadora:</span> {detail.operadora}</div>
-                  <div><span className="font-medium">Consultor:</span> {detail.consultor}</div>
-                  <div><span className="font-medium">Email Consultor:</span> {detail.consultor_email || '—'}</div>
+              <div className="space-y-6 text-sm">
+                {/* Blocos superiores: Consultor / Analista */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-md border bg-muted/20 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Consultor</h4>
+                    <div><span className="font-medium">Nome:</span> {detail.consultor || '—'}</div>
+                    <div><span className="font-medium">Email:</span> {detail.consultor_email || '—'}</div>
                     <div><span className="font-medium">Cliente:</span> {detail.cliente_nome || '—'}</div>
                     <div><span className="font-medium">Email Cliente:</span> {detail.cliente_email || '—'}</div>
-                    <div><span className="font-medium">Responsável Atual:</span> {detail.analista_responsavel_nome || detail.atendido_por_nome || (detail.atendido_por && (users.find(u => u.id === detail.atendido_por)?.nome)) || (users.find(u => u.id === detail.criado_por)?.nome) || '—'}</div>
-                    <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
-                  <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
-                  <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>
-                  <div><span className="font-medium">Status:</span> {detail.status}</div>
-                  <div className="col-span-2"><span className="font-medium">Previsão Implantação:</span> {detail.previsao_implantacao ? new Date(detail.previsao_implantacao).toLocaleDateString('pt-BR') : '—'}</div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Observações do Cliente:</span>
-                    <p className="text-xs mt-1 whitespace-pre-wrap border rounded p-2 bg-muted/30 min-h-[40px]">{detail.observacoes_cliente || '—'}</p>
+                  </div>
+                  <div className="p-4 rounded-md border bg-muted/20 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Analista</h4>
+                    {(() => {
+                      const nomeResp = detail.atendido_por ? (users.find(u => u.id === detail.atendido_por)?.nome || '—') : '—'
+                      return (
+                        <>
+                          <div><span className="font-medium">Responsável Atual:</span> {nomeResp}</div>
+                          <div><span className="font-medium">Assumido em:</span> {detail.atendido_em ? new Date(detail.atendido_em).toLocaleString('pt-BR') : '—'}</div>
+                          <div><span className="font-medium">Status:</span> {detail.status}</div>
+                          <div><span className="font-medium">Previsão Implantação:</span> {detail.previsao_implantacao ? new Date(detail.previsao_implantacao).toLocaleDateString('pt-BR') : '—'}</div>
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+                {/* Dados gerais */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-md border bg-background/50 space-y-1">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Dados da Proposta</h4>
+                    <div><span className="font-medium">CNPJ:</span> {formatCNPJ(detail.cnpj)}</div>
+                    <div><span className="font-medium">Operadora:</span> {detail.operadora}</div>
+                    <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
+                    <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>
+                  </div>
+                  <div className="p-4 rounded-md border bg-background/50 space-y-2">
+                    <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Observações Cliente</h4>
+                    <p className="text-xs whitespace-pre-wrap border rounded p-2 bg-muted/30 min-h-[60px]">{detail.observacoes_cliente || '—'}</p>
                   </div>
                 </div>
                 {/* Tags & Notas */}

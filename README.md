@@ -16,10 +16,14 @@ Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de plano
 - Validação automática de CNPJ (3 APIs em cascata)
 - Status personalizados para pipeline de vendas
 - Múltiplas operadoras de saúde suportadas
-- Dashboard com métricas e gráficos
 - Tooltip no CNPJ exibindo Razão Social (via /api/validate-cnpj)
 - Coluna “Email do Consultor” visível para gestores
 - Filtros persistentes com chips removíveis (Propostas e Dashboard)
+- Campos enriquecidos: `horas_em_analise` e `dias_em_analise` retornados pelo endpoint `/api/proposals` para evitar recomputo no cliente
+- Badges de envelhecimento (≥24h / ≥48h) e destaques visuais no board/Kanban
+- Edição inline de status com spinner individual por linha e bloqueio durante PATCH
+- Toasts de SLA: avisos em marcos (ex.: 8h, 24h, 48h) para acompanhamento proativo
+- Alerta automático de propostas paradas (≥24h) via endpoint dedicado (ver seção "Alertas")
 
 ### 🔒 Segurança
 
@@ -219,12 +223,91 @@ node .\test_cnpj_validation.js
 # Adicione a coluna obrigatória consultor_email em bases existentes:
 # veja scripts/migrations/2025-08-18-add-consultor-email.sql
 
-# Windows: preparar/remover cache do Next.js
+## 🔔 Alertas Automáticos
+
+### Propostas Paradas (≥24h)
+
+Endpoint: `GET /api/alerts/proposals/stale`
+
+Identifica propostas com status `em análise` cujo tempo desde `criado_em` ≥ `STALE_PROPOSAL_ALERT_HOURS` (padrão 24) e dispara e‑mail para:
+
+- Todos os usuários com `tipo_usuario = 'gestor'`
+- E o e‑mail definido em `PRIMARY_GESTOR_EMAIL` (sempre incluído, mesmo se não existir usuário)
+
+Características:
+
+- Sem limite superior de idade: continua notificando enquanto permanecer `em análise`
+- Idempotente por execução (não grava estado); para diminuir repetição ajuste a frequência do cron
+- Pode ser chamado manualmente autenticado como gestor
+
+Autorização:
+
+1. Cron externo: enviar header `X-Cron-Key: <CRON_SECRET>` (quando definido)
+2. Usuário gestor autenticado (cookie / Bearer)
+
+Variáveis de ambiente:
+
+- `STALE_PROPOSAL_ALERT_HOURS` (default 24)
+- `PRIMARY_GESTOR_EMAIL`
+- `CRON_SECRET` (opcional)
+
+Resposta (exemplo abreviado):
+
+```json
+{"proposals_found":3,"alerted":true,"threshold_hours":24}
+```
+
+Agendamento sugerido: a cada hora. Ajuste conforme necessidade de ruído vs. rapidez.
+
+## 📈 Dashboard Analítico (Gestor)
+
+O dashboard para gestores foi reformulado para privilegiar métricas operacionais e previsivas em vez de gráficos de funil genéricos ou heatmaps de baixo valor.
+
+### Conjunto Atual de Cards / Gráficos
+
+- Status (ABS/% toggle): barras horizontais mostrando contagem e proporção de propostas por status.
+- Top Operadoras (ABS/% + Conversão): distribuição de propostas e taxa de conversão (implantado / total) por operadora.
+- Aging Buckets: distribuição por faixas de idade em análise (ex.: 0–7h, 8–23h, 24–47h, 48–71h, ≥72h).* Faixas podem ser ajustadas no código.
+- SLA Assunção: tempo até primeira ação/assunção com métricas: média, p95, % ≤8h, % ≤24h.
+- Evolução 7 Dias: sparkline de volume diário de novas propostas / implantações recentes.
+- Value Buckets: segmentação de propostas por faixas de `valor` (configurável) para entender mix de ticket.
+- Forecast Meta: projeção de atingimento mensal extrapolando média diária MTD (month-to-date) vs meta acumulada requerida.
+- Ranking Analistas: ordenação por implantações (ou valor implantado) com destaques (medalhas, barra de conversão).
+
+#### Movimentações (Solicitações) – Macros (Gestor)
+
+- Movimentações Totais (todas as solicitações)
+- Abertas / Em Execução (soma e breakdown)
+- Concluídas (e canceladas)
+- Atrasadas (SLA previsto ultrapassado e não concluída/cancelada) + % do total
+- Status Movimentações (barras e % por grupo)
+- SLA Assunção Movimentações (média horas da criação até primeiro status diferente de "aberta")
+
+Removed / Substituídos:
+
+- Funil de conversão estático → substituído pelos cards combinados (Status + Conversão por Operadora + Forecast)
+- Heatmap de atividade → substituído por Aging + Evolução 7 Dias (mais diretamente acionáveis)
+
+### Interações / UX
+
+- Toggle ABS/% persiste na sessão (localStorage)
+- Tooltips explicam fórmulas e limites (ex.: forecast = média diária * dias úteis restantes)
+- Cálculos feitos client-side (sem novas consultas) usando dados já retornados de `/api/proposals`
+- Operações O(n) linear sobre a lista de propostas (sem agregações redundantes)
+
+### Forecast (Simplificação Atual)
+
+Projeção linear: `proj = (valor_implantado_mtd / dias_passados) * dias_totais_mes`. Percentual de progresso = `valor_implantado_mtd / meta`. Ajustes futuros podem considerar sazonalidade ou pesos por dia da semana.
+
+## Windows: preparar/remover cache do Next.js
+
+```powershell
 npm run windows:next-cache:setup
 npm run windows:next-cache:remove
 ```
 
-## � Metas (lógica de negócio)
+
+## 🎯 Metas (lógica de negócio)
 
 - A meta do analista considera o somatório das propostas com status `implantado`.
 - Transição de status aplica deltas na meta via RPC `atualizar_meta_usuario`:
@@ -232,7 +315,7 @@ npm run windows:next-cache:remove
   - De `implantado` → outro status: subtrai o valor da proposta.
 - O endpoint `GET /api/goals` retorna o valor alcançado calculado dinamicamente a partir das propostas `implantado` por usuário, evitando duplicações.
 
-## �🗃️ Migração opcional: backfill e índice (consultor_email)
+## 🗃️ Migração opcional: backfill e índice (consultor_email)
 
 Para melhorar a visibilidade de propostas antigas para analistas e a performance de consultas, aplique a migração em `scripts/migrations/2025-08-19-backfill-consultor-email-and-index.sql` no Supabase. Ela:
 
@@ -250,7 +333,7 @@ Para melhorar a visibilidade de propostas antigas para analistas e a performance
 vercel --prod
 ```
 
-### Variáveis de ambiente para produção
+## Variáveis de ambiente para produção
 
 ```env
 NODE_ENV=production
@@ -270,6 +353,7 @@ O sistema inclui:
 - **Métricas de sessão** por usuário
 - **Alertas de rate limiting**
 - **Dashboard de segurança** para gestores
+- **Alerta de propostas paradas** (≥24h)
 
 ## 🤝 Contribuindo
 
@@ -332,6 +416,6 @@ CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id)
 Um usuário é considerado online se possui sessão sem `data_logout` e com `ultimo_ping` recente (ex.: nos últimos 2 minutos). O cliente envia pings a cada ~60s.
 
 —
-Atualizado em: 20/08/2025
+Atualizado em: 29/08/2025
 
 Observação: Este sistema contém dados sensíveis. Siga as melhores práticas de segurança e nunca exponha credenciais ou chaves de API.

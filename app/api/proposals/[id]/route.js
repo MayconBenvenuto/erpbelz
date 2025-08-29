@@ -174,6 +174,7 @@ export async function PATCH(request, { params }) {
     return handleCORS(NextResponse.json(claimed), origin)
   }
 
+  // Antes de validar, se analista enviou apenas status (sem claim) e ele é criador e ninguém assumiu, permitiremos claim implícito depois.
   const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
     const payloadErr = process.env.NODE_ENV === 'production'
@@ -188,16 +189,55 @@ export async function PATCH(request, { params }) {
 
   // Busca a proposta e checa autorização:
   // - Gestor pode alterar qualquer
-  // - Analista pode alterar apenas se for o criador
+  // - Analista pode alterar somente se for o atendente (após claim)
   // - Consultor NÃO pode alterar
-  const { data: currentProposal, error: fetchError } = await supabase
-    .from('propostas')
-  .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente')
-    .eq('id', id)
-    .single()
-  if (fetchError || !currentProposal) {
-    try { console.warn('[PROPOSALS] PATCH not found', { id, fetchError: fetchError?.message }) } catch {}
-    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+  // Função de busca com pequena tentativa de retry para mitigar race (replicação / latência após claim)
+  async function fetchProposalWithRetry() {
+    const attempt = async () => {
+      return await supabase
+        .from('propostas')
+        .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente')
+        .eq('id', id)
+        .single()
+    }
+    let { data: p, error: e } = await attempt()
+    if ((!p || e) && !request.signal?.aborted) {
+      // breve espera
+      await new Promise(r => setTimeout(r, 150))
+      const retry = await attempt()
+      p = retry.data; e = retry.error
+      if (!p || e) return { p: null, e }
+    }
+    return { p, e: null }
+  }
+
+  let { p: currentProposal, e: fetchError } = await fetchProposalWithRetry()
+  if (!currentProposal) {
+    // Retry extra rápido (terceira tentativa) antes de desistir
+    try {
+      await new Promise(r => setTimeout(r, 120))
+  const third = await supabase
+        .from('propostas')
+        .select('id, codigo, criado_por, atendido_por')
+        .eq('id', id)
+        .single()
+      if (third.data) {
+        // Substitui e continua fluxo
+        currentProposal = third.data
+      }
+    } catch (_) {}
+  }
+  if (!currentProposal) {
+    try {
+      console.warn('[PROPOSALS] PATCH not found after retry', {
+        id,
+        fetchError: fetchError?.message,
+        user: auth.user.id,
+        role: auth.user.tipo_usuario,
+        bodyKeys: Object.keys(body||{}),
+      })
+    } catch {}
+    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada (pode ter sido removida ou você perdeu acesso). Recarregue a lista.' }, { status: 404 }), origin)
   }
   // Claim já tratado no bloco anterior
 
@@ -205,9 +245,36 @@ export async function PATCH(request, { params }) {
     try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
     return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
   }
-  if (auth.user.tipo_usuario !== 'gestor' && currentProposal.criado_por !== auth.user.id) {
-    try { console.warn('[PROPOSALS] PATCH forbidden', { id, by: auth.user.id }) } catch {}
-    return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
+  if (auth.user.tipo_usuario !== 'gestor') {
+    let isHandler = currentProposal.atendido_por === auth.user.id
+    const canImplicitClaim = auth.user.tipo_usuario === 'analista' && !currentProposal.atendido_por && String(currentProposal.criado_por) === String(auth.user.id)
+    if (!isHandler && canImplicitClaim) {
+      try {
+        const { data: claimAuto } = await supabase
+          .from('propostas')
+          .update({ atendido_por: auth.user.id, atendido_em: new Date().toISOString() })
+          .eq('id', id)
+          .eq('atendido_por', currentProposal.atendido_por) // garante que ninguém assumiu nesse intervalo
+          .select('atendido_por')
+          .single()
+        if (claimAuto?.atendido_por === auth.user.id) isHandler = true
+      } catch (_) {}
+      if (!isHandler) {
+        // refetch uma vez – pode ter sido assumida por outro analista
+        try {
+          const { data: refetched } = await supabase
+            .from('propostas')
+            .select('atendido_por')
+            .eq('id', id)
+            .single()
+          if (refetched?.atendido_por === auth.user.id) isHandler = true
+        } catch (_) {}
+      }
+    }
+    if (!isHandler) {
+      try { console.warn('[PROPOSALS] PATCH forbidden', { id, by: auth.user.id, atendido_por: currentProposal.atendido_por }) } catch {}
+      return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
+    }
   }
 
   // Constrói update controlado
@@ -228,9 +295,7 @@ export async function PATCH(request, { params }) {
     .update(updatePayload)
     .eq('id', id)
 
-  if (auth.user.tipo_usuario !== 'gestor') {
-    updateQuery = updateQuery.eq('criado_por', auth.user.id)
-  }
+  // Removido filtro estrito por criado_por: autorização já validada incluindo atendido_por
 
   const { data: updated, error } = await updateQuery.select().single()
 
