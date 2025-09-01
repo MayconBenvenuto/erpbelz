@@ -28,7 +28,7 @@ export async function GET(req, { params }) {
 
     // autorização
     const isGestor = user.tipo === 'gestor'
-    const isAnalistaAutorizado = user.tipo === 'analista' && data.atendido_por === user.userId
+    const isAnalistaAutorizado = ['analista_implantacao', 'analista_movimentacao'].includes(user.tipo) && data.atendido_por === user.userId
     const isConsultorProprietario = user.tipo === 'consultor' && data.criado_por === user.userId
     if (!(isGestor || isAnalistaAutorizado || isConsultorProprietario)) {
       return NextResponse.json({ message: 'Sem permissão para ver detalhes' }, { status: 403 })
@@ -98,7 +98,7 @@ export async function PATCH(req, { params }) {
     const historicoAppend = []
 
     if (body.claim) {
-      if (user.tipo !== 'analista') {
+      if (!['analista_implantacao', 'analista_movimentacao'].includes(user.tipo)) {
         return NextResponse.json({ message: 'Somente analistas podem assumir' }, { status: 403 })
       }
       const { data: cur } = await supabase.from('solicitacoes').select('atendido_por').eq('id', id).single()
@@ -116,7 +116,7 @@ export async function PATCH(req, { params }) {
       historicoAppend.push({ status: 'atribuída', em: new Date().toISOString(), usuario_id: user.userId })
     }
     if (body.status) {
-      if (user.tipo !== 'analista') {
+      if (!['analista_implantacao', 'analista_movimentacao'].includes(user.tipo)) {
         return NextResponse.json({ message: 'Somente analistas podem alterar status' }, { status: 403 })
       }
       const statusLimpo = sanitizeInput(String(body.status).toLowerCase())
