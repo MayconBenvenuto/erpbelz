@@ -30,8 +30,11 @@ export async function GET(request) {
 			// Consultor: vê apenas propostas que criou ou cujo email de consultor é o seu
 			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
 		} else if (auth.user.tipo_usuario === 'analista_implantacao') {
-		// Analista de implantação: mesma lógica do antigo analista
+		// Analista implantação: vê propostas que criou, que atende ou que estão livres
 		q = q.or(`criado_por.eq.${auth.user.id},atendido_por.eq.${auth.user.id},atendido_por.is.null`)
+		} else if (auth.user.tipo_usuario === 'analista_movimentacao') {
+		// Analista movimentação: vê apenas propostas que criou ou que atende
+		q = q.or(`criado_por.eq.${auth.user.id},atendido_por.eq.${auth.user.id}`)
 		} else if (auth.user.tipo_usuario === 'gerente') {
 		// Gerente enxerga tudo (como gestor porém sem permissão de gestão de usuários)
 		// nada a adicionar
@@ -80,8 +83,8 @@ const validateFutureOrToday = (d) => {
 
 const createSchema = z.object({
 	cnpj: z.string().min(14),
-	// Para analista/gestor continua enviando consultor e consultor_email.
-	consultor: z.string().min(2).optional(),
+	// Para analista/gestor consultor e consultor_email são opcionais (podem ser preenchidos depois)
+	consultor: z.string().min(1).optional(),
 	consultor_email: z.string().email().optional(),
 	cliente_nome: z.string().min(2).optional(),
 	cliente_email: z.string().email().optional(),
@@ -99,8 +102,8 @@ export async function POST(request) {
 	if (auth.error) {
 		return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 	}
-	if (!hasPermission(auth.user,'viewPropostas')) {
-		return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
+	if (!hasPermission(auth.user,'createPropostas')) {
+		return handleCORS(NextResponse.json({ error: 'Acesso negado para criar propostas' }, { status: 403 }), origin)
 	}
 	// Antes: consultor não podia criar. Agora permitido (consultor é quem abre a proposta).
 	// Regras adicionais: se for consultor, sempre força status inicial 'em análise' para evitar criação já implantada
@@ -116,7 +119,7 @@ export async function POST(request) {
 
 	const payload = { ...parsed.data }
 	if (auth.user.tipo_usuario === 'consultor') {
-		payload.status = 'em análise'
+		payload.status = 'recepcionado'
 		// Garante nome e email do consultor mesmo se user.nome estiver vazio ou null
 		let resolvedNome = (auth.user.nome || '').trim()
 		if (!resolvedNome) {
@@ -137,8 +140,11 @@ export async function POST(request) {
 		if (!payload.cliente_nome || !payload.cliente_email) {
 			return handleCORS(NextResponse.json({ error: 'Informe nome e email do cliente' }, { status: 400 }), origin)
 		}
+	} else if (['analista_implantacao', 'analista_movimentacao'].includes(auth.user.tipo_usuario)) {
+		// Para analistas, consultor e consultor_email são opcionais (podem preencher depois)
+		// A proposta será automaticamente atribuída ao analista que criou
 	} else {
-		// Para analista/gestor manter necessidade de consultor e consultor_email
+		// Para gestor/gerente manter necessidade de consultor e consultor_email
 		if (!payload.consultor || !payload.consultor_email) {
 			return handleCORS(NextResponse.json({ error: 'Consultor e email do consultor são obrigatórios' }, { status: 400 }), origin)
 		}
@@ -153,6 +159,13 @@ export async function POST(request) {
 	// Campos de atendimento (analista que assumir depois)
 	payload.atendido_por = null
 	payload.atendido_em = null
+	
+	// Se for analista criando a proposta, auto-atribuir para ele
+	if (['analista_implantacao', 'analista_movimentacao'].includes(auth.user.tipo_usuario)) {
+		payload.atendido_por = auth.user.id
+		payload.atendido_em = new Date().toISOString()
+	}
+	
 	const { data, error } = await supabase
 		.from('propostas')
 		.insert(payload)

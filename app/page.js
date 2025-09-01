@@ -275,9 +275,11 @@ export default function App() {
         }
         scheduleLoadData()
       } else {
-        toast.error(result.error || 'Erro ao criar proposta')
+        console.error('Erro ao criar proposta:', result)
+        toast.error(result.error || result.message || 'Erro ao criar proposta')
       }
-    } catch {
+    } catch (error) {
+      console.error('Erro de conexão:', error)
       toast.error('Erro ao conectar com o servidor')
     } finally {
       setIsLoading(false)

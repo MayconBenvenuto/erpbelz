@@ -1,5 +1,10 @@
 ﻿# Sistema de Gestão - Belz
 
+## 📚 Documentação
+
+- **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
+- **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
+
 // Documentação de pipelines automatizados removida (workflows GitHub excluídos). Gerar cobertura local:
 
 ```powershell

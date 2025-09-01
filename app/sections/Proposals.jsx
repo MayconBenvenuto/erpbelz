@@ -12,6 +12,8 @@ import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle, Clock }
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
+import { STATUS_COLORS } from '@/lib/constants'
+import ProposalsTimeline from '@/components/timeline/ProposalsTimelineComponent'
 
 export default function ProposalsSection(props) {
   return <ProposalsInner {...props} />
@@ -75,7 +77,7 @@ function ProposalsInner({
     quantidade_vidas: '',
     valor: '',
     previsao_implantacao: '',
-    status: 'em análise'
+    status: 'recepcionado'
   })
   // Validação / cache CNPJ
   // Resultado detalhado (somente gestor exibe após criação) - removido do layout por enquanto
@@ -89,8 +91,6 @@ function ProposalsInner({
   })()
   // Filtros
   const defaultFilters = { q: '', status: 'todos', operadora: 'todas', analista: 'todos', consultor: 'todos' }
-  // Filtro extra: somente propostas livres (não atribuídas) para analista
-  const [onlyFree, setOnlyFree] = useState(false)
   const [filters, setFilters] = useState(defaultFilters)
   const [vidasSortAsc, setVidasSortAsc] = useState(true)
   // Edição (gestor)
@@ -184,11 +184,10 @@ function ProposalsInner({
       if (filters.operadora !== 'todas' && p.operadora !== filters.operadora) return false
       if (currentUser.tipo_usuario === 'gestor' && filters.analista !== 'todos' && String(p.criado_por) !== String(filters.analista)) return false
       if (currentUser.tipo_usuario === 'gestor' && filters.consultor !== 'todos' && p.consultor !== filters.consultor) return false
-      if (onlyFree && currentUser.tipo_usuario === 'analista' && p.atendido_por) return false
       return true
     })
     const sorted = list.slice().sort((a, b) => {
-      if (currentUser.tipo_usuario === 'analista') {
+      if (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario)) {
         const aFree = !a.atendido_por
         const bFree = !b.atendido_por
         if (aFree !== bFree) return aFree ? -1 : 1
@@ -207,7 +206,7 @@ function ProposalsInner({
       return da - db
     })
     return sorted
-  }, [proposalsMerged, filters, currentUser.tipo_usuario, vidasSortAsc, onlyFree])
+  }, [proposalsMerged, filters, currentUser.tipo_usuario, vidasSortAsc])
 
   // Alertas em tempo real de SLA estourado (analista/gestor)
   useEffect(() => {
@@ -387,7 +386,7 @@ function ProposalsInner({
     }
     if (!cnpjResult?.valid) { toast.error(cnpjResult?.error || 'CNPJ inválido'); return }
     if (currentUser.tipo_usuario === 'gestor') setCnpjValidationResult(cnpjResult.data)
-    const forcedStatus = currentUser.tipo_usuario === 'consultor' ? 'em análise' : proposalForm.status
+    const forcedStatus = currentUser.tipo_usuario === 'consultor' ? 'recepcionado' : proposalForm.status
     const payload = {
       ...proposalForm,
       status: forcedStatus,
@@ -404,12 +403,15 @@ function ProposalsInner({
       // Se não for consultor, cliente_* podem ser removidos se vierem vazios
       if (!payload.cliente_nome) delete payload.cliente_nome
       if (!payload.cliente_email) delete payload.cliente_email
+      // Para analistas, também limpar campos de consultor se vazios
+      if (!payload.consultor || !payload.consultor.trim()) delete payload.consultor
+      if (!payload.consultor_email || !payload.consultor_email.trim()) delete payload.consultor_email
     }
     await onCreateProposal({
       ...payload,
       cnpjValidationData: cnpjResult.data,
       afterSuccess: () => {
-        setProposalForm({ cnpj: '', consultor: '', consultor_email: '', cliente_nome: '', cliente_email: '', operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', status: 'em análise' })
+        setProposalForm({ cnpj: '', consultor: '', consultor_email: '', cliente_nome: '', cliente_email: '', operadora: '', quantidade_vidas: '', valor: '', previsao_implantacao: '', status: 'recepcionado' })
         setCnpjValidationResult(null)
         setIsDialogOpen(false)
       }
@@ -420,7 +422,7 @@ function ProposalsInner({
     const map = {}
     for (const s of statusOptions) map[s] = []
     for (const p of filteredProposals) {
-      const st = p.status || statusOptions[0] || 'em análise'
+      const st = p.status || statusOptions[0] || 'recepcionado'
       if (!map[st]) map[st] = []
       map[st].push(p)
     }
@@ -453,7 +455,7 @@ function ProposalsInner({
           </CardHeader>
           <CardContent className="pt-0 text-xs space-y-1">
             <p><strong>1.</strong> Clique em &quot;Solicitar Proposta&quot; e preencha os dados.</p>
-            <p><strong>2.</strong> O status inicial será sempre <span className="font-semibold">em análise</span>.</p>
+            <p><strong>2.</strong> O status inicial será sempre <span className="font-semibold">recepcionado</span>.</p>
             <p><strong>3.</strong> Um analista clica em &quot;Assumir&quot; e passa a atualizar o status.</p>
             <p><strong>4.</strong> Você vê o nome do analista no cartão quando atribuído.</p>
           </CardContent>
@@ -463,16 +465,16 @@ function ProposalsInner({
         <div>
           <h2 className="text-2xl font-bold">
             {currentUser.tipo_usuario === 'gestor' && 'Monitorar Propostas'}
-            {currentUser.tipo_usuario === 'analista' && 'Gerenciar Propostas'}
+            {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Gerenciar Propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Minhas Propostas'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {currentUser.tipo_usuario === 'gestor' && 'Visualize e monitore todas as propostas'}
-            {currentUser.tipo_usuario === 'analista' && 'Crie, edite e gerencie suas propostas'}
+            {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Crie, edite e gerencie suas propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Crie novas propostas e acompanhe o andamento'}
           </p>
         </div>
-        {(currentUser.tipo_usuario === 'analista' || currentUser.tipo_usuario === 'consultor') && (
+        {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="self-start">{currentUser.tipo_usuario === 'consultor' ? (<><PlusCircle className="w-4 h-4 mr-2" />Solicitar Proposta</>) : (<><PlusCircle className="w-4 h-4 mr-2" />Nova Proposta</>)}</Button>
@@ -692,21 +694,35 @@ function ProposalsInner({
                 </Button>
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setFilters(defaultFilters)}>Limpar</Button>
               </div>
-              {currentUser.tipo_usuario === 'analista' && (
-                <label className="flex items-center gap-2 text-[11px] pt-1 select-none cursor-pointer">
-                  <input type="checkbox" className="h-3 w-3" checked={onlyFree} onChange={(e) => setOnlyFree(e.target.checked)} /> Somente livres
-                </label>
-              )}
             </div>
           </div>
 
+          {/* Linha do Tempo - Para Analistas de Implantação */}
+          {currentUser.tipo_usuario === 'analista_implantacao' && (
+            <div className="mb-6">
+              <ProposalsTimeline 
+                proposals={filteredProposals} 
+                currentUser={currentUser}
+              />
+            </div>
+          )}
+
           {/* Kanban melhorado */}
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
-            {statusOptions.map(status => (
+            {statusOptions.map(status => {
+              const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
+              return (
               <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden">
-                <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 bg-card z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border">
+                <div 
+                  className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
+                  style={{
+                    backgroundColor: statusColors.bg,
+                    color: statusColors.text,
+                    borderColor: statusColors.border
+                  }}
+                >
                   <span>{status}</span>
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{groupedByStatus[status]?.length || 0}</span>
+                  <span className="ml-auto text-xs tabular-nums opacity-70">{groupedByStatus[status]?.length || 0}</span>
                 </div>
                 <div className="p-2 space-y-2 overflow-y-auto custom-scrollbar">
                   {(!groupedByStatus[status] || groupedByStatus[status].length === 0) && (
@@ -717,18 +733,35 @@ function ProposalsInner({
                   {groupedByStatus[status]?.map((p) => {
                     const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
-                      currentUser.tipo_usuario === 'gestor' || (currentUser.tipo_usuario === 'analista' && isHandler)
+                      currentUser.tipo_usuario === 'gestor' || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
                     )
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
                     const isLate = isWaiting && ageHours(p) > SLA_THRESHOLD_HOURS
                     const ageClass = p.horas_em_analise >= 48 ? 'before:bg-gradient-to-b before:from-red-500 before:to-red-700' : p.horas_em_analise >= 24 ? 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600' : 'before:bg-gradient-to-b before:from-transparent before:to-transparent'
+                    const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
                     return (
-                      <div key={p.id} className={`rounded p-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'border-red-400 shadow-[0_0_0_1px_rgba(248,113,113,0.45)]' : 'border-amber-300/70 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]') : p.status === 'implantado' ? 'border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.35)]' : 'border-border'} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}>
+                      <div 
+                        key={p.id} 
+                        className={`rounded p-2 backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'ring-2 ring-red-400' : 'ring-1 ring-amber-300') : ''} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}
+                        style={{
+                          backgroundColor: statusColors.bg,
+                          color: statusColors.text,
+                          borderColor: statusColors.border
+                        }}
+                      >
                         {/* zebra effect via idx */}
                         <div className="absolute inset-0 pointer-events-none rounded opacity-0 group-hover:opacity-5 transition-opacity bg-primary" />
                         <div className="font-medium truncate flex items-center gap-1" title={p.consultor}>
-                          <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded flex items-center gap-1">
+                          <span 
+                            className="font-mono text-[10px] px-1 py-0.5 rounded flex items-center gap-1"
+                            style={{
+                              backgroundColor: statusColors.bg,
+                              color: '#000000 !important',
+                              fontWeight: 'bold',
+                              border: `1px solid ${statusColors.border}`
+                            }}
+                          >
                             {p.codigo || '—'}
                             {typeof p.horas_em_analise === 'number' && (
                               <span
@@ -777,7 +810,7 @@ function ProposalsInner({
                           {canEdit && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button type="button" disabled={busy} className="px-2 py-0.5 text-[11px] rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50">{busy ? '...' : 'Status'}</button>
+                                <button type="button" disabled={busy} className="px-2 py-0.5 text-[11px] rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50">{busy ? '...' : 'Alterar Status'}</button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="start" className="w-44">
                                 <DropdownMenuLabel className="text-[11px]">Alterar status</DropdownMenuLabel>
@@ -814,7 +847,7 @@ function ProposalsInner({
                           {(() => {
                             let handlerId = p.atendido_por
                             if (!handlerId && p.status === 'implantado') {
-                              const creatorIsAnalyst = users.some(u => u.id === p.criado_por && u.tipo_usuario === 'analista')
+                              const creatorIsAnalyst = users.some(u => u.id === p.criado_por && ['analista_implantacao', 'analista_movimentacao'].includes(u.tipo_usuario))
                               if (creatorIsAnalyst) handlerId = p.criado_por
                             }
                             const nome = handlerId ? (users.find(u => u.id === handlerId)?.nome || '—') : '—'
@@ -833,7 +866,8 @@ function ProposalsInner({
                   })}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {auditOpenFor && (<AuditDrawer id={auditOpenFor} onClose={() => setAuditOpenFor(null)} />)}
@@ -866,7 +900,7 @@ function ProposalsInner({
                       <Input type="number" step="0.01" value={editForm.valor} onChange={(e) => setEditForm(prev => ({ ...prev, valor: e.target.value }))} />
                     </div>
                     <div className="space-y-2">
-                      <Label>Previsão de Implantação</Label>
+                      <Label>Início de Vigência</Label>
                       <Input type="date" value={editForm.previsao_implantacao} onChange={(e) => setEditForm(prev => ({ ...prev, previsao_implantacao: e.target.value }))} />
                     </div>
                   </div>
@@ -903,7 +937,21 @@ function ProposalsInner({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2">
           <div className="bg-background w-full max-w-2xl rounded-md border shadow-lg max-h-[90vh] overflow-y-auto p-4 space-y-4">
             <div className="flex items-start gap-2">
-              <h3 className="font-semibold text-lg">Detalhes da Proposta {detail?.codigo && <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{detail.codigo}</span>}</h3>
+              <h3 className="font-semibold text-lg">
+                Detalhes da Proposta {detail?.codigo && (
+                  <span 
+                    className="font-mono text-xs px-1 py-0.5 rounded ml-2"
+                    style={{
+                      backgroundColor: (STATUS_COLORS[detail.status] || { bg: '#f6f6f6' }).bg,
+                      color: '#000000 !important',
+                      fontWeight: 'bold',
+                      border: `1px solid ${(STATUS_COLORS[detail.status] || { border: '#e2e2e2' }).border}`
+                    }}
+                  >
+                    {detail.codigo}
+                  </span>
+                )}
+              </h3>
               <button className="ml-auto text-sm text-muted-foreground hover:text-foreground" onClick={() => setDetailOpen(false)}>Fechar</button>
             </div>
             {detailLoading && <p className="text-sm">Carregando...</p>}

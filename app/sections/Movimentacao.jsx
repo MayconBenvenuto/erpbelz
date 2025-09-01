@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Clock, Activity, CheckCircle2, XCircle, Pencil, Save, FileDown, Loader2 } from 'lucide-react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { SOLICITACAO_STATUS } from '@/lib/constants'
+import { SOLICITACAO_STATUS, SOLICITACAO_STATUS_COLORS } from '@/lib/constants'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { NovaSolicitacaoDialog } from '@/components/solicitacoes/NovaSolicitacaoDialog'
@@ -277,11 +277,20 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
 
       {/* Kanban simples por status */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {SOLICITACAO_STATUS.map(status => (
-          <div key={status} className="border rounded-md bg-card flex flex-col max-h-[520px]">
-            <div className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize">
+        {SOLICITACAO_STATUS.map(status => {
+          const statusColors = SOLICITACAO_STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
+          return (
+          <div key={status} className="border rounded-md bg-card flex flex-col max-h-[520px] shadow-sm overflow-hidden">
+            <div 
+              className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
+              style={{
+                backgroundColor: statusColors.bg,
+                color: statusColors.text,
+                borderColor: statusColors.border
+              }}
+            >
               {statusIcon(status)} {status}
-              <span className="ml-auto text-xs text-muted-foreground">{groupedByStatus[status]?.length || 0}</span>
+              <span className="ml-auto text-xs opacity-75">{groupedByStatus[status]?.length || 0}</span>
             </div>
             <div className="p-2 space-y-2 overflow-y-auto">
               {groupedByStatus[status]?.map(sol => (
@@ -351,7 +360,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
               )}
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {/* Timeline Interativa */}
