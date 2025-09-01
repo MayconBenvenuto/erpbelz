@@ -697,16 +697,6 @@ function ProposalsInner({
             </div>
           </div>
 
-          {/* Linha do Tempo - Para Analistas de Implantação */}
-          {currentUser.tipo_usuario === 'analista_implantacao' && (
-            <div className="mb-6">
-              <ProposalsTimeline 
-                proposals={filteredProposals} 
-                currentUser={currentUser}
-              />
-            </div>
-          )}
-
           {/* Kanban melhorado */}
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
             {statusOptions.map(status => {
@@ -869,6 +859,16 @@ function ProposalsInner({
               )
             })}
           </div>
+
+          {/* Linha do Tempo - Para Analistas de Implantação */}
+          {currentUser.tipo_usuario === 'analista_implantacao' && (
+            <div className="mt-6">
+              <ProposalsTimeline 
+                proposals={filteredProposals} 
+                currentUser={currentUser}
+              />
+            </div>
+          )}
 
           {auditOpenFor && (<AuditDrawer id={auditOpenFor} onClose={() => setAuditOpenFor(null)} />)}
 
