@@ -228,7 +228,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
           <h2 className="text-xl font-semibold tracking-tight">Movimentação</h2>
       <p className="text-sm text-muted-foreground flex items-center gap-2">Gerencie solicitações e acompanhe SLA. {reloading && <Loader2 className="h-4 w-4 animate-spin text-primary" aria-label="Atualizando" />}</p>
         </div>
-        {currentUser?.tipo_usuario !== 'analista' && (
+        {!['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && (
           <Button onClick={() => setOpenSolicitacao(true)} className="bg-primary">Nova Solicitação</Button>
         )}
       </div>
@@ -292,14 +292,14 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                   </div>
                   <div className="flex justify-between gap-2 flex-wrap">
                     <span className="text-muted-foreground">{sol.tipo}{sol.subtipo ? `/${sol.subtipo}` : ''}</span>
-                    <SlaEditor sol={sol} hoje={hoje} canEdit={currentUser?.tipo_usuario === 'gestor' || (currentUser?.tipo_usuario === 'analista' && String(sol.atendido_por) === String(currentUser?.id))} onSave={updateSla} busy={updating[sol.id]} />
+                    <SlaEditor sol={sol} hoje={hoje} canEdit={currentUser?.tipo_usuario === 'gestor' || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && String(sol.atendido_por) === String(currentUser?.id))} onSave={updateSla} busy={updating[sol.id]} />
                   </div>
-                  {currentUser?.tipo_usuario === 'analista' && !sol.atendido_por && (
+                  {['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && !sol.atendido_por && (
                     <div className="flex mb-1">
                       <button disabled={updating[sol.id]} onClick={() => claim(sol.id)} className="px-2 py-0.5 text-[11px] bg-primary text-white rounded disabled:opacity-50">Assumir</button>
                     </div>
                   )}
-                  {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
+                  {['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && sol.atendido_por && String(sol.atendido_por) === String(currentUser?.id) && (
                     <div className="flex gap-1 flex-wrap items-center">
                       <button
                         type="button"
@@ -338,10 +338,10 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                       </DropdownMenu>
                     </div>
                   )}
-                  {currentUser?.tipo_usuario === 'analista' && sol.atendido_por && String(sol.atendido_por) !== String(currentUser?.id) && (
+                  {['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && sol.atendido_por && String(sol.atendido_por) !== String(currentUser?.id) && (
                     <div className="text-[10px] text-muted-foreground">Em análise por {sol.atendido_por_nome || 'outro analista'}</div>
                   )}
-                  {currentUser?.tipo_usuario !== 'analista' && sol.atendido_por_nome && (
+                  {!['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) && sol.atendido_por_nome && (
                     <div className="text-[10px] text-muted-foreground">Analista: {sol.atendido_por_nome}</div>
                   )}
                 </div>

@@ -796,7 +796,7 @@ function ProposalsInner({
                           {currentUser.tipo_usuario === 'gestor' && (
                             <button type="button" onClick={() => openEditDialog(p)} className="px-2 py-0.5 text-[11px] rounded border bg-background hover:bg-muted">Editar</button>
                           )}
-                          {currentUser.tipo_usuario === 'analista' && !p.atendido_por && (
+                          {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && !p.atendido_por && (
                             <button
                               type="button"
                               onClick={async () => {
