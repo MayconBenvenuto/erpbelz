@@ -81,7 +81,7 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
               </SheetClose>
             )}
 
-            {(currentUser?.tipo_usuario === 'analista' || currentUser?.tipo_usuario === 'consultor' || currentUser?.tipo_usuario === 'gestor') && (
+            {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) || currentUser?.tipo_usuario === 'consultor' || currentUser?.tipo_usuario === 'gestor') && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('movimentacao')}
