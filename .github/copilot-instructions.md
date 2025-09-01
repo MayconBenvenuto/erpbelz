@@ -6,7 +6,7 @@ This is a CRM system for Belz company focused on health insurance proposal manag
 Current architecture:
 - Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
 
-Recent updates (2025-08-27):
+Recent updates (2025-09-01):
 - Sequential proposal code (codigo) PRP0000 format (unique, indexed); lists ordered asc by codigo; emails reference only codigo.
 - Inline status editing with per-row loading/disable.
 - Meta progress now backed by table metas (mes, ano, quantidade_implantacoes) instead of accumulating valor.
@@ -15,6 +15,7 @@ Recent updates (2025-08-27):
 - Added sessoes table storing auth sessions tokens + expirado_em.
 - Added view vw_usuarios_online (derived presence status) used for reports/monitoring.
 - Reports exclude gestor from monitoring; refresh button shows spinner/disable.
+- **Standardized UI colors**: Movimentação section now uses the same color system as Propostas section for consistency.
 
 ## Tech Stack
 - **Frontend/Backend**: Next.js 14.2.3 with App Router (/api routes)
@@ -268,6 +269,56 @@ const operadoras = [
   'fox', 'hapvida', 'medsenior', 'sulamerica', 'select'
 ];
 ```
+
+### Solicitação Status & Colors
+```javascript
+const SOLICITACAO_STATUS = [
+  'aberta',          // criada
+  'em validação',    // documentos conferindo
+  'em execução',     // ação em andamento
+  'concluída',       // finalizada com sucesso
+  'cancelada'        // interrompida
+];
+
+// Cores padronizadas para status de solicitações (mesmo padrão das propostas)
+const SOLICITACAO_STATUS_COLORS = {
+  'aberta': { bg: '#E3F2FD', text: '#1565C0', border: '#2196F3' },
+  'em validação': { bg: '#FFF8E1', text: '#F57C00', border: '#FF9800' },
+  'em execução': { bg: '#E8EAF6', text: '#3F51B5', border: '#3F51B5' },
+  'concluída': { bg: '#E0F2F1', text: '#00695C', border: '#009688' },
+  'cancelada': { bg: '#FFEBEE', text: '#C62828', border: '#F44336' }
+};
+```
+
+## Color System & Visual Consistency
+
+### Standardized Status Colors
+Both Propostas and Movimentação sections use consistent color patterns for visual harmony:
+
+```javascript
+// Import colors from constants
+import { STATUS_COLORS, SOLICITACAO_STATUS_COLORS } from '@/lib/constants'
+
+// Apply to kanban columns
+const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
+
+// Column header styling
+<div 
+  className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10"
+  style={{
+    backgroundColor: statusColors.bg,
+    color: statusColors.text,
+    borderColor: statusColors.border
+  }}
+>
+```
+
+### Color Palette Guidelines
+- **Blue tones**: Initial/open states (recepcionado, aberta)
+- **Orange/amber tones**: In progress/validation states  
+- **Purple tones**: Escalated/complex states
+- **Green tones**: Completed/success states
+- **Red tones**: Cancelled/declined states
 
 ## Styling Guidelines
 

@@ -609,7 +609,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
       )}
 
       {/* Timelines específicas para analista (visual do consultor) */}
-      {currentUser.tipo_usuario === 'analista' && (
+      {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
