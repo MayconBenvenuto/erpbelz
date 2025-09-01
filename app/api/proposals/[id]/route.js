@@ -143,7 +143,7 @@ export async function PATCH(request, { params }) {
   const isGestor = auth.user.tipo_usuario === 'gestor'
   const isGerente = auth.user.tipo_usuario === 'gerente'
   // Claim é tratado antes para evitar necessidade de validar status
-  if (body?.claim && auth.user.tipo_usuario === 'analista_implantacao') {
+  if (body?.claim && ['analista_implantacao', 'analista_movimentacao'].includes(auth.user.tipo_usuario)) {
     // Busca proposta para verificar assignment
     const { data: currentProposalPre, error: fetchErrorPre } = await supabase
       .from('propostas')
