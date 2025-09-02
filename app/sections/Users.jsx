@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { PlusCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-export default function UsersSection({ currentUser, users, proposals, userGoals, onCreateUser, onUpdateUserGoal, isLoading }) {
+export default function UsersSection({ currentUser, users, proposals, userGoals, onCreateUser, onUpdateUserGoal, onDeleteUser, isLoading }) {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [userForm, setUserForm] = useState({ nome: '', email: '', senha: '', tipo_usuario: 'analista_implantacao' })
   const [metaDialogUser, setMetaDialogUser] = useState(null) // usuário selecionado para edição de meta
@@ -277,8 +277,17 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
                             </div>
                           </TableCell>
                           {currentUser?.tipo_usuario === 'gestor' && (
-                            <TableCell>
+                            <TableCell className="space-x-1">
                               <Button size="sm" variant="outline" onClick={() => openMetaDialog(user, targetValue)}>Meta</Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => onDeleteUser && onDeleteUser(user.id)}
+                                disabled={['gestor'].includes(user.tipo_usuario) || String(user.id) === String(currentUser.id)}
+                                title={['gestor'].includes(user.tipo_usuario) ? 'Não é permitido excluir gestor' : (String(user.id) === String(currentUser.id) ? 'Você não pode excluir a si mesmo' : 'Excluir usuário')}
+                              >
+                                Excluir
+                              </Button>
                             </TableCell>
                           )}
                         </TableRow>

@@ -22,9 +22,18 @@ export async function GET(request) {
 	if (auth.user.tipo_usuario !== 'gestor') {
 		metasQuery = metasQuery.eq('usuario_id', auth.user.id)
 	}
-	const { data: metas, error: metasError } = await metasQuery
+	let { data: metas, error: metasError } = await metasQuery
 	if (metasError) {
-		return handleCORS(NextResponse.json({ error: metasError.message }, { status: 500 }), origin)
+		// Fallback se coluna atualizado_em não existir em produção (hotfix)
+		if (/atualizado_em/i.test(metasError.message || '')) {
+			let fallbackQuery = supabase.from('metas').select('usuario_id, valor_meta, valor_alcancado')
+			if (auth.user.tipo_usuario !== 'gestor') fallbackQuery = fallbackQuery.eq('usuario_id', auth.user.id)
+			const fb = await fallbackQuery
+			if (fb.error) return handleCORS(NextResponse.json({ error: fb.error.message }, { status: 500 }), origin)
+			metas = fb.data?.map(m => ({ ...m, atualizado_em: null })) || []
+		} else {
+			return handleCORS(NextResponse.json({ error: metasError.message }, { status: 500 }), origin)
+		}
 	}
 
 	// 2) Calcular valor_alcancado real a partir das propostas implantadas

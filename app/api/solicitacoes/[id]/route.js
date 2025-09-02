@@ -26,11 +26,12 @@ export async function GET(req, { params }) {
   const { data, error } = await supabase.from('solicitacoes').select('*').eq('id', id).single()
     if (error || !data) return NextResponse.json({ message: 'Não encontrado' }, { status: 404 })
 
-    // autorização
-    const isGestor = user.tipo === 'gestor'
+  // autorização
+  const isGestor = user.tipo === 'gestor'
+  const isGerente = user.tipo === 'gerente'
     const isAnalistaAutorizado = ['analista_implantacao', 'analista_movimentacao'].includes(user.tipo) && data.atendido_por === user.userId
     const isConsultorProprietario = user.tipo === 'consultor' && data.criado_por === user.userId
-    if (!(isGestor || isAnalistaAutorizado || isConsultorProprietario)) {
+  if (!(isGestor || isGerente || isAnalistaAutorizado || isConsultorProprietario)) {
       return NextResponse.json({ message: 'Sem permissão para ver detalhes' }, { status: 403 })
     }
 

@@ -1,0 +1,78 @@
+name: Verificar PR dev -> main
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quality-gates:
+    if: github.base_ref == 'main' && github.head_ref == 'dev'
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.set-pass.outputs.passed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Testes completos (cobertura)
+        run: npm run test:full
+
+      - name: Marcar sucesso
+        id: set-pass
+        if: success()
+        run: echo "passed=true" >> $GITHUB_OUTPUT
+
+      - name: Publicar status detalhado (sucesso)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Qualidade verificada: lint, build e testes completos passaram.'
+            });
+            // Remove label de bloqueio se existir
+            try {
+              await github.rest.issues.removeLabel({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, name: 'needs-full-qa' });
+            } catch {}
+
+      - name: Publicar status detalhado (falha)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❌ Falha na verificação dev->main. Merge bloqueado até correção (veja logs de lint/build/testes).'
+            });
+            // Garante label de bloqueio
+            try {
+              await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, labels: ['needs-full-qa'] });
+            } catch {}

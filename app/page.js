@@ -42,6 +42,7 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([]) // movimentações para métricas macro no dashboard gestor
   const [userGoals, setUserGoals] = useState([])
+  const [clientes, setClientes] = useState([])
   const [sessions, setSessions] = useState([])
 
   // Command palette
@@ -156,10 +157,13 @@ export default function App() {
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
       const common = { credentials: 'include' }
       const fetches = []
-      // Propostas: gestor e analista usam
+    // Propostas
   fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
-  // Solicitações: sempre trazer (gestor usa macro; analista/consultor podem reutilizar futuramente)
+  // Solicitações
   fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
+    // Carteira de clientes: consultor e gestor
+    const needsClientes = currentUser && ['consultor','gestor'].includes(currentUser.tipo_usuario)
+    if (needsClientes) fetches.push(fetch('/api/clientes', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
   const needsAdminData = currentUser && (currentUser.tipo_usuario === 'gestor')
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
@@ -170,13 +174,17 @@ export default function App() {
 
   const responses = await Promise.all(fetches)
       let idx = 0
-      const proposalsRes = responses[idx++]
-      const solicitacoesRes = responses[idx++]
+  const proposalsRes = responses[idx++]
+  const solicitacoesRes = responses[idx++]
       if (proposalsRes?.ok) setProposals(await proposalsRes.json())
       if (solicitacoesRes?.ok) {
         const json = await solicitacoesRes.json()
         // endpoint retorna { data: [], ... }
         if (Array.isArray(json.data)) setSolicitacoes(json.data)
+      }
+      if (needsClientes) {
+        const clientesRes = responses[idx++]
+        if (clientesRes?.ok) setClientes(await clientesRes.json())
       }
   if (needsAdminData) {
         const usersRes = responses[idx++]
@@ -481,6 +489,25 @@ export default function App() {
     }
   }
 
+  const handleDeleteUser = async (usuarioId) => {
+    if (!usuarioId) return
+    if (!window.confirm('Confirmar exclusão deste usuário? Esta ação é irreversível.')) return
+    try {
+      const headers = { }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`/api/users?id=${encodeURIComponent(usuarioId)}`, { method: 'DELETE', headers, credentials: 'include' })
+      const data = await res.json().catch(()=>({}))
+      if (res.ok) {
+        toast.success('Usuário excluído')
+        await loadData()
+      } else {
+        toast.error(data.error || 'Erro ao excluir usuário')
+      }
+    } catch {
+      toast.error('Erro ao conectar com o servidor')
+    }
+  }
+
   // Auto refresh e atividade
   const updateActivity = useCallback(() => {
     const now = Date.now()
@@ -702,13 +729,19 @@ export default function App() {
 
             {currentUser.tipo_usuario === 'gestor' && (
               <TabsContent value="usuarios" className="space-y-6">
-                <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} isLoading={isLoading} />
+                <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} onDeleteUser={handleDeleteUser} isLoading={isLoading} />
               </TabsContent>
             )}
 
             {currentUser.tipo_usuario === 'gestor' && (
               <TabsContent value="relatorios" className="space-y-6">
                 <ReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
+              </TabsContent>
+            )}
+
+            {['consultor','gestor'].includes(currentUser.tipo_usuario) && (
+              <TabsContent value="carteira" className="space-y-6">
+                {(() => { const Carteira = require('./sections/CarteiraClientes.jsx').default; return <Carteira currentUser={currentUser} token={token} initialClientes={clientes} /> })()}
               </TabsContent>
             )}
 

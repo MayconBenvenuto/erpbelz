@@ -14,12 +14,12 @@
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat } from 'lucide-react'
+import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat, Briefcase } from 'lucide-react'
 import { hasPermission } from '@/lib/rbac'
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
   return (
-  <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-card border-r shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
+  <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-secondary border-r shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
       <div className="p-6 border-b">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10">
@@ -72,6 +72,20 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             >
               <Repeat className="w-5 h-5" />
               <span className="font-medium">Movimentação</span>
+            </button>
+          )}
+
+          {/* Carteira de Clientes: consultor e gestor */}
+          {['consultor','gestor'].includes(currentUser?.tipo_usuario) && (
+            <button
+              onClick={() => setActiveTab('carteira')}
+              aria-current={activeTab === 'carteira' ? 'page' : undefined}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                activeTab === 'carteira' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Briefcase className="w-5 h-5" />
+              <span className="font-medium">Carteira de Clientes</span>
             </button>
           )}
 

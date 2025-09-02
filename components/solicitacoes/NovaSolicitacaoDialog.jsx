@@ -1,5 +1,5 @@
 "use client"
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,9 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   const [subtipo, setSubtipo] = useState('funcionario')
   const [razaoSocial, setRazaoSocial] = useState('')
   const [cnpj, setCnpj] = useState('')
+  const [cnpjState, setCnpjState] = useState({ loading: false, error: null, validated: false })
+  const cnpjAbortRef = useRef(null)
+  const lastValidatedRef = useRef(null)
   const [apoliceBelz, setApoliceBelz] = useState(false)
   const [acessoEmpresa, setAcessoEmpresa] = useState('')
   const [operadora, setOperadora] = useState('')
@@ -134,8 +137,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   }, [DOC_TIPS])
 
   const validate = useCallback(() => {
-    if (!razaoSocial.trim()) return 'Razão Social é obrigatória'
     if (!cnpj.trim() || !validateCNPJ(cnpj)) return 'CNPJ inválido'
+    if (!cnpjState.validated || !razaoSocial.trim()) return 'Valide o CNPJ para carregar a Razão Social'
     if (!tipo) return 'Tipo obrigatório'
     if (tipo === 'inclusao' && !subtipo) return 'Subtipo obrigatório'
     if (!observacoes.trim()) return 'Observações são obrigatórias'
@@ -146,7 +149,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
     const missing = requiredDocKeys().filter(k => !docFiles[k])
     if (missing.length) return `Documento(s) faltando: ${missing.map(m => docLabel(m)).join(', ')}`
     return null
-  }, [razaoSocial, cnpj, tipo, subtipo, observacoes, docFiles, extraFiles, docLabel, requiredDocKeys])
+  }, [cnpj, cnpjState.validated, razaoSocial, tipo, subtipo, observacoes, docFiles, extraFiles, docLabel, requiredDocKeys])
 
   const buildDadosDinamicos = useCallback(() => {
     const d = {}
@@ -277,6 +280,55 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
     } finally { setUploading(false) }
   }
 
+  // --- Validação / Auto-fetch de CNPJ ---
+  const digitsCnpj = (masked) => masked.replace(/\D/g,'')
+  const handleCnpjChange = (value) => {
+    setCnpj(value)
+    setCnpjState({ loading: false, error: null, validated: false })
+    setRazaoSocial('')
+    const digits = digitsCnpj(value)
+    if (digits.length < 14) {
+      lastValidatedRef.current = null
+    }
+    // valida automaticamente ao completar 14 dígitos
+    if (digits.length === 14 && digits !== lastValidatedRef.current) {
+      lastValidatedRef.current = digits
+      // dispara validação assíncrona
+      fetchCnpjInfo(value)
+    }
+  }
+  const fetchCnpjInfo = useCallback(async (masked) => {
+    const digits = digitsCnpj(masked)
+    if (digits.length !== 14) return
+    if (!validateCNPJ(digits)) {
+      setCnpjState({ loading: false, error: 'CNPJ inválido', validated: false })
+      setRazaoSocial('')
+      return
+    }
+    // Evita revalidação redundante do mesmo CNPJ já validado com sucesso
+    if (cnpjState.validated && razaoSocial && digits === lastValidatedRef.current) return
+    // abort anterior
+    try { cnpjAbortRef.current?.abort() } catch {}
+    const controller = new AbortController()
+    cnpjAbortRef.current = controller
+    setCnpjState({ loading: true, error: null, validated: false })
+    try {
+      const resp = await fetch('/api/validate-cnpj', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cnpj: digits }), signal: controller.signal })
+      const data = await resp.json().catch(()=>null)
+      if (!resp.ok || !data?.valid || !data?.data) {
+        setCnpjState({ loading: false, error: data?.error || 'Não encontrado', validated: false })
+        setRazaoSocial('')
+        return
+      }
+      const nome = data.data.nome_fantasia || data.data.razao_social || ''
+      setRazaoSocial(nome)
+      setCnpjState({ loading: false, error: null, validated: true })
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      setCnpjState({ loading: false, error: 'Erro ao validar', validated: false })
+    }
+  }, [cnpjState.validated, razaoSocial])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
   <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" description="Formulário completo para criação e envio de uma nova solicitação com uploads de documentos.">
@@ -286,12 +338,28 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
         <div className="grid gap-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label>Razão Social *</Label>
-              <Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} />
+              <Label>CNPJ *</Label>
+              <Input
+                value={cnpj}
+                onChange={e => handleCnpjChange(maskCnpj(e.target.value))}
+                onBlur={e => fetchCnpjInfo(e.target.value)}
+                placeholder="00.000.000/0000-00"
+                maxLength={18}
+                inputMode="numeric"
+              />
+              {(() => {
+                if (!cnpj) return null
+                const digits = digitsCnpj(cnpj)
+                if (digits.length < 14) return <p className="text-[11px] text-muted-foreground mt-1">Digite os 14 dígitos.</p>
+                if (cnpjState.loading) return <p className="text-[11px] text-primary mt-1">Validando CNPJ...</p>
+                if (cnpjState.error) return <p className="text-[11px] text-red-600 mt-1">{cnpjState.error}</p>
+                if (cnpjState.validated) return <p className="text-[11px] text-emerald-600 mt-1">CNPJ válido ✓</p>
+                return null
+              })()}
             </div>
             <div>
-              <Label>CNPJ *</Label>
-              <Input value={cnpj} onChange={e => setCnpj(maskCnpj(e.target.value))} />
+              <Label>Razão Social *</Label>
+              <Input value={razaoSocial} readOnly disabled placeholder="Valide o CNPJ" className="bg-muted" />
             </div>
             <div>
               <Label>SLA Previsto</Label>

@@ -465,16 +465,18 @@ function ProposalsInner({
         <div>
           <h2 className="text-2xl font-bold">
             {currentUser.tipo_usuario === 'gestor' && 'Monitorar Propostas'}
+            {currentUser.tipo_usuario === 'gerente' && 'Gerenciar Propostas'}
             {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Gerenciar Propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Minhas Propostas'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {currentUser.tipo_usuario === 'gestor' && 'Visualize e monitore todas as propostas'}
+            {currentUser.tipo_usuario === 'gerente' && 'Crie, monitore e gerencie propostas'}
             {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Crie, edite e gerencie suas propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Crie novas propostas e acompanhe o andamento'}
           </p>
         </div>
-        {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
+        {(['analista_implantacao', 'analista_movimentacao','gerente'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="self-start">{currentUser.tipo_usuario === 'consultor' ? (<><PlusCircle className="w-4 h-4 mr-2" />Solicitar Proposta</>) : (<><PlusCircle className="w-4 h-4 mr-2" />Nova Proposta</>)}</Button>
@@ -697,12 +699,13 @@ function ProposalsInner({
             </div>
           </div>
 
-          {/* Kanban melhorado */}
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
+          {/* Kanban horizontal */}
+          <div className="overflow-x-auto pb-2 -m-1 pl-1" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex gap-4 min-h-[300px] w-max pr-4">
             {statusOptions.map(status => {
               const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
               return (
-              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden">
+              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden min-w-[270px] w-[270px]">
                 <div 
                   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
                   style={{
@@ -723,7 +726,7 @@ function ProposalsInner({
                   {groupedByStatus[status]?.map((p) => {
                     const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
-                      currentUser.tipo_usuario === 'gestor' || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
+                      ['gestor','gerente'].includes(currentUser.tipo_usuario) || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
                     )
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
@@ -785,6 +788,10 @@ function ProposalsInner({
                           <span>{p.quantidade_vidas} vidas</span>
                           <span>{formatCurrency(p.valor)}</span>
                         </div>
+                        {/* Solicitante visível antes de assumir */}
+                        {isWaiting && p.consultor && (
+                          <div className="text-[10px] text-muted-foreground truncate" title={`Consultor solicitante: ${p.consultor}`}>Solicitado por: {p.consultor}</div>
+                        )}
                         {isWaiting && (
                           <div className="text-[10px] text-muted-foreground">Aguardando há {ageHours(p).toFixed(1)}h</div>
                         )}
@@ -858,6 +865,7 @@ function ProposalsInner({
               </div>
               )
             })}
+            </div>
           </div>
 
           {/* Linha do Tempo - Para Analistas de Implantação */}

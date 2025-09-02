@@ -47,3 +47,35 @@ export async function POST(request) {
 	if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
 	return handleCORS(NextResponse.json(data), origin)
 }
+
+// DELETE /api/users?id=<uuid>
+// Apenas gestor pode excluir. Proteções:
+// - Não permitir que remova a si próprio (evita lockout acidental)
+// - Opcional: impedir exclusão de outro gestor se no futuro houver mais de um (mantém controle) -> por enquanto permitir somente se alvo não for gestor
+export async function DELETE(request) {
+	const origin = request.headers.get('origin')
+	const auth = await requireAuth(request)
+	if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+	if (auth.user.tipo_usuario !== 'gestor') {
+		return handleCORS(NextResponse.json({ error: 'Apenas gestores podem excluir usuários' }, { status: 403 }), origin)
+	}
+	try {
+		const { searchParams } = new URL(request.url)
+		const id = searchParams.get('id')
+		if (!id) return handleCORS(NextResponse.json({ error: 'Parâmetro id é obrigatório' }, { status: 400 }), origin)
+		if (String(id) === String(auth.user.id)) {
+			return handleCORS(NextResponse.json({ error: 'Você não pode excluir seu próprio usuário' }, { status: 400 }), origin)
+		}
+		// Buscar tipo do alvo para regra de exclusão
+		const { data: targetUser, error: fetchErr } = await supabase.from('usuarios').select('id, tipo_usuario').eq('id', id).single()
+		if (fetchErr) return handleCORS(NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 }), origin)
+		if (targetUser.tipo_usuario === 'gestor') {
+			return handleCORS(NextResponse.json({ error: 'Não é permitido excluir outro gestor' }, { status: 403 }), origin)
+		}
+		const { error: delErr } = await supabase.from('usuarios').delete().eq('id', id)
+		if (delErr) return handleCORS(NextResponse.json({ error: delErr.message || 'Erro ao excluir' }, { status: 500 }), origin)
+		return handleCORS(NextResponse.json({ success: true }), origin)
+	} catch (e) {
+		return handleCORS(NextResponse.json({ error: 'Erro inesperado' }, { status: 500 }), origin)
+	}
+}
