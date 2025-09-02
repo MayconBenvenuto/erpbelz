@@ -697,12 +697,13 @@ function ProposalsInner({
             </div>
           </div>
 
-          {/* Kanban melhorado */}
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative">
+          {/* Kanban horizontal */}
+          <div className="overflow-x-auto pb-2 -m-1 pl-1" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex gap-4 min-h-[300px] w-max pr-4">
             {statusOptions.map(status => {
               const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
               return (
-              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden">
+              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden min-w-[270px] w-[270px]">
                 <div 
                   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
                   style={{
@@ -858,6 +859,7 @@ function ProposalsInner({
               </div>
               )
             })}
+            </div>
           </div>
 
           {/* Linha do Tempo - Para Analistas de Implantação */}
