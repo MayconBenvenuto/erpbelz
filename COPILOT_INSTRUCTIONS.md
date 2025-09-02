@@ -10,7 +10,21 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## Atualizações recentes (29/08/2025)
+## Atualizações recentes (02/09/2025)
+
+Adições desde 29/08/2025:
+
+- Novo role `gerente`: pode criar, listar, visualizar detalhes e atualizar status/atribuições de propostas e movimentações, ver dashboards completos, mas NÃO gerencia usuários nem exclui propostas.
+- Expansão de roles de analistas específicos: `analista_implantacao` (foco propostas) e `analista_movimentacao` (foco movimentações). Ambos visualizam dashboards próprios; somente o respectivo tipo pode editar status na sua área (implantação vs movimentação) salvo gestores/gerentes.
+- Role `consultor`: pode criar propostas e movimentações (solicitações) e ver apenas as que criou; não altera status após atribuída nem vê dashboards agregados.
+- Gerente agora enxerga detalhes (GET) de propostas e movimentações como o gestor.
+- Gerente incluído nas permissões de criação de propostas (paridade com analista_implantacao e consultor).
+- Listagens de propostas e movimentações exibem "Solicitado por" quando ainda não atribuídas (antes de claim/assunção) para analistas decidirem melhor a prioridade.
+- Formulário de Nova Movimentação: campo CNPJ passou a ser o primeiro; validação automática dispara ao atingir 14 dígitos limpando máscara; razão social é preenchida automaticamente e fica somente leitura após validação; impede submissão se CNPJ não validado.
+- Endpoint `/api/solicitacoes` agora retorna `criado_por_nome` e `criado_por_email` para suportar a exibição do solicitante.
+- Ajustes no PATCH de propostas: gerente usa o mesmo schema de gestor para atualizar status.
+
+Histórico anterior:
 
 - Backend Next-only: todas as rotas `/api/*` são servidas pelo App Router; não há mais proxy ou servidor Nest separado.
 - Propostas com Código sequencial no formato `PRP0000`:
@@ -102,41 +116,110 @@ emergent-crm-adm/
 
 ### 🔐 Tipos de Usuário
 
-#### **Analista** (Criador de Propostas)
+Resumo rápido:
+
+- gestor: supervisão total, gerencia usuários, exclui propostas.
+- gerente: gestão operacional (propostas + movimentações + dashboards) sem gestão de usuários ou exclusão.
+- analista_implantacao: cria/gerencia suas propostas, altera status das que atende.
+- analista_movimentacao: cria/gerencia suas movimentações, altera status das que atende.
+- consultor: cria propostas e movimentações, visualiza apenas as próprias, não altera status após atribuição a analista.
+
+#### **Gerente** (Operacional Amplo)
 
 ```javascript
-// Permissões do analista
-const analistaPermissions = {
+const gerentePermissions = {
   propostas: {
-    create: true,    // ✅ Criar propostas
-    read: true,      // ✅ Visualizar propostas
-  update: false,   // ❌ Editar propostas (campos gerais)
-  delete: false,   // ❌ Excluir propostas
-  status: true     // ✅ Alterar status APENAS das próprias propostas
+    create: true,
+    read: true,
+    update: true,      // campos operacionais (status, atendido_por, etc.)
+    delete: false,     // não exclui
+    status: true
   },
-  dashboard: true,   // ✅ Ver dashboard
-  usuarios: false,   // ❌ Gerenciar usuários
-  relatorios: false  // ❌ Ver relatórios
+  movimentacoes: {
+    create: true,
+    read: true,
+    update: true,
+    delete: false,
+    status: true
+  },
+  dashboard: true,
+  usuarios: false,
+  relatorios: true
 }
 ```
 
-#### **Gestor** (Monitor e Aprovador)
+#### **Gestor** (Supervisão Completa)
 
 ```javascript
-// Permissões do gestor
 const gestorPermissions = {
   propostas: {
-    create: false,   // ❌ Criar propostas
-    read: true,      // ✅ Visualizar propostas
-    update: true,    // ✅ Editar propostas
-    delete: true,    // ✅ Excluir propostas
-    status: true     // ✅ Alterar status
+    create: true,   // Pode criar para agilizar fluxos
+    read: true,
+    update: true,
+    delete: true,
+    status: true
   },
-  dashboard: true,   // ✅ Ver dashboard
-  usuarios: true,    // ✅ Gerenciar usuários
-  relatorios: true   // ✅ Ver relatórios
+  movimentacoes: {
+    create: true,
+    read: true,
+    update: true,
+    delete: true,
+    status: true
+  },
+  dashboard: true,
+  usuarios: true,
+  relatorios: true
 }
 ```
+
+#### **Analista de Implantação**
+
+```javascript
+const analistaImplantacaoPermissions = {
+  propostas: { create: true, read: true, update: false, delete: false, status: true },
+  movimentacoes: { create: false, read: true, update: false, delete: false, status: false },
+  dashboard: true,
+  usuarios: false,
+  relatorios: false
+}
+```
+
+#### **Analista de Movimentação**
+
+```javascript
+const analistaMovimentacaoPermissions = {
+  propostas: { create: false, read: true, update: false, delete: false, status: false },
+  movimentacoes: { create: true, read: true, update: false, delete: false, status: true },
+  dashboard: true,
+  usuarios: false,
+  relatorios: false
+}
+```
+
+#### **Consultor**
+
+```javascript
+const consultorPermissions = {
+  propostas: { create: true, read: true, update: false, delete: false, status: false },
+  movimentacoes: { create: true, read: true, update: false, delete: false, status: false },
+  dashboard: false,
+  usuarios: false,
+  relatorios: false
+}
+```
+
+### Exibição de Solicitante
+
+Propostas e movimentações não atribuídas exibem "Solicitado por NOME_DO_SOLICITANTE" (com e-mail em tooltip) para auxiliar priorização antes de analistas assumirem.
+
+### Fluxo de Criação de Movimentação (Atualizado)
+
+1. Usuário (consultor, analista_movimentacao, gerente ou gestor) abre diálogo.
+2. Campo CNPJ é o primeiro: ao atingir 14 dígitos numéricos, dispara validação automática contra `/api/validate-cnpj`.
+3. Razão Social é preenchida e bloqueada (readOnly) após validação.
+4. Submissão bloqueada se CNPJ inválido ou não validado.
+5. Backend armazena dados saneados; enriquecimento de criador retornado nas listagens.
+
 
 ---
 

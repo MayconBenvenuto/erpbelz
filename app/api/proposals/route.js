@@ -151,7 +151,7 @@ export async function POST(request) {
 	}
 	if (payload.consultor_email) payload.consultor_email = payload.consultor_email.trim().toLowerCase()
 	if (payload.cliente_email) payload.cliente_email = payload.cliente_email.trim().toLowerCase()
-	// força autor do token (para consultor e analista)
+	// força autor do token para todos exceto gestor (gestor pode registrar para outro analista)
 	if (auth.user.tipo_usuario !== 'gestor') {
 		payload.criado_por = auth.user.id
 	}

@@ -465,16 +465,18 @@ function ProposalsInner({
         <div>
           <h2 className="text-2xl font-bold">
             {currentUser.tipo_usuario === 'gestor' && 'Monitorar Propostas'}
+            {currentUser.tipo_usuario === 'gerente' && 'Gerenciar Propostas'}
             {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Gerenciar Propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Minhas Propostas'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {currentUser.tipo_usuario === 'gestor' && 'Visualize e monitore todas as propostas'}
+            {currentUser.tipo_usuario === 'gerente' && 'Crie, monitore e gerencie propostas'}
             {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Crie, edite e gerencie suas propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Crie novas propostas e acompanhe o andamento'}
           </p>
         </div>
-        {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
+        {(['analista_implantacao', 'analista_movimentacao','gerente'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="self-start">{currentUser.tipo_usuario === 'consultor' ? (<><PlusCircle className="w-4 h-4 mr-2" />Solicitar Proposta</>) : (<><PlusCircle className="w-4 h-4 mr-2" />Nova Proposta</>)}</Button>
@@ -724,7 +726,7 @@ function ProposalsInner({
                   {groupedByStatus[status]?.map((p) => {
                     const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
-                      currentUser.tipo_usuario === 'gestor' || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
+                      ['gestor','gerente'].includes(currentUser.tipo_usuario) || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
                     )
                     const busy = !!updatingStatus[p.id]
                     const isWaiting = !p.atendido_por
@@ -786,6 +788,10 @@ function ProposalsInner({
                           <span>{p.quantidade_vidas} vidas</span>
                           <span>{formatCurrency(p.valor)}</span>
                         </div>
+                        {/* Solicitante visível antes de assumir */}
+                        {isWaiting && p.consultor && (
+                          <div className="text-[10px] text-muted-foreground truncate" title={`Consultor solicitante: ${p.consultor}`}>Solicitado por: {p.consultor}</div>
+                        )}
                         {isWaiting && (
                           <div className="text-[10px] text-muted-foreground">Aguardando há {ageHours(p).toFixed(1)}h</div>
                         )}

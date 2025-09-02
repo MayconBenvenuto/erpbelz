@@ -181,7 +181,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                         <SlaEditor sol={sol} hoje={hoje} canEdit={!isConsultor && (isGestor || (isAnalista && String(sol.atendido_por) === String(currentUser?.id)))} onSave={updateSla} busy={updating[sol.id]} />
                       </div>
                       <div className="flex gap-1 flex-wrap items-center mb-1">
-                        <button type="button" onClick={() => openDetails(sol.id)} disabled={updating[sol.id]} className="px-2 py-0.5 text-[11px] rounded bg-secondary text-secondary-foreground hover:brightness-105 disabled:opacity-50">Ver detalhes</button>
+                        <button type="button" onClick={() => openDetails(sol.id)} disabled={updating[sol.id]} className="px-2 py-0.5 text-[13px] rounded bg-primary text-white hover:brightness-105 disabled:opacity-50">Ver detalhes</button>
                         {isAnalista && !isConsultor && !sol.atendido_por && (
                           <button disabled={updating[sol.id]} onClick={() => claim(sol.id)} className="px-2 py-0.5 text-[11px] bg-primary text-white rounded disabled:opacity-50">Assumir</button>
                         )}
@@ -203,10 +203,13 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                         )}
                       </div>
                       {isAnalista && sol.atendido_por && String(sol.atendido_por) !== String(currentUser?.id) && (
-                        <div className="text-[10px] text-muted-foreground">Em análise por {sol.atendido_por_nome || 'outro analista'}</div>
+                        <div className="text-[13px] text-muted-foreground">Em análise por {sol.atendido_por_nome || 'outro analista'}</div>
+                      )}
+                      {!sol.atendido_por && sol.criado_por_nome && (
+                        <div className="text-[13px] text-muted-foreground truncate" title={`Solicitado por ${sol.criado_por_nome}${sol.criado_por_email ? ' <'+sol.criado_por_email+'>' : ''}`}>Solicitado por: {sol.criado_por_nome}</div>
                       )}
                       {!isAnalista && sol.atendido_por_nome && (
-                        <div className="text-[10px] text-muted-foreground">Analista: {sol.atendido_por_nome}</div>
+                        <div className="text-[13px] text-muted-foreground">Analista: {sol.atendido_por_nome}</div>
                       )}
                     </div>
                   ))}
