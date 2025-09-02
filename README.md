@@ -29,28 +29,32 @@ CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_pin
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
 ```
 
-Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas de planos de saúde. Arquitetura atual: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (analista/gestor).
+Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas e movimentações de planos de saúde. Arquitetura: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (gestor, gerente, analistas especializados e consultor).
 
 ## 🎯 Funcionalidades
 
-### 👥 Sistema de Usuários
+### 👥 Sistema de Usuários (Roles)
 
-- **Analistas**: Criam e visualizam propostas
-- **Consultores**: Acesso apenas à tela de Movimentação
-- **Gestores**: Monitoram, alteram status e excluem propostas
-- **Autenticação**: JWT + bcrypt com rate limiting
+- **Gestor**: Supervisão completa; cria/edita/exclui propostas e movimentações, gerencia usuários, vê relatórios.
+- **Gerente**: Gestão operacional (propostas + movimentações + dashboards), sem gerenciar usuários, não exclui.
+- **Analista de Implantação** (`analista_implantacao`): Cria e gerencia suas propostas, altera status das que atende.
+- **Analista de Movimentação** (`analista_movimentacao`): Cria e gerencia suas movimentações, altera status das que atende.
+- **Consultor**: Cria propostas e movimentações; visualiza apenas as próprias; não altera status após atribuição.
+- **Autenticação**: JWT + bcrypt com rate limiting.
 
-### 📊 Gestão de Propostas
+### 📊 Gestão de Propostas & Movimentações
 
 - Validação automática de CNPJ (3 APIs em cascata)
 - Status personalizados para pipeline de vendas
 - Múltiplas operadoras de saúde suportadas
 - Tooltip no CNPJ exibindo Razão Social (via /api/validate-cnpj)
+- Exibição de "Solicitado por" (nome + e-mail em tooltip) em propostas e movimentações não atribuídas
 - Coluna “Email do Consultor” visível para gestores
 - Filtros persistentes com chips removíveis (Propostas e Dashboard)
 - Campos enriquecidos: `horas_em_analise` e `dias_em_analise` retornados pelo endpoint `/api/proposals` para evitar recomputo no cliente
 - Badges de envelhecimento (≥24h / ≥48h) e destaques visuais no board/Kanban
 - Edição inline de status com spinner individual por linha e bloqueio durante PATCH
+- Formulário de nova movimentação: CNPJ é o primeiro campo; valida automaticamente ao atingir 14 dígitos; razão social auto-preenchida e bloqueada após validação.
 - Toasts de SLA: avisos em marcos (ex.: 8h, 24h, 48h) para acompanhamento proativo
 - Alerta automático de propostas paradas (≥24h) via endpoint dedicado (ver seção "Alertas")
 

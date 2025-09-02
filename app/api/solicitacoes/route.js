@@ -50,6 +50,18 @@ export async function GET(req) {
       return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
     }
     if (error) throw error
+    // Enriquecer com nome/email do criador para exibição antes de assumir
+    const userIds = Array.from(new Set(data.map(d => d.criado_por).filter(Boolean)))
+    if (userIds.length) {
+      try {
+        const { data: usuarios } = await supabase.from('usuarios').select('id,nome,email').in('id', userIds)
+        const map = new Map((usuarios||[]).map(u => [u.id, u]))
+        data.forEach(d => {
+          const u = map.get(d.criado_por)
+          if (u) { d.criado_por_nome = u.nome; d.criado_por_email = u.email }
+        })
+      } catch(_) {}
+    }
     return NextResponse.json({ data, page, pageSize, total: count })
   } catch (e) {
     console.error('Erro GET solicitacoes', sanitizeForLog(e))

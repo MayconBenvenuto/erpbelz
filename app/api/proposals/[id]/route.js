@@ -177,7 +177,7 @@ export async function PATCH(request, { params }) {
   }
 
   // Antes de validar, se analista enviou apenas status (sem claim) e ele é criador e ninguém assumiu, permitiremos claim implícito depois.
-  const parsed = (isGestor ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
+  const parsed = ((isGestor || isGerente) ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
     const payloadErr = process.env.NODE_ENV === 'production'
       ? { error: 'Dados inválidos' }

@@ -1,0 +1,108 @@
+name: Auto PR (testes -> dev -> main)
+
+on:
+  push:
+    branches: [ testes ]
+
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-prs-and-test:
+    name: Criar/Mesclar PR testes->dev, rodar testes e promover dev->main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar / criar PR testes -> dev
+        id: pr_testes_dev
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = 'testes';
+            const base = 'dev';
+            // Listar PRs abertos com head testes e base dev
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', base
+            });
+            let existing = prs.find(p => p.head.ref === head && p.base.ref === base);
+            if (!existing) {
+              const created = await github.rest.pulls.create({ owner, repo, head, base, title: `Sync ${head} -> ${base}`, body: 'PR automático gerado pelo workflow ao receber push em testes.' });
+              existing = created.data;
+              core.notice(`PR criado #${existing.number}`);
+            } else {
+              core.notice(`PR já existente #${existing.number}`);
+            }
+            core.setOutput('pr_number', existing.number);
+
+      - name: Checkout código (branch testes)
+        uses: actions/checkout@v4
+        with:
+            ref: testes
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Rodar testes
+        run: npm test --ignore-scripts --if-present
+
+      - name: Merge automático PR testes->dev (fast-forward/squash)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const base = 'dev';
+            const head = 'testes';
+            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base });
+            const pr = prs.find(p => p.head.ref === head && p.base.ref === base);
+            if (!pr) { core.notice('Nenhum PR testes->dev aberto para merge.'); return; }
+            // Tenta merge normal primeiro
+            try {
+              await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: 'squash' });
+              core.notice(`PR #${pr.number} mesclado (squash).`);
+            } catch (e) {
+              core.setFailed(`Falha ao mesclar PR testes->dev: ${e.message}`);
+            }
+
+      - name: Atualizar branch dev local pós-merge
+        if: success()
+        run: |
+          git fetch origin dev --depth=1
+          git checkout dev
+          git pull --ff-only origin dev
+      - name: Criar PR dev -> main (se merge e testes passaram)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = 'dev';
+            const base = 'main';
+            try { await github.rest.repos.getBranch({ owner, repo, branch: head }); } catch { core.setFailed(`Branch ${head} não existe`); return; }
+            try { await github.rest.repos.getBranch({ owner, repo, branch: base }); } catch { core.setFailed(`Branch ${base} não existe`); return; }
+            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base });
+            const exists = prs.find(p => p.head.ref === head && p.base.ref === base);
+            if (exists) { core.notice(`PR dev->main já existe (#${exists.number})`); return; }
+            const created = await github.rest.pulls.create({ owner, repo, head, base, title: `Promover ${head} -> ${base}`, body: 'PR automático criado após sucesso nos testes e merge testes->dev. Não será mesclado automaticamente caso verificações falhem.' });
+            // Adiciona label para indicar necessidade de verificação completa
+            try {
+              await github.rest.issues.addLabels({ owner, repo, issue_number: created.data.number, labels: ['needs-full-qa'] });
+            } catch (e) { core.warning('Falha ao adicionar label: ' + e.message); }
+            core.notice(`PR dev->main criado #${created.data.number}`);
+
+      - name: Resultado final
+        if: always()
+        run: |
+          echo "Status final do job: ${{ job.status }}"
