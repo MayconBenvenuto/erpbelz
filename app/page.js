@@ -700,7 +700,13 @@ export default function App() {
                         !p.atendido_por
                       ))
                     }
-                    // analista_movimentacao não deveria ver propostas
+                    if (role === 'analista_movimentacao') {
+                      return proposals.filter(p => (
+                        String(p.criado_por) === String(currentUser.id) ||
+                        String(p.atendido_por) === String(currentUser.id) ||
+                        !p.atendido_por
+                      ))
+                    }
                     return []
                   })()
 
@@ -745,7 +751,6 @@ export default function App() {
               </TabsContent>
             )}
 
-            {/* Seção Implantação removida */}
           </Tabs>
         </main>
       </div>
