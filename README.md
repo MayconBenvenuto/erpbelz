@@ -5,10 +5,10 @@
 - **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
 - **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
 
-// Documentação de pipelines automatizados removida (workflows GitHub excluídos). Gerar cobertura local:
+// Pipelines CI (GitHub Actions) usam Yarn. Para gerar cobertura local:
 
 ```powershell
-npm run test -- --coverage
+yarn test --coverage
 Start-Process .\coverage\index.html
 ```
 
@@ -29,18 +29,24 @@ CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_pin
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
 ```
 
-Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas e movimentações de planos de saúde. Arquitetura: Next.js (App Router) servindo frontend e backend (rotas /api) no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (gestor, gerente, analistas especializados e consultor).
+Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas (implantação) e movimentações (solicitações). Arquitetura: Next.js (App Router) servindo frontend + rotas /api no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (gestor, gerente, analistas especializados e consultor). Virtualização customizada substitui dependências externas para listas grandes.
 
 ## 🎯 Funcionalidades
 
-### 👥 Sistema de Usuários (Roles)
+### 👥 Sistema de Usuários (Roles Atuais)
 
-- **Gestor**: Supervisão completa; cria/edita/exclui propostas e movimentações, gerencia usuários, vê relatórios.
-- **Gerente**: Gestão operacional (propostas + movimentações + dashboards), sem gerenciar usuários, não exclui.
-- **Analista de Implantação** (`analista_implantacao`): Cria e gerencia suas propostas, altera status das que atende.
-- **Analista de Movimentação** (`analista_movimentacao`): Cria e gerencia suas movimentações, altera status das que atende.
-- **Consultor**: Cria propostas e movimentações; visualiza apenas as próprias; não altera status após atribuição.
-- **Autenticação**: JWT + bcrypt com rate limiting.
+| Role | Cria Propostas | Cria Movimentações | Edita Status (Próprias) | Edita Status (Todas) | Gerencia Usuários | Exclui Propostas | Dashboards |
+|------|----------------|--------------------|--------------------------|----------------------|-------------------|------------------|------------|
+| gestor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| gerente | ✅ | ✅ | ✅ (atribuídas / operacionais) | ✅ (operacionais) | ❌ | ❌ | ✅ |
+| analista_implantacao | ✅ (suas) | ❌ | ✅ (suas) | ❌ | ❌ | ❌ | ✅ (limitado) |
+| analista_movimentacao | ❌ | ✅ (suas) | ✅ (suas mov.) | ❌ | ❌ | ❌ | ✅ (limitado) |
+| consultor | ✅ (suas) | ✅ (suas) | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+Notas:
+
+
+Autenticação: cookie de sessão + JWT interno com rate limiting.
 
 ### 📊 Gestão de Propostas & Movimentações
 
@@ -74,10 +80,10 @@ git clone https://github.com/MayconBenvenuto/emergent-crm-adm.git
 Set-Location emergent-crm-adm
 ```
 
-1. Instale as dependências
+1. Instale as dependências (Yarn padrão)
 
 ```powershell
-npm install
+yarn install --frozen-lockfile
 ```
 
 1. Configure as variáveis de ambiente
@@ -134,10 +140,10 @@ RESEND_API_KEY=
 EMAIL_OVERRIDE_TO=
 ```
 
-1. Execute o projeto (Next.js serve o frontend e as rotas de API)
+1. Execute o projeto (Next.js serve frontend + rotas /api)
 
 ```powershell
-npm run dev
+yarn dev
 ```
 
 Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são servidas pelo Next.
@@ -235,19 +241,20 @@ CREATE TABLE propostas (
 
 ```powershell
 # Desenvolvimento
-npm run dev
+yarn dev
 
 # Build para produção
-npm run build
+yarn build
 
 # Iniciar produção
-npm start
+yarn start
 
 # Lint e formatação
-npm run lint
-npm run format
+yarn lint
+yarn format
 
 # Testes utilitários (e.g., validação de CNPJ, e-mails)
+yarn test
 node .\tests\test_email_api.js
 node .\tests\test_email_send.js
 node .\test_cnpj_validation.js
@@ -335,8 +342,8 @@ Projeção linear: `proj = (valor_implantado_mtd / dias_passados) * dias_totais_
 ## Windows: preparar/remover cache do Next.js
 
 ```powershell
-npm run windows:next-cache:setup
-npm run windows:next-cache:remove
+yarn windows:next-cache:setup
+yarn windows:next-cache:remove
 ```
 
 
@@ -434,3 +441,32 @@ Um usuário é considerado online se possui sessão sem `data_logout` e com `ult
 Atualizado em: 29/08/2025
 
 Observação: Este sistema contém dados sensíveis. Siga as melhores práticas de segurança e nunca exponha credenciais ou chaves de API.
+
+## 🧩 Virtualização de Listas
+
+Foi removida a dependência de bibliotecas externas de virtualização. A tela de Propostas utiliza um componente interno `VirtualList` (altura fixa por item, overscan configurável) para reduzir custo de renderização em grandes volumes. Diretrizes:
+
+- Evite reintroduzir `react-window` ou similares sem justificativa de benchmark.
+- Ao adicionar novas colunas pesadas, medir impacto antes/depois (Chrome Performance).
+- Para alturas variáveis futuras, criar estratégia de medição incremental (resize observer) em outro componente ao invés de acoplar no atual.
+
+## 🔄 CI / Qualidade
+
+GitHub Actions padronizado em Yarn (--frozen-lockfile). Não adicionar `package-lock.json`. Passos típicos:
+1. Instalação: `yarn install --frozen-lockfile`
+2. Lint/Test: `yarn lint` / `yarn test`
+3. (Futuro) Build: `yarn build`
+
+Falhas comuns:
+- Erro de lock: remover qualquer `package-lock.json` residual.
+- Dependência dev somente local: sempre commitar `yarn.lock`.
+
+## 📌 Roadmap Curto (Sugerido)
+
+- CSP mais restritivo (remover fontes wildcard se possível)
+- Testes de integração adicionais para fluxo de movimentações
+- Normalização de logs de auditoria em propostas (excluir campos calculados)
+- Health check mais completo (latência de query simples + tempo de hash bcrypt simulada)
+
+—
+Atualizado em: 03/09/2025
