@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,6 +13,108 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
+/* ================= BELZ 5.0 THEME (inspirado no protótipo x-tudo) ================= */
+/* Aplicado quando o wrapper .belz5-layout envolve a aplicação autenticada */
+.belz5-layout {
+  /* Mantemos tokens HSL para compatibilidade com Tailwind + shadcn */
+  /* Base escura */
+  --background: 215 30% 7%; /* #0B0F14 approx */
+  --foreground: 0 0% 100%;
+  /* Cartões / superfícies */
+  --card: 215 26% 14%; /* ~#1F2937 */
+  --card-foreground: 0 0% 100%;
+  --secondary: 215 23% 18%; /* ~#374151 */
+  --secondary-foreground: 0 0% 100%;
+  --muted: 215 23% 18%;
+  --muted-foreground: 215 15% 65%;
+  /* Cores de marca / destaques */
+  --primary: 221 96% 18%; /* #011147 */
+  --primary-foreground: 0 0% 100%;
+  --accent: 207 84% 52%; /* #1E88E5 */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 23% 24%;
+  --input: 215 23% 24%;
+  --ring: 207 84% 52%;
+  /* Gráficos (mantemos alguns existentes) */
+  --chart-1: 207 84% 52%;
+  --chart-2: 153 60% 45%; /* sucesso */
+  --chart-3: 37 92% 54%; /* warning */
+  --chart-4: 0 84% 60%; /* error */
+  --chart-5: 260 60% 55%; /* roxo extra */
+  /* Sidebar tokens (aproximação) */
+  --sidebar-background: 215 26% 14%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 207 84% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 221 96% 18%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 215 23% 24%;
+  --sidebar-ring: 207 84% 52%;
+  font-family: 'Inter', 'Montserrat', sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.belz5-layout .font-inter { font-family: 'Inter', sans-serif; }
+
+/* Cartões com cantos maiores e sombra semelhante ao protótipo */
+.belz5-layout .belz-card,
+.belz5-layout .card,
+.belz5-layout [data-belz-card] {
+  @apply rounded-2xl shadow-lg; /* shadow util padrão */
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,.35), 0 2px 4px -1px rgba(0,0,0,.25);
+}
+
+/* Botões principais estilizados */
+.belz5-layout .btn-accent { @apply bg-accent text-accent-foreground hover:opacity-90 transition; }
+.belz5-layout .btn-primary-alt { @apply bg-primary text-primary-foreground hover:opacity-90 transition; }
+
+/* Inputs escuros */
+.belz5-layout .input-dark { @apply bg-background/60 border border-border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring; }
+
+/* Scrollbar discreta */
+.belz5-layout ::-webkit-scrollbar { width: 10px; height: 10px; }
+.belz5-layout ::-webkit-scrollbar-track { background: transparent; }
+.belz5-layout ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 9999px; }
+.belz5-layout ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* Sidebar itens estilo protótipo */
+.belz5-sidebar-item { @apply flex items-center space-x-3 px-4 py-3 rounded-xl cursor-pointer text-sm font-medium transition-colors select-none; }
+.belz5-sidebar-item:hover { background: rgba(30,136,229,0.10); }
+.belz5-sidebar-item-active { color: hsl(var(--accent)); background: rgba(30,136,229,0.12); }
+
+/* Scrollbar específica da sidebar (aparece somente quando necessário) */
+.belz5-sidebar-scroll { scrollbar-width: thin; }
+.belz5-sidebar-scroll::-webkit-scrollbar { width: 8px; }
+.belz5-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.belz5-sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+.belz5-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+
+/* Header fixo com fundo mais escuro */
+.belz5-header { @apply bg-card/95 backdrop-blur border-b; }
+
+/* Animação de fade leve */
+@keyframes belz-fade-in { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform: translateY(0);} }
+.belz5-fade-in { animation: belz-fade-in .25s ease; }
+
+/* Ajuste de Tabs content spacing compatível */
+.belz5-layout [role='tabpanel'] { @apply belz5-fade-in; }
+
+/* Utilidade para círculos de ícones */
+.belz5-icon-ring { @apply w-10 h-10 rounded-xl flex items-center justify-center; background: rgba(255,255,255,0.06); }
+
+/* Ajustes nos componentes shadcn base dentro do tema */
+.belz5-layout .shadcn-card, /* fallback custom marker */
+.belz5-layout .card {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+/* Evitar mudança visual em tela de login (fora do wrapper) */
+
 
 code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",

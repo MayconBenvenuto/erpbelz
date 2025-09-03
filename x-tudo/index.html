@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Belz 5.0 - Sistema de Gestão</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'belz-dark': '#0B0F14',
+                        'belz-primary': '#011147',
+                        'belz-secondary': '#0A2540',
+                        'belz-accent': '#1E88E5',
+                        'belz-success': '#12B76A',
+                        'belz-warning': '#F79009',
+                        'belz-error': '#EF4444',
+                        'belz-gray': '#1F2937',
+                        'belz-light-gray': '#374151'
+                    },
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .sidebar-item:hover { background: rgba(29, 136, 229, 0.1); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2); }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .chart-container { height: 300px; }
+        .empty-state { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 3rem; 
+            text-align: center; 
+        }
+    </style>
+</head>
+<body class="bg-belz-dark text-white font-inter">
+    <!-- Sidebar -->
+    <div id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-belz-gray border-r border-belz-light-gray z-50">
+        <div class="p-6 border-b border-belz-light-gray">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-belz-primary rounded-xl flex items-center justify-center">
+                    <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white">Belz 5.0</h1>
+                    <p class="text-sm text-gray-400">Sistema de Gestão</p>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="p-4 space-y-2">
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-belz-accent" onclick="showModule('dashboard')">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span>Dashboard</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('crm')">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span>CRM</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('simulator')">
+                <i data-lucide="calculator" class="w-5 h-5"></i>
+                <span>Simulador</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('financial')">
+                <i data-lucide="dollar-sign" class="w-5 h-5"></i>
+                <span>Financeiro</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('processes')">
+                <i data-lucide="workflow" class="w-5 h-5"></i>
+                <span>Processos</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('ai')">
+                <i data-lucide="brain" class="w-5 h-5"></i>
+                <span>IA Belz</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('university')">
+                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+                <span>Universidade</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('portfolio')">
+                <i data-lucide="briefcase" class="w-5 h-5"></i>
+                <span>Carteira</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('leads')">
+                <i data-lucide="target" class="w-5 h-5"></i>
+                <span>Leads</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('materials')">
+                <i data-lucide="folder" class="w-5 h-5"></i>
+                <span>Materiais</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('client-portal')">
+                <i data-lucide="external-link" class="w-5 h-5"></i>
+                <span>Portal Cliente</span>
+            </div>
+            <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('contacts')">
+                <i data-lucide="phone" class="w-5 h-5"></i>
+                <span>Contatos</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64">
+        <!-- Header -->
+        <header class="bg-belz-gray border-b border-belz-light-gray p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h2 id="page-title" class="text-2xl font-semibold">Dashboard</h2>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <div class="relative">
+                        <input type="text" placeholder="Buscar..." class="bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 pl-10 w-80 focus:outline-none focus:border-belz-accent">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                    
+                    <!-- Notifications -->
+                    <div class="relative">
+                        <button class="p-2 rounded-xl bg-belz-dark hover:bg-belz-light-gray relative">
+                            <i data-lucide="bell" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- User Menu -->
+                    <div class="flex items-center space-x-3">
+                        <div class="text-right">
+                            <p class="text-sm font-medium">Usuário</p>
+                            <p class="text-xs text-gray-400">Administrador</p>
+                        </div>
+                        <div class="w-10 h-10 bg-belz-primary rounded-xl flex items-center justify-center">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="p-6">
+            <!-- Dashboard Module -->
+            <div id="dashboard-module" class="animate-fade-in">
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Vendas Mensais</p>
+                                <p class="text-3xl font-bold text-white">0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <div class="w-12 h-12 bg-belz-success/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="trending-up" class="w-6 h-6 text-belz-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Oportunidades</p>
+                                <p class="text-3xl font-bold text-white">0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <div class="w-12 h-12 bg-belz-warning/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="target" class="w-6 h-6 text-belz-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Comissões</p>
+                                <p class="text-3xl font-bold text-white">R$ 0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <div class="w-12 h-12 bg-belz-accent/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="dollar-sign" class="w-6 h-6 text-belz-accent"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Clientes Ativos</p>
+                                <p class="text-3xl font-bold text-white">0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <div class="w-12 h-12 bg-belz-primary/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="users" class="w-6 h-6 text-belz-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                    <div class="empty-state">
+                        <div class="w-16 h-16 bg-belz-primary/20 rounded-xl flex items-center justify-center mb-4">
+                            <i data-lucide="bar-chart-3" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Bem-vindo ao Belz 5.0</h3>
+                        <p class="text-gray-400 mb-6">Comece adicionando seus primeiros dados para ver os dashboards em ação</p>
+                        <div class="flex space-x-4">
+                            <button onclick="showModule('crm')" class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
+                                Começar com CRM
+                            </button>
+                            <button onclick="showModule('leads')" class="bg-belz-accent hover:bg-belz-primary px-6 py-3 rounded-xl">
+                                Importar Leads
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CRM Module -->
+            <div id="crm-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">CRM - Pipeline de Vendas</h2>
+                    <div class="flex space-x-3">
+                        <button class="bg-belz-accent hover:bg-belz-primary px-4 py-2 rounded-xl flex items-center space-x-2">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            <span>Importar CSV</span>
+                        </button>
+                        <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Nova Oportunidade</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pipeline Kanban -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+                    <div class="bg-belz-gray rounded-2xl p-4 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Prospect</h3>
+                            <span class="bg-belz-dark px-2 py-1 rounded-full text-sm">0</span>
+                        </div>
+                        <div class="empty-state min-h-[200px]">
+                            <i data-lucide="user-plus" class="w-8 h-8 text-gray-400 mb-2"></i>
+                            <p class="text-gray-400 text-sm">Nenhum prospect</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-4 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Qualificado</h3>
+                            <span class="bg-belz-dark px-2 py-1 rounded-full text-sm">0</span>
+                        </div>
+                        <div class="empty-state min-h-[200px]">
+                            <i data-lucide="user-check" class="w-8 h-8 text-gray-400 mb-2"></i>
+                            <p class="text-gray-400 text-sm">Nenhum qualificado</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-4 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Proposta</h3>
+                            <span class="bg-belz-dark px-2 py-1 rounded-full text-sm">0</span>
+                        </div>
+                        <div class="empty-state min-h-[200px]">
+                            <i data-lucide="file-text" class="w-8 h-8 text-gray-400 mb-2"></i>
+                            <p class="text-gray-400 text-sm">Nenhuma proposta</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-4 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Negociação</h3>
+                            <span class="bg-belz-dark px-2 py-1 rounded-full text-sm">0</span>
+                        </div>
+                        <div class="empty-state min-h-[200px]">
+                            <i data-lucide="handshake" class="w-8 h-8 text-gray-400 mb-2"></i>
+                            <p class="text-gray-400 text-sm">Nenhuma negociação</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-4 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Fechado</h3>
+                            <span class="bg-belz-dark px-2 py-1 rounded-full text-sm">0</span>
+                        </div>
+                        <div class="empty-state min-h-[200px]">
+                            <i data-lucide="check-circle" class="w-8 h-8 text-gray-400 mb-2"></i>
+                            <p class="text-gray-400 text-sm">Nenhum fechamento</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CRM Tools -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Automação</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="clock" class="w-5 h-5 text-belz-accent"></i>
+                                    <span>Lembretes de Follow-up</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="mail" class="w-5 h-5 text-belz-success"></i>
+                                    <span>Templates de E-mail</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="message-circle" class="w-5 h-5 text-belz-warning"></i>
+                                    <span>Templates WhatsApp</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Cadastros</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="building" class="w-5 h-5 text-belz-primary"></i>
+                                    <span>Contas</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="users" class="w-5 h-5 text-belz-accent"></i>
+                                    <span>Contatos</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="activity" class="w-5 h-5 text-belz-success"></i>
+                                    <span>Atividades</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Ferramentas</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="filter" class="w-5 h-5 text-belz-warning"></i>
+                                    <span>Filtros Avançados</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="tags" class="w-5 h-5 text-belz-error"></i>
+                                    <span>Gerenciar Tags</span>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="paperclip" class="w-5 h-5 text-belz-primary"></i>
+                                    <span>Anexos</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulator Module -->
+            <div id="simulator-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">Simulador de Plano de Saúde</h2>
+                    <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Salvar Cotação</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulário -->
+                    <div class="lg:col-span-2 bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-6">Dados para Cotação</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Número de Vidas</label>
+                                <input type="number" class="w-full bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-3 focus:outline-none focus:border-belz-accent" placeholder="Ex: 4">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Região</label>
+                                <select class="w-full bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-3 focus:outline-none focus:border-belz-accent">
+                                    <option>Selecione a região</option>
+                                    <option>São Paulo - Capital</option>
+                                    <option>São Paulo - Interior</option>
+                                    <option>Rio de Janeiro</option>
+                                    <option>Minas Gerais</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Acomodação</label>
+                                <select class="w-full bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-3 focus:outline-none focus:border-belz-accent">
+                                    <option>Selecione</option>
+                                    <option>Apartamento</option>
+                                    <option>Enfermaria</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Coparticipação</label>
+                                <select class="w-full bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-3 focus:outline-none focus:border-belz-accent">
+                                    <option>Selecione</option>
+                                    <option>Com coparticipação</option>
+                                    <option>Sem coparticipação</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Faixas Etárias</label>
+                            <div class="space-y-3">
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">0-18 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">19-23 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">24-28 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">29-33 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">34-38 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">39-43 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">44-48 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">49-53 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">54-58 anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span class="w-24 text-sm text-gray-300">59+ anos:</span>
+                                    <input type="number" class="flex-1 bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="w-full mt-6 bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl font-semibold">
+                            Simular Planos
+                        </button>
+                    </div>
+                    
+                    <!-- Resultados -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Resultados</h3>
+                        <div class="empty-state">
+                            <i data-lucide="calculator" class="w-12 h-12 text-gray-400 mb-4"></i>
+                            <p class="text-gray-400 text-center">Preencha os dados e clique em "Simular Planos" para ver as opções disponíveis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Module -->
+            <div id="financial-module" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-semibold mb-6">Gestão Financeira</h2>
+                
+                <!-- Financial Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Comissões a Receber</p>
+                                <p class="text-2xl font-bold text-white">R$ 0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <i data-lucide="trending-up" class="w-8 h-8 text-belz-success"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Comissões Recebidas</p>
+                                <p class="text-2xl font-bold text-white">R$ 0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <i data-lucide="check-circle" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Pendências</p>
+                                <p class="text-2xl font-bold text-white">R$ 0</p>
+                                <p class="text-gray-400 text-sm">Aguardando dados</p>
+                            </div>
+                            <i data-lucide="alert-circle" class="w-8 h-8 text-belz-warning"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Tools -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Comissões</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Por Produto</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Por Operadora</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Por Consultor</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Projeção por Competência</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Boletos</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Consulta por Cliente</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Histórico por Contrato</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Conciliação</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Anexar Borderôs</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processes Module -->
+            <div id="processes-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">Gestão de Processos</h2>
+                    <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Novo Processo</span>
+                    </button>
+                </div>
+
+                <!-- Process Types -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow cursor-pointer hover:bg-belz-light-gray">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-belz-success/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="user-plus" class="w-6 h-6 text-belz-success"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Inclusão</h3>
+                                <p class="text-sm text-gray-400">0 processos</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow cursor-pointer hover:bg-belz-light-gray">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-belz-error/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="user-minus" class="w-6 h-6 text-belz-error"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Exclusão</h3>
+                                <p class="text-sm text-gray-400">0 processos</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow cursor-pointer hover:bg-belz-light-gray">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-belz-warning/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="edit" class="w-6 h-6 text-belz-warning"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Atualização</h3>
+                                <p class="text-sm text-gray-400">0 processos</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow cursor-pointer hover:bg-belz-light-gray">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-belz-accent/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="copy" class="w-6 h-6 text-belz-accent"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">2ª Via</h3>
+                                <p class="text-sm text-gray-400">0 processos</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                    <div class="empty-state">
+                        <div class="w-16 h-16 bg-belz-primary/20 rounded-xl flex items-center justify-center mb-4">
+                            <i data-lucide="workflow" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Nenhum processo em andamento</h3>
+                        <p class="text-gray-400 mb-6">Comece criando seu primeiro processo de implantação ou movimentação</p>
+                        <button class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
+                            Criar Primeiro Processo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Module -->
+            <div id="ai-module" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-semibold mb-6">IA Belz - Assistentes Inteligentes</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- IA do Cliente -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div class="w-12 h-12 bg-belz-success/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="user-check" class="w-6 h-6 text-belz-success"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold">IA do Cliente</h3>
+                                <p class="text-sm text-gray-400">Assistente para clientes finais</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <h4 class="font-medium mb-2">Funcionalidades:</h4>
+                                <ul class="space-y-2 text-sm text-gray-300">
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-success"></i>
+                                        <span>FAQ automatizado</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-success"></i>
+                                        <span>Status de solicitações</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-success"></i>
+                                        <span>Orientação de uso do plano</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-success"></i>
+                                        <span>Consulta de documentos</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <button class="w-full bg-belz-success hover:bg-green-600 px-4 py-3 rounded-xl">
+                                Configurar IA do Cliente
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- IA do Consultor -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div class="w-12 h-12 bg-belz-primary/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="briefcase" class="w-6 h-6 text-belz-primary"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold">IA do Consultor</h3>
+                                <p class="text-sm text-gray-400">Assistente para equipe comercial</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <h4 class="font-medium mb-2">Funcionalidades:</h4>
+                                <ul class="space-y-2 text-sm text-gray-300">
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-primary"></i>
+                                        <span>Base técnica completa</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-primary"></i>
+                                        <span>Manuais e normativos ANS</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-primary"></i>
+                                        <span>Argumentos comerciais</span>
+                                    </li>
+                                    <li class="flex items-center space-x-2">
+                                        <i data-lucide="check" class="w-4 h-4 text-belz-primary"></i>
+                                        <span>Materiais Belz</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <button class="w-full bg-belz-primary hover:bg-belz-secondary px-4 py-3 rounded-xl">
+                                Configurar IA do Consultor
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- AI Configuration -->
+                <div class="mt-6 bg-belz-gray rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-semibold mb-4">Configuração da IA</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-belz-accent/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="database" class="w-8 h-8 text-belz-accent"></i>
+                            </div>
+                            <h4 class="font-medium mb-2">Base de Conhecimento</h4>
+                            <p class="text-sm text-gray-400">Upload e vetorização de documentos</p>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-belz-warning/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="git-branch" class="w-8 h-8 text-belz-warning"></i>
+                            </div>
+                            <h4 class="font-medium mb-2">Controle de Versões</h4>
+                            <p class="text-sm text-gray-400">Versionamento de documentos e políticas</p>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-belz-success/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="shield-check" class="w-8 h-8 text-belz-success"></i>
+                            </div>
+                            <h4 class="font-medium mb-2">Auditoria</h4>
+                            <p class="text-sm text-gray-400">Trilhas de auditoria das respostas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- University Module -->
+            <div id="university-module" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-semibold mb-6">Universidade Corporativa Belz</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="lg:col-span-2">
+                        <!-- Trilhas de Aprendizado -->
+                        <div class="bg-belz-gray rounded-2xl p-6 card-shadow mb-6">
+                            <h3 class="text-lg font-semibold mb-4">Trilhas de Aprendizado</h3>
+                            <div class="empty-state">
+                                <i data-lucide="graduation-cap" class="w-12 h-12 text-gray-400 mb-4"></i>
+                                <p class="text-gray-400 text-center mb-4">Nenhuma trilha criada ainda</p>
+                                <button class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
+                                    Criar Primeira Trilha
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Biblioteca de Materiais -->
+                        <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                            <h3 class="text-lg font-semibold mb-4">Biblioteca de Materiais</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="p-4 bg-belz-dark rounded-xl cursor-pointer hover:bg-belz-light-gray">
+                                    <div class="flex items-center space-x-3">
+                                        <i data-lucide="book-open" class="w-6 h-6 text-belz-primary"></i>
+                                        <div>
+                                            <h4 class="font-medium">Cartilhas</h4>
+                                            <p class="text-sm text-gray-400">0 documentos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 bg-belz-dark rounded-xl cursor-pointer hover:bg-belz-light-gray">
+                                    <div class="flex items-center space-x-3">
+                                        <i data-lucide="file-text" class="w-6 h-6 text-belz-accent"></i>
+                                        <div>
+                                            <h4 class="font-medium">Guias de Uso</h4>
+                                            <p class="text-sm text-gray-400">0 documentos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 bg-belz-dark rounded-xl cursor-pointer hover:bg-belz-light-gray">
+                                    <div class="flex items-center space-x-3">
+                                        <i data-lucide="play-circle" class="w-6 h-6 text-belz-success"></i>
+                                        <div>
+                                            <h4 class="font-medium">Vídeos</h4>
+                                            <p class="text-sm text-gray-400">0 vídeos</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 bg-belz-dark rounded-xl cursor-pointer hover:bg-belz-light-gray">
+                                    <div class="flex items-center space-x-3">
+                                        <i data-lucide="help-circle" class="w-6 h-6 text-belz-warning"></i>
+                                        <div>
+                                            <h4 class="font-medium">Quiz</h4>
+                                            <p class="text-sm text-gray-400">0 questionários</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Progresso -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Progresso Geral</h3>
+                        <div class="space-y-4">
+                            <div class="text-center">
+                                <div class="w-20 h-20 bg-belz-primary/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <span class="text-2xl font-bold text-belz-primary">0%</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Conclusão Média</p>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-300">Consultores Ativos</span>
+                                    <span class="text-sm font-medium">0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-300">Certificações</span>
+                                    <span class="text-sm font-medium">0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-300">Horas de Treinamento</span>
+                                    <span class="text-sm font-medium">0h</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio Module -->
+            <div id="portfolio-module" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-semibold mb-6">Gestão de Carteira</h2>
+                
+                <!-- Portfolio Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total de Clientes</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="users" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Contratos Ativos</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="file-check" class="w-8 h-8 text-belz-success"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Renovações Próximas</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="calendar" class="w-8 h-8 text-belz-warning"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Taxa de Churn</p>
+                                <p class="text-2xl font-bold text-white">0%</p>
+                            </div>
+                            <i data-lucide="trending-down" class="w-8 h-8 text-belz-error"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                    <div class="empty-state">
+                        <div class="w-16 h-16 bg-belz-primary/20 rounded-xl flex items-center justify-center mb-4">
+                            <i data-lucide="briefcase" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Sua carteira está vazia</h3>
+                        <p class="text-gray-400 mb-6">Comece importando seus clientes e contratos existentes</p>
+                        <div class="flex space-x-4">
+                            <button class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
+                                Importar Carteira
+                            </button>
+                            <button class="bg-belz-accent hover:bg-belz-primary px-6 py-3 rounded-xl">
+                                Adicionar Cliente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leads Module -->
+            <div id="leads-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">Gestão de Leads</h2>
+                    <div class="flex space-x-3">
+                        <button class="bg-belz-accent hover:bg-belz-primary px-4 py-2 rounded-xl flex items-center space-x-2">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            <span>Importar CSV</span>
+                        </button>
+                        <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Novo Lead</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lead Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Total de Leads</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="target" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Novos Hoje</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="plus-circle" class="w-8 h-8 text-belz-success"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Em Atendimento</p>
+                                <p class="text-2xl font-bold text-white">0</p>
+                            </div>
+                            <i data-lucide="phone" class="w-8 h-8 text-belz-warning"></i>
+                        </div>
+                    </div>
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-400 text-sm">Taxa de Conversão</p>
+                                <p class="text-2xl font-bold text-white">0%</p>
+                            </div>
+                            <i data-lucide="trending-up" class="w-8 h-8 text-belz-accent"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lead Management Tools -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Configurações de Roteamento</h3>
+                        <div class="space-y-3">
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Regras por Região</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Regras por Produto</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Filas de Atendimento</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                            <button class="w-full text-left p-3 bg-belz-dark rounded-xl hover:bg-belz-light-gray">
+                                <div class="flex items-center justify-between">
+                                    <span>Dedupe Automático</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">SLA e Monitoramento</h3>
+                        <div class="space-y-4">
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-300">SLA de Primeiro Contato</span>
+                                    <span class="text-sm font-medium text-belz-success">24h</span>
+                                </div>
+                                <div class="w-full bg-belz-light-gray rounded-full h-2">
+                                    <div class="bg-belz-success h-2 rounded-full w-0"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-300">Velocidade Média</span>
+                                    <span class="text-sm font-medium text-gray-400">-- min</span>
+                                </div>
+                                <div class="w-full bg-belz-light-gray rounded-full h-2">
+                                    <div class="bg-belz-accent h-2 rounded-full w-0"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Materials Module -->
+            <div id="materials-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">Materiais de Apoio</h2>
+                    <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span>Upload Material</span>
+                    </button>
+                </div>
+
+                <!-- Material Categories -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-belz-primary/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="building" class="w-6 h-6 text-belz-primary"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Por Operadora</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhum material por operadora</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-belz-success/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="package" class="w-6 h-6 text-belz-success"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Por Produto</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhum material por produto</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-belz-accent/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="star" class="w-6 h-6 text-belz-accent"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Favoritos</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhum material favoritado</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-belz-warning/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="briefcase" class="w-6 h-6 text-belz-warning"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Kit de Marca</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhum material de marca</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-belz-error/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="presentation" class="w-6 h-6 text-belz-error"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Apresentações</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhuma apresentação</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                                <i data-lucide="image" class="w-6 h-6 text-purple-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white">Peças Digitais</h3>
+                                <p class="text-sm text-gray-400">0 materiais</p>
+                            </div>
+                        </div>
+                        <div class="empty-state py-8">
+                            <p class="text-gray-400 text-sm">Nenhuma peça digital</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Portal Module -->
+            <div id="client-portal-module" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-semibold mb-6">Portal do Cliente</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Portal Features -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Funcionalidades do Portal</h3>
+                        <div class="space-y-4">
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <i data-lucide="file-plus" class="w-5 h-5 text-belz-primary"></i>
+                                    <h4 class="font-medium">Abertura de Solicitações</h4>
+                                </div>
+                                <p class="text-sm text-gray-400">Clientes podem abrir solicitações diretamente</p>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <i data-lucide="eye" class="w-5 h-5 text-belz-success"></i>
+                                    <h4 class="font-medium">Acompanhamento</h4>
+                                </div>
+                                <p class="text-sm text-gray-400">Visualização do status das solicitações</p>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <i data-lucide="message-circle" class="w-5 h-5 text-belz-accent"></i>
+                                    <h4 class="font-medium">Chat com Time</h4>
+                                </div>
+                                <p class="text-sm text-gray-400">Comunicação direta com a equipe</p>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <i data-lucide="receipt" class="w-5 h-5 text-belz-warning"></i>
+                                    <h4 class="font-medium">Consulta de Boletos</h4>
+                                </div>
+                                <p class="text-sm text-gray-400">Acesso ao histórico de pagamentos</p>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <i data-lucide="brain" class="w-5 h-5 text-purple-400"></i>
+                                    <h4 class="font-medium">IA do Cliente</h4>
+                                </div>
+                                <p class="text-sm text-gray-400">Assistente inteligente integrado</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Portal Stats -->
+                    <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                        <h3 class="text-lg font-semibold mb-4">Estatísticas do Portal</h3>
+                        <div class="space-y-6">
+                            <div class="text-center">
+                                <div class="w-20 h-20 bg-belz-primary/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <span class="text-2xl font-bold text-belz-primary">0</span>
+                                </div>
+                                <p class="text-sm text-gray-400">Clientes Cadastrados</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-white">0</p>
+                                    <p class="text-sm text-gray-400">Solicitações</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-white">0</p>
+                                    <p class="text-sm text-gray-400">Acessos Hoje</p>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 bg-belz-dark rounded-xl">
+                                <h4 class="font-medium mb-2">Satisfação</h4>
+                                <div class="flex items-center space-x-2">
+                                    <div class="flex-1 bg-belz-light-gray rounded-full h-2">
+                                        <div class="bg-belz-success h-2 rounded-full w-0"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-400">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contacts Module -->
+            <div id="contacts-module" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">Contatos Internos</h2>
+                    <button class="bg-belz-primary hover:bg-belz-secondary px-4 py-2 rounded-xl flex items-center space-x-2">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        <span>Novo Contato</span>
+                    </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="bg-belz-gray rounded-2xl p-6 card-shadow mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" placeholder="Buscar por nome..." class="bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent">
+                        <select class="bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent">
+                            <option>Todas as Áreas</option>
+                            <option>Comercial</option>
+                            <option>Operações</option>
+                            <option>Financeiro</option>
+                            <option>TI</option>
+                            <option>RH</option>
+                        </select>
+                        <select class="bg-belz-dark border border-belz-light-gray rounded-xl px-4 py-2 focus:outline-none focus:border-belz-accent">
+                            <option>Todos os Cargos</option>
+                            <option>Diretor</option>
+                            <option>Gerente</option>
+                            <option>Coordenador</option>
+                            <option>Analista</option>
+                            <option>Assistente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
+                    <div class="empty-state">
+                        <div class="w-16 h-16 bg-belz-primary/20 rounded-xl flex items-center justify-center mb-4">
+                            <i data-lucide="phone" class="w-8 h-8 text-belz-primary"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Diretório vazio</h3>
+                        <p class="text-gray-400 mb-6">Comece adicionando os contatos da sua equipe</p>
+                        <button class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
+                            Adicionar Primeiro Contato
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Module navigation
+        function showModule(moduleName) {
+            // Hide all modules
+            const modules = ['dashboard', 'crm', 'simulator', 'financial', 'processes', 'ai', 'university', 'portfolio', 'leads', 'materials', 'client-portal', 'contacts'];
+            modules.forEach(module => {
+                document.getElementById(module + '-module').classList.add('hidden');
+            });
+
+            // Show selected module
+            document.getElementById(moduleName + '-module').classList.remove('hidden');
+
+            // Update page title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'crm': 'CRM - Pipeline de Vendas',
+                'simulator': 'Simulador de Plano de Saúde',
+                'financial': 'Gestão Financeira',
+                'processes': 'Gestão de Processos',
+                'ai': 'IA Belz - Assistentes Inteligentes',
+                'university': 'Universidade Corporativa Belz',
+                'portfolio': 'Gestão de Carteira',
+                'leads': 'Gestão de Leads',
+                'materials': 'Materiais de Apoio',
+                'client-portal': 'Portal do Cliente',
+                'contacts': 'Contatos Internos'
+            };
+            document.getElementById('page-title').textContent = titles[moduleName];
+
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('text-belz-accent');
+                item.classList.add('text-gray-300');
+            });
+            event.target.closest('.sidebar-item').classList.add('text-belz-accent');
+            event.target.closest('.sidebar-item').classList.remove('text-gray-300');
+
+            // Reinitialize icons for new content
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9729bf30c7eff614',t:'MTc1NTc3NTI4Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

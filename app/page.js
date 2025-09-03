@@ -15,12 +15,14 @@ import Image from 'next/image'
 // Seções
 import Sidebar from '@/app/sections/Sidebar'
 import Header from '@/app/sections/Header'
+import TopUserActions from '@/components/TopUserActions'
 import MobileSidebar from '@/app/sections/MobileSidebar'
 import ProposalsSection from '@/app/sections/Proposals'
 import DashboardSection from '@/app/sections/Dashboard'
 import UsersSection from '@/app/sections/Users'
 import ReportsSection from '@/app/sections/Reports'
 import MovimentacaoSection from '@/app/sections/Movimentacao'
+import EmDesenvolvimento from '@/app/sections/EmDesenvolvimento'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
 import { hasPermission } from '@/lib/rbac'
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
@@ -627,14 +629,15 @@ export default function App() {
 
   // App principal
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background belz5-layout font-inter">
       <Toaster />
-      <Sidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} />
+      <Sidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="md:ml-64 min-h-screen flex flex-col">
-  <Header
+        <Header
           activeTab={activeTab}
           currentUser={currentUser}
           leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
+          rightSlot={<TopUserActions currentUser={currentUser} onRefresh={autoRefreshData} onLogout={handleLogout} />}
         />
   <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
           {/* Command Palette Trigger Hint */}
@@ -647,7 +650,7 @@ export default function App() {
           </div>
           {/** Para consultor: restringe Propostas/Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {true && (
+            {hasPermission(currentUser,'viewPropostas') && (
             <TabsContent value="propostas" className="space-y-6">
               {(() => {
                 const proposalsForView = currentUser.tipo_usuario === 'gestor'
@@ -727,19 +730,19 @@ export default function App() {
               </TabsContent>
             )}
 
-            {(['gestor','gerente','analista_movimentacao','consultor'].includes(currentUser.tipo_usuario)) && (
+            {hasPermission(currentUser,'viewMovimentacao') && (
               <TabsContent value="movimentacao" className="space-y-6">
                 <MovimentacaoSection currentUser={currentUser} token={token} />
               </TabsContent>
             )}
 
-            {currentUser.tipo_usuario === 'gestor' && (
+            {hasPermission(currentUser,'manageUsers') && (
               <TabsContent value="usuarios" className="space-y-6">
                 <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} onDeleteUser={handleDeleteUser} isLoading={isLoading} />
               </TabsContent>
             )}
 
-            {currentUser.tipo_usuario === 'gestor' && (
+            {hasPermission(currentUser,'viewRelatorios') && (
               <TabsContent value="relatorios" className="space-y-6">
                 <ReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
               </TabsContent>
@@ -750,6 +753,17 @@ export default function App() {
                 {(() => { const Carteira = require('./sections/CarteiraClientes.jsx').default; return <Carteira currentUser={currentUser} token={token} initialClientes={clientes} /> })()}
               </TabsContent>
             )}
+
+            {/* Abas em desenvolvimento - acesso liberado para todos autenticados por enquanto */}
+            <TabsContent value="simulador"><EmDesenvolvimento titulo="Simulador" descricao="Ferramenta de simulação de planos e cenários." /></TabsContent>
+            <TabsContent value="financeiro"><EmDesenvolvimento titulo="Financeiro" descricao="Gestão financeira e comissionamentos." /></TabsContent>
+            <TabsContent value="processos"><EmDesenvolvimento titulo="Processos" descricao="Orquestração e automação de fluxos internos." /></TabsContent>
+            <TabsContent value="ia-belz"><EmDesenvolvimento titulo="IA Belz" descricao="Recursos de inteligência artificial e insights." /></TabsContent>
+            <TabsContent value="universidade"><EmDesenvolvimento titulo="Universidade" descricao="Portal de treinamentos e capacitações." /></TabsContent>
+            <TabsContent value="leads"><EmDesenvolvimento titulo="Leads" descricao="Gestão de leads e funil comercial." /></TabsContent>
+            <TabsContent value="materiais"><EmDesenvolvimento titulo="Materiais" descricao="Repositório central de materiais e documentos." /></TabsContent>
+            <TabsContent value="portal-cliente"><EmDesenvolvimento titulo="Portal do Cliente" descricao="Área dedicada para interação com clientes." /></TabsContent>
+            <TabsContent value="contatos"><EmDesenvolvimento titulo="Contatos" descricao="Diretório e gestão de contatos estratégicos." /></TabsContent>
 
           </Tabs>
         </main>
@@ -763,21 +777,25 @@ export default function App() {
             <CommandItem onSelect={() => { setActiveTab('dashboard'); setCommandOpen(false) }} value="dashboard">
               <BarChart3 className="mr-2" /> Dashboard
             </CommandItem>
-            <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
-              <FileText className="mr-2" /> Propostas
-            </CommandItem>
-            <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
-              <Repeat className="mr-2" /> Movimentação
-            </CommandItem>
-            {currentUser.tipo_usuario === 'gestor' && (
-              <>
-                <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false) }} value="usuarios">
-                  <Users className="mr-2" /> Usuários
-                </CommandItem>
-                <CommandItem onSelect={() => { setActiveTab('relatorios'); setCommandOpen(false) }} value="relatorios">
-                  <TrendingUp className="mr-2" /> Relatórios
-                </CommandItem>
-              </>
+            {hasPermission(currentUser,'viewPropostas') && (
+              <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
+                <FileText className="mr-2" /> Propostas
+              </CommandItem>
+            )}
+            {hasPermission(currentUser,'viewMovimentacao') && (
+              <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
+                <Repeat className="mr-2" /> Movimentação
+              </CommandItem>
+            )}
+            {hasPermission(currentUser,'manageUsers') && (
+              <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false) }} value="usuarios">
+                <Users className="mr-2" /> Usuários
+              </CommandItem>
+            )}
+            {hasPermission(currentUser,'viewRelatorios') && (
+              <CommandItem onSelect={() => { setActiveTab('relatorios'); setCommandOpen(false) }} value="relatorios">
+                <TrendingUp className="mr-2" /> Relatórios
+              </CommandItem>
             )}
           </CommandGroup>
           <CommandSeparator />
@@ -785,12 +803,12 @@ export default function App() {
             <CommandItem onSelect={() => { scheduleLoadData(true); setCommandOpen(false) }} value="recarregar">
               <Repeat className="mr-2" /> Recarregar Dados
             </CommandItem>
-            {currentUser.tipo_usuario !== 'consultor' && (
+            {hasPermission(currentUser,'createPropostas') && currentUser.tipo_usuario !== 'analista_movimentacao' && (
               <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-proposal-btn]')?.click() }, 50) }} value="nova-proposta">
                 <PlusCircle className="mr-2" /> Nova Proposta
               </CommandItem>
             )}
-            {currentUser.tipo_usuario === 'gestor' && (
+            {hasPermission(currentUser,'manageUsers') && (
               <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-user-btn]')?.click() }, 50) }} value="novo-usuario">
                 <PlusCircle className="mr-2" /> Novo Usuário
               </CommandItem>

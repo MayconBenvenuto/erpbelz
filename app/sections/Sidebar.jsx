@@ -12,35 +12,31 @@
  */
 
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { FileText, BarChart3, Users, TrendingUp, RefreshCw, LogOut, User, Repeat, Briefcase } from 'lucide-react'
+import { FileText, BarChart3, Users, TrendingUp, Repeat, Briefcase, Calculator, DollarSign, Workflow, Cpu, GraduationCap, Target, FolderKanban, ExternalLink, Phone } from 'lucide-react'
 import { hasPermission } from '@/lib/rbac'
 
-export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefresh, onLogout }) {
+export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
   return (
-  <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-secondary border-r shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
+  <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-card border-r border-border shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
       <div className="p-6 border-b">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10">
             <Image src="/logo-belz.jpg" alt="Logo Belz" width={40} height={40} className="rounded-lg object-cover" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-primary font-montserrat">Sistema de Gestão - Belz</h1>
+            <h1 className="text-lg font-bold text-white font-montserrat">Sistema de Gestão - Belz</h1>
             <p className="text-xs text-muted-foreground">&nbsp;</p>
           </div>
         </div>
       </div>
 
-  <nav className="flex-1 p-4">
+  <nav className="flex-1 p-4 overflow-y-auto belz5-sidebar-scroll">
         <div className="space-y-2">
           {/* Dashboard: sempre a primeira opção para todos os perfis */}
           <button
             onClick={() => setActiveTab('dashboard')}
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-              activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'dashboard' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
           >
             <BarChart3 className="w-5 h-5" />
             <span className="font-medium">Dashboard</span>
@@ -51,14 +47,86 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <button
               onClick={() => setActiveTab('propostas')}
               aria-current={activeTab === 'propostas' ? 'page' : undefined}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                activeTab === 'propostas' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+              className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'propostas' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
             >
               <FileText className="w-5 h-5" />
               <span className="font-medium">Propostas</span>
             </button>
           )}
+
+          {/* Novas seções em desenvolvimento - apenas navegação; permissões futuras podem ser aplicadas */}
+          <button
+            onClick={() => setActiveTab('simulador')}
+            aria-current={activeTab === 'simulador' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'simulador' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <Calculator className="w-5 h-5" />
+            <span className="font-medium">Simulador</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('financeiro')}
+            aria-current={activeTab === 'financeiro' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'financeiro' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <DollarSign className="w-5 h-5" />
+            <span className="font-medium">Financeiro</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('processos')}
+            aria-current={activeTab === 'processos' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'processos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <Workflow className="w-5 h-5" />
+            <span className="font-medium">Processos</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ia-belz')}
+            aria-current={activeTab === 'ia-belz' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'ia-belz' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <Cpu className="w-5 h-5" />
+            <span className="font-medium">IA Belz</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('universidade')}
+            aria-current={activeTab === 'universidade' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'universidade' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <GraduationCap className="w-5 h-5" />
+            <span className="font-medium">Universidade</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('leads')}
+            aria-current={activeTab === 'leads' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'leads' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <Target className="w-5 h-5" />
+            <span className="font-medium">Leads</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('materiais')}
+            aria-current={activeTab === 'materiais' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'materiais' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <FolderKanban className="w-5 h-5" />
+            <span className="font-medium">Materiais</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('portal-cliente')}
+            aria-current={activeTab === 'portal-cliente' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'portal-cliente' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <ExternalLink className="w-5 h-5" />
+            <span className="font-medium">Portal Cliente</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('contatos')}
+            aria-current={activeTab === 'contatos' ? 'page' : undefined}
+            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'contatos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+          >
+            <Phone className="w-5 h-5" />
+            <span className="font-medium">Contatos</span>
+          </button>
 
           {/* Seção Implantação removida */}
 
@@ -66,9 +134,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <button
               onClick={() => setActiveTab('movimentacao')}
               aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                activeTab === 'movimentacao' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+              className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'movimentacao' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
             >
               <Repeat className="w-5 h-5" />
               <span className="font-medium">Movimentação</span>
@@ -80,65 +146,41 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab, onRefres
             <button
               onClick={() => setActiveTab('carteira')}
               aria-current={activeTab === 'carteira' ? 'page' : undefined}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                activeTab === 'carteira' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+              className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'carteira' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
             >
               <Briefcase className="w-5 h-5" />
               <span className="font-medium">Carteira de Clientes</span>
             </button>
           )}
 
-          {hasPermission(currentUser,'manageUsers') && (
+          {(hasPermission(currentUser,'manageUsers') || hasPermission(currentUser,'viewRelatorios')) && (
             <>
+              {hasPermission(currentUser,'manageUsers') && (
               <button
                 onClick={() => setActiveTab('usuarios')}
                 aria-current={activeTab === 'usuarios' ? 'page' : undefined}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                  activeTab === 'usuarios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
+                className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'usuarios' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
               >
                 <Users className="w-5 h-5" />
                 <span className="font-medium">Usuários</span>
               </button>
-
-              <button
-                onClick={() => setActiveTab('relatorios')}
-                aria-current={activeTab === 'relatorios' ? 'page' : undefined}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                  activeTab === 'relatorios' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <TrendingUp className="w-5 h-5" />
-                <span className="font-medium">Relatórios</span>
-              </button>
+              )}
+              {hasPermission(currentUser,'viewRelatorios') && (
+                <button
+                  onClick={() => setActiveTab('relatorios')}
+                  aria-current={activeTab === 'relatorios' ? 'page' : undefined}
+                  className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'relatorios' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+                >
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="font-medium">Relatórios</span>
+                </button>
+              )}
             </>
           )}
         </div>
       </nav>
-
-      <div className="p-4 border-t">
-        <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
-          <User className="w-8 h-8 p-2 bg-primary/10 rounded-full text-primary" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{currentUser.nome}</p>
-            <Badge variant={currentUser.tipo_usuario === 'gestor' ? 'default' : 'secondary'} className="text-xs">
-              {currentUser.tipo_usuario}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-2">
-          <Button variant="outline" size="sm" onClick={onRefresh} className="w-full" aria-label="Atualizar dados">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-          <Button variant="outline" size="sm" onClick={onLogout} className="w-full" aria-label="Sair da conta">
-            <LogOut className="w-4 h-4 mr-2" />
-            Sair
-          </Button>
-        </div>
-      </div>
+  {/* Bloco de usuário movido para o topo direito (TopUserActions). Mantido espaço final mínimo */}
+  <div className="h-4" />
     </aside>
   )
 }

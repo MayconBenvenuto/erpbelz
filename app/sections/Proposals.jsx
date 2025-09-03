@@ -824,7 +824,7 @@ function ProposalsInner({
                             </DropdownMenu>
                           )}
                           {currentUser.tipo_usuario === 'gestor' && (
-                            <button type="button" onClick={() => openEditDialog(p)} className="px-2 py-0.5 text-[11px] rounded border bg-background hover:bg-muted">Editar</button>
+                            <button type="button" onClick={() => openEditDialog(p)} className="px-2 py-0.5 text-[11px] rounded border bg-background hover:bg-muted text-white">Editar</button>
                           )}
                           {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && !p.atendido_por && (
                             <button
@@ -849,14 +849,14 @@ function ProposalsInner({
                             }
                             const nome = handlerId ? (users.find(u => u.id === handlerId)?.nome || '—') : '—'
                             return (
-                              <span className="text-[10px] text-muted-foreground">
+                              <span className="text-[10px] text-white-foreground">
                                 {`Atendido por: ${nome}`}
                               </span>
                             )
                           })()}
                         </div>
                         {currentUser.tipo_usuario === 'gestor' && (
-                          <div className="text-[10px] text-muted-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
+                          <div className="text-[10px] text-white-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
                         )}
                       </div>
                     )
