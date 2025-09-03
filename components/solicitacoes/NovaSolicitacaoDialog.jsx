@@ -27,7 +27,7 @@ const MAX_FILE_SIZE_MB = 7
 
 export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   const [tipo, setTipo] = useState('inclusao')
-  const [subtipo, setSubtipo] = useState('funcionario')
+  const [subtipo, setSubtipo] = useState('funcionário')
   const [razaoSocial, setRazaoSocial] = useState('')
   const [cnpj, setCnpj] = useState('')
   const [cnpjState, setCnpjState] = useState({ loading: false, error: null, validated: false })
@@ -49,13 +49,13 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
 
   // Mini textos explicativos (poderia vir de config externa futuramente)
   const DOC_TIPS = useMemo(() => ({
-    funcionario: [
+    funcionário: [
       { key: 'documento_identificacao', label: 'Documento de identificação', desc: 'RG ou CNH com foto, dentro da validade e legível.' },
       { key: 'esocial_completo', label: 'e-Social completo', desc: 'Relatório completo comprovando vínculo ativo do colaborador.' },
       { key: 'ctps_digital', label: 'CTPS digital', desc: 'Páginas com dados pessoais + contrato de trabalho.' },
       { key: 'formulario_inclusao', label: 'Formulário de inclusão', desc: 'Formulário interno preenchido e assinado.' },
     ],
-    socio: [
+    sócio: [
       { key: 'contrato_social', label: 'Contrato social', desc: 'Última alteração ou consolidação registrada.' },
       { key: 'documento_identificacao', label: 'Documento de identificação', desc: 'RG ou CNH do sócio responsável.' },
       { key: 'formulario_inclusao', label: 'Formulário de inclusão', desc: 'Formulário interno preenchido e assinado.' },
@@ -114,8 +114,8 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   // Funções auxiliares (declaradas antes para evitar ReferenceError)
   const requiredDocKeys = useCallback(() => {
     if (tipo === 'inclusao') {
-      if (subtipo === 'funcionario') return ['documento_identificacao','esocial_completo','ctps_digital','formulario_inclusao']
-      if (subtipo === 'socio') return ['contrato_social','documento_identificacao','formulario_inclusao']
+      if (subtipo === 'funcionário') return ['documento_identificacao','esocial_completo','ctps_digital','formulario_inclusao']
+      if (subtipo === 'sócio') return ['contrato_social','documento_identificacao','formulario_inclusao']
       if (subtipo === 'dependente') return ['certidao_dependente','formulario_inclusao']
     }
     if (tipo === 'exclusao') {
@@ -132,7 +132,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
   }, [tipo, subtipo, operadora])
 
   const docLabel = useCallback((key) => {
-    const all = [...DOC_TIPS.funcionario, ...DOC_TIPS.socio, ...DOC_TIPS.dependente, ...DOC_TIPS.exclusao, ...DOC_TIPS.cancelamento]
+    const all = [...DOC_TIPS.funcionário, ...DOC_TIPS.sócio, ...DOC_TIPS.dependente, ...DOC_TIPS.exclusao, ...DOC_TIPS.cancelamento]
     return all.find(d => d.key === key)?.label || key
   }, [DOC_TIPS])
 
@@ -219,7 +219,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
       setObservacoes('')
       setAcessoEmpresa('')
       setTipo('inclusao')
-      setSubtipo('funcionario')
+      setSubtipo('funcionário')
       setSlaPrevisto('')
       // dispara evento para outra tela recarregar sem refresh manual
       try { window.dispatchEvent(new CustomEvent('solicitacao:created')) } catch {}
@@ -400,7 +400,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
             </TabsList>
             <TabsContent value="inclusao" className="mt-4 space-y-4">
               <div className="flex gap-3 flex-wrap">
-                {['funcionario', 'socio', 'dependente'].map(s => (
+                {['funcionário', 'sócio', 'dependente'].map(s => (
                   <Button key={s} variant={subtipo === s ? 'default' : 'outline'} onClick={() => setSubtipo(s)} className="text-sm capitalize">
                     {s}
                   </Button>
@@ -486,7 +486,7 @@ export function NovaSolicitacaoDialog({ open, onOpenChange, token }) {
                         )}
                       </div>
                       {!meta && (
-                        <p className="mt-1 text-[11px] text-muted-foreground">Envie: PDF/JPG/PNG &lt;={MAX_FILE_SIZE_MB}MB. {DOC_TIPS.funcionario.concat(DOC_TIPS.socio, DOC_TIPS.dependente, DOC_TIPS.exclusao, DOC_TIPS.cancelamento).find(d => d.key === docKey)?.desc}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">Envie: PDF/JPG/PNG &lt;={MAX_FILE_SIZE_MB}MB. {DOC_TIPS.funcionário.concat(DOC_TIPS.sócio, DOC_TIPS.dependente, DOC_TIPS.exclusao, DOC_TIPS.cancelamento).find(d => d.key === docKey)?.desc}</p>
                       )}
                       {meta && (
                         <p className="mt-1 text-[11px] text-muted-foreground break-all">{meta.nome}</p>
