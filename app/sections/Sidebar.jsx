@@ -32,6 +32,17 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
 
   <nav className="flex-1 p-4 overflow-y-auto belz5-sidebar-scroll">
         <div className="space-y-2">
+          {/* Para analista_movimentacao: Movimentação fica no topo */}
+          {currentUser?.tipo_usuario === 'analista_movimentacao' && hasPermission(currentUser,'viewMovimentacao') && (
+            <button
+              onClick={() => setActiveTab('movimentacao')}
+              aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
+              className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'movimentacao' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
+            >
+              <Repeat className="w-5 h-5" />
+              <span className="font-medium">Movimentação</span>
+            </button>
+          )}
           {/* Dashboard: sempre a primeira opção para todos os perfis */}
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -130,7 +141,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
 
           {/* Seção Implantação removida */}
 
-          {hasPermission(currentUser,'viewMovimentacao') && (
+          {currentUser?.tipo_usuario !== 'analista_movimentacao' && hasPermission(currentUser,'viewMovimentacao') && (
             <button
               onClick={() => setActiveTab('movimentacao')}
               aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
