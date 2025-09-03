@@ -25,20 +25,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: 'yarn'
 
-      - name: Instalar dependências
+      - name: Remover package-lock (padronizar yarn)
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if [ -f package-lock.json ]; then rm package-lock.json; fi
+
+      - name: Instalar dependências (yarn)
+        run: yarn install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: yarn lint
 
       - name: Build
-        run: npm run build
+        run: yarn build
 
       - name: Testes completos (cobertura)
-        run: npm run test:full
+        run: yarn test:full
 
       - name: Marcar sucesso
         id: set-pass

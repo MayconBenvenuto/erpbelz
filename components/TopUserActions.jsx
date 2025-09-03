@@ -9,7 +9,7 @@ export default function TopUserActions({ currentUser, onRefresh, onLogout, isRef
   return (
     <div className="hidden md:flex items-stretch gap-3">
       <div className="flex items-center gap-3 pl-3 pr-4 py-2 rounded-xl bg-card border border-border shadow-sm">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-primary shrink-0">
           <User className="w-5 h-5" />
         </div>
         <div className="min-w-0 leading-tight">

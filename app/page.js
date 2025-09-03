@@ -12,23 +12,31 @@ import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import Image from 'next/image'
 
-// Seções
-import Sidebar from '@/app/sections/Sidebar'
-import Header from '@/app/sections/Header'
+// Performance providers
+import { QueryProvider } from '@/components/query-provider'
+import { useServiceWorker } from '@/hooks/use-service-worker'
+
+// Lazy loaded sections (otimizadas)
+import { 
+  LazyProposalsSection, 
+  LazyReportsSection, 
+  LazyMovimentacaoSection, 
+  LazyUsersSection,
+  DashboardSection,
+  Sidebar,
+  Header,
+  EmDesenvolvimento 
+} from '@/components/lazy-sections'
+
 import TopUserActions from '@/components/TopUserActions'
 import MobileSidebar from '@/app/sections/MobileSidebar'
-import ProposalsSection from '@/app/sections/Proposals'
-import DashboardSection from '@/app/sections/Dashboard'
-import UsersSection from '@/app/sections/Users'
-import ReportsSection from '@/app/sections/Reports'
-import MovimentacaoSection from '@/app/sections/Movimentacao'
-import EmDesenvolvimento from '@/app/sections/EmDesenvolvimento'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
+import { useProposals } from '@/hooks/use-api'
 import { hasPermission } from '@/lib/rbac'
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
 import { FileText, BarChart3, Users, TrendingUp, Repeat, LogOut, PlusCircle, Search } from 'lucide-react'
 
-export default function App() {
+function AppContent() {
   const [currentUser, setCurrentUser] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -39,13 +47,17 @@ export default function App() {
   // Forms
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
 
-  // Dados
-  const [proposals, setProposals] = useState([])
+  // Dados - mantidos para compatibilidade, mas serão migrados para React Query gradualmente
+  // Proposals agora via React Query
+  const { data: proposals = [], refetch: refetchProposals } = useProposals()
   const [users, setUsers] = useState([])
   const [solicitacoes, setSolicitacoes] = useState([]) // movimentações para métricas macro no dashboard gestor
   const [userGoals, setUserGoals] = useState([])
   const [clientes, setClientes] = useState([])
   const [sessions, setSessions] = useState([])
+
+  // Service Worker para cache
+  useServiceWorker()
 
   // Command palette
   const [commandOpen, setCommandOpen] = useState(false)
@@ -160,7 +172,8 @@ export default function App() {
       const common = { credentials: 'include' }
       const fetches = []
     // Propostas
-  fetches.push(fetch('/api/proposals', { headers: authHeaders, ...common }))
+  // Proposals já carregadas via React Query; opcionalmente refetch paralelo
+  refetchProposals()
   // Solicitações
   fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
     // Carteira de clientes: consultor e gestor
@@ -176,9 +189,8 @@ export default function App() {
 
   const responses = await Promise.all(fetches)
       let idx = 0
-  const proposalsRes = responses[idx++]
   const solicitacoesRes = responses[idx++]
-      if (proposalsRes?.ok) setProposals(await proposalsRes.json())
+      // proposals via react-query
       if (solicitacoesRes?.ok) {
         const json = await solicitacoesRes.json()
         // endpoint retorna { data: [], ... }
@@ -220,7 +232,7 @@ export default function App() {
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     }
-  }, [token, currentUser])
+  }, [token, currentUser, refetchProposals])
 
   // Debounce simples para evitar múltiplos loadData encadeados (ex: criar + atualizar status)
   const loadDataDebouncedRef = useRef({ timer: null, pending: false })
@@ -277,13 +289,12 @@ export default function App() {
         afterSuccess && afterSuccess()
         // Otimista: insere nova proposta imediatamente sem esperar round-trip completo
         if (result && result.id) {
-          setProposals(prev => {
-            // evita duplicar se já vier do SSE
-            if (prev.some(p => p.id === result.id)) return prev
-            return [...prev, result]
+          queryClient.setQueryData(queryKeys.proposals, (old = []) => {
+            if (old.some(p => p.id === result.id)) return old
+            return [...old, result]
           })
         }
-        scheduleLoadData()
+        refetchProposals()
       } else {
         console.error('Erro ao criar proposta:', result)
         toast.error(result.error || result.message || 'Erro ao criar proposta')
@@ -332,8 +343,9 @@ export default function App() {
         credentials: 'include',
         body: JSON.stringify(payload)
       })
-      // Otimista: aplica status local enquanto requisita
-      setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: payload.status } : p))
+      // Otimista via React Query
+      const prevCache = queryClient.getQueryData(queryKeys.proposals)
+      queryClient.setQueryData(queryKeys.proposals, (old = []) => old.map(p => p.id === proposalId ? { ...p, status: payload.status } : p))
       let response = await doPatch()
       if (!response.ok && response.status === 404) {
         // pequena espera para caso de claim implícito
@@ -343,34 +355,45 @@ export default function App() {
       }
       if (response.ok) {
         toast.success('Status da proposta atualizado com sucesso!')
-        scheduleLoadData()
+        refetchProposals()
         return
       }
       if (response.status === 404) {
         const result = await response.json().catch(() => ({}))
         toast.error(result.error || 'Proposta não encontrada. Recarregando...')
-        scheduleLoadData(true)
+        queryClient.setQueryData(queryKeys.proposals, prevCache)
+        refetchProposals()
         return
       }
       if (response.status === 403) {
         toast.error('Ação não permitida (verifique se você assumiu a proposta)')
-        // Reverte otimista se proibido
-        scheduleLoadData(true)
+        queryClient.setQueryData(queryKeys.proposals, prevCache)
+        refetchProposals()
         return
       }
       const result = await response.json().catch(() => ({}))
       toast.error(result.error || 'Erro ao atualizar status')
-      scheduleLoadData()
+      queryClient.setQueryData(queryKeys.proposals, prevCache)
+      refetchProposals()
     } catch {
       toast.error('Erro ao conectar com o servidor')
-      scheduleLoadData()
+      refetchProposals()
     }
   }
 
   const handlePatchProposal = async (proposalId, payload) => {
+    const { queryClient } = await import('@/lib/query-client')
+    const { updateAllProposalsCaches } = await import('@/lib/query-client')
+    let rollback
     try {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
+      // Otimista: aplica merge em todas as caches de propostas
+      const prevSnapshots = queryClient.getQueriesData({ queryKey: ['proposals'] })
+      rollback = () => {
+        prevSnapshots.forEach(([key, data]) => queryClient.setQueryData(key, data))
+      }
+      updateAllProposalsCaches(list => list.map(p => p.id === proposalId ? { ...p, ...payload } : p))
       const response = await fetch(`/api/proposals/${proposalId}`, {
         method: 'PATCH',
         headers,
@@ -379,19 +402,18 @@ export default function App() {
       })
       if (response.ok) {
         toast.success('Proposta atualizada com sucesso!')
-        // Atualização otimista básica (merge campos conhecidos)
-        setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, ...payload } : p))
-        scheduleLoadData()
+        refetchProposals()
         return { ok: true }
-      } else {
-        const result = await response.json().catch(() => ({}))
-        toast.error(result.error || 'Erro ao atualizar proposta')
-        scheduleLoadData()
-        return { ok: false, error: result.error }
       }
+      const result = await response.json().catch(() => ({}))
+      rollback?.()
+      toast.error(result.error || 'Erro ao atualizar proposta')
+      refetchProposals()
+      return { ok: false, error: result.error }
     } catch {
+      rollback?.()
       toast.error('Erro ao conectar com o servidor')
-      scheduleLoadData()
+      refetchProposals()
       return { ok: false, error: 'network' }
     }
   }
@@ -667,7 +689,7 @@ export default function App() {
                         !p.atendido_por
                       ))
         return (
-                  <ProposalsSection
+                  <LazyProposalsSection
                     currentUser={currentUser}
                     proposals={proposalsForView}
                     operadoras={operadoras}
@@ -732,19 +754,19 @@ export default function App() {
 
             {hasPermission(currentUser,'viewMovimentacao') && (
               <TabsContent value="movimentacao" className="space-y-6">
-                <MovimentacaoSection currentUser={currentUser} token={token} />
+                <LazyMovimentacaoSection currentUser={currentUser} token={token} />
               </TabsContent>
             )}
 
             {hasPermission(currentUser,'manageUsers') && (
               <TabsContent value="usuarios" className="space-y-6">
-                <UsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} onDeleteUser={handleDeleteUser} isLoading={isLoading} />
+                <LazyUsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} onDeleteUser={handleDeleteUser} isLoading={isLoading} />
               </TabsContent>
             )}
 
             {hasPermission(currentUser,'viewRelatorios') && (
               <TabsContent value="relatorios" className="space-y-6">
-                <ReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
+                <LazyReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
               </TabsContent>
             )}
 
@@ -820,5 +842,14 @@ export default function App() {
         </CommandList>
       </CommandDialog>
     </div>
+  )
+}
+
+// Export principal com Providers globais
+export default function App() {
+  return (
+    <QueryProvider>
+      <AppContent />
+    </QueryProvider>
   )
 }

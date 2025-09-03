@@ -85,7 +85,7 @@ export default function ConsultorDashboardSection({ currentUser, proposals = [],
         </CardContent>
       </Card>
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-primary">Seu Dashboard</h2>
+        <h2 className="text-2xl font-bold text-primary text-white">Seu Dashboard</h2>
         <div className="text-sm text-muted-foreground flex items-center gap-2">
           <User className="w-4 h-4" />
           <span>{currentUser.nome}</span>
@@ -99,7 +99,7 @@ export default function ConsultorDashboardSection({ currentUser, proposals = [],
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{total}</div>
+            <div className="text-2xl font-bold text-primary text-white">{total}</div>
             <p className="text-xs text-muted-foreground">Total que você abriu</p>
           </CardContent>
         </Card>
