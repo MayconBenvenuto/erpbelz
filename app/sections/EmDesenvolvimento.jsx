@@ -20,7 +20,7 @@ export default function EmDesenvolvimento({ titulo = 'Em desenvolvimento', descr
             <ul className="list-disc pl-5 space-y-1">
               <li>Design e requisitos sendo refinados</li>
               <li>Integrações e segurança alinhadas ao padrão do sistema</li>
-              <li>Feedbacks são bem-vindos</li>
+              <li>Feedbacks são bem-vindos, fale conosco.</li>
             </ul>
           </div>
         </CardContent>
