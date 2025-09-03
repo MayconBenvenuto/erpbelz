@@ -442,7 +442,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
         </section>
       )}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-primary">Relatórios e Monitoramento</h2>
+        <h2 className="text-2xl font-bold text-white">Relatórios e Monitoramento</h2>
         <Button
           variant="outline"
           size="sm"
@@ -615,7 +615,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                   </div>
 
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">Ver últimas 5 sessões</summary>
+                    <summary className="cursor-pointer text-sm font-medium text-white hover:text-white/50">Ver últimas 5 sessões</summary>
                     <div className="mt-2 space-y-1">
                       {userSessions.slice(-5).reverse().map((session) => (
                         <div key={session.id} className="text-xs bg-muted/50 p-2 rounded">

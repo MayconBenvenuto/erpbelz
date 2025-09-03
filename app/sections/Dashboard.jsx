@@ -608,9 +608,9 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </div>
       )}
 
-      {/* Timelines específicas para analista (visual do consultor) */}
+      {/* Timeline de propostas para analista de implantação e movimentação; timeline de movimentações só para analista_movimentacao */}
       {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Linha do Tempo - Propostas</CardTitle>
@@ -643,37 +643,39 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
               </ul>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Linha do Tempo - Movimentações</CardTitle>
-              <CardDescription>Últimas movimentações que você abriu ou assumiu</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {analystMovTimeline.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhuma movimentação ainda.</p>
-              )}
-              <ul className="space-y-3">
-                {analystMovTimeline.map(item => (
-                  <li key={item.id} className="p-3 rounded-md border bg-card/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${movStatusColor(item.status)}`} />
-                      <div>
-                        <p className="text-sm font-medium">{item.codigo}</p>
-                        <p className="text-xs text-muted-foreground">Criado {formatDateTime(item.criado_em)}</p>
+          {currentUser.tipo_usuario === 'analista_movimentacao' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Linha do Tempo - Movimentações</CardTitle>
+                <CardDescription>Últimas movimentações que você abriu ou assumiu</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analystMovTimeline.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhuma movimentação ainda.</p>
+                )}
+                <ul className="space-y-3">
+                  {analystMovTimeline.map(item => (
+                    <li key={item.id} className="p-3 rounded-md border bg-card/50 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${movStatusColor(item.status)}`} />
+                        <div>
+                          <p className="text-sm font-medium">{item.codigo}</p>
+                          <p className="text-xs text-muted-foreground">Criado {formatDateTime(item.criado_em)}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col md:items-end gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge>
-                        {item.atualizado_em && item.atualizado_em !== item.criado_em && (<Badge variant="outline" className="text-xs">Atualizado {formatDateTime(item.atualizado_em)}</Badge>)}
-                        {item.tipo && <Badge variant="outline" className="text-xs capitalize">{item.tipo}{item.subtipo ? `/${item.subtipo}` : ''}</Badge>}
+                      <div className="flex flex-col md:items-end gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="text-xs capitalize">{item.status}</Badge>
+                          {item.atualizado_em && item.atualizado_em !== item.criado_em && (<Badge variant="outline" className="text-xs">Atualizado {formatDateTime(item.atualizado_em)}</Badge>)}
+                          {item.tipo && <Badge variant="outline" className="text-xs capitalize">{item.tipo}{item.subtipo ? `/${item.subtipo}` : ''}</Badge>}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
