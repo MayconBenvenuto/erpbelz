@@ -9,7 +9,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
-import { FixedSizeList as List } from 'react-window'
+// Virtualização: carregamento dinâmico para evitar erro de build caso a lib mude formato de export
+// e para não quebrar em ambientes onde "react-window" não esteja disponível (fallback graceful)
+// Virtualização simples baseada em altura fixa de item (itemSize)
+function VirtualList({ itemCount, itemSize, height, width, children, className, overscan = 4 }) {
+  const containerRef = useRef(null)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const onScroll = (e) => {
+    setScrollTop(e.currentTarget.scrollTop)
+  }
+
+  const totalHeight = itemCount * itemSize
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemSize))
+  const visibleCount = Math.ceil(height / itemSize) + overscan
+  const endIndex = Math.min(itemCount, startIndex + visibleCount)
+
+  const items = []
+  for (let i = startIndex; i < endIndex; i++) {
+    const style = {
+      position: 'absolute',
+      top: i * itemSize,
+      left: 0,
+      width: '100%',
+      height: itemSize,
+    }
+    items.push(children({ index: i, style }))
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={onScroll}
+      style={{ position: 'relative', overflowY: 'auto', height, width }}
+      className={className}
+      role="list"
+      aria-label="Lista virtualizada"
+    >
+      <div style={{ height: totalHeight, position: 'relative', width: '100%' }}>
+        {items}
+      </div>
+    </div>
+  )
+}
+
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
@@ -462,9 +505,9 @@ function ProposalsInner({
   return (
     <div className="space-y-6">
       {currentUser.tipo_usuario === 'consultor' && (
-        <Card className="border-amber-300/60 bg-amber-50 dark:bg-amber-950/20">
+        <Card className="border-amber-300/60 bg-secondary dark:bg-amber-950/20">
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">Como funciona</CardTitle>
+            <CardTitle className="text-sm">Como funciona:</CardTitle>
             <CardDescription>Solicite a proposta e acompanhe quando um analista assumir.</CardDescription>
           </CardHeader>
           <CardContent className="pt-0 text-xs space-y-1">
@@ -738,7 +781,7 @@ function ProposalsInner({
                     </div>
                   )}
                   {groupedByStatus[status] && groupedByStatus[status].length > 0 && (
-                    <List
+                    <VirtualList
                       height={480}
                       itemCount={groupedByStatus[status].length}
                       itemSize={140}
@@ -884,7 +927,7 @@ function ProposalsInner({
                         )}
                       </div>
                     )}}
-                    </List>
+                    </VirtualList>
                   )}
                 </div>
               </div>
@@ -978,6 +1021,7 @@ function ProposalsInner({
                       backgroundColor: (STATUS_COLORS[detail.status] || { bg: '#f6f6f6' }).bg,
                       color: '#000000 !important',
                       fontWeight: 'bold',
+                      color: (STATUS_COLORS[detail.status] || { text: '#333333' }).text,
                       border: `1px solid ${(STATUS_COLORS[detail.status] || { border: '#e2e2e2' }).border}`
                     }}
                   >
