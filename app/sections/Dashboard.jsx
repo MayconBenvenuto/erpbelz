@@ -413,7 +413,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
         </CardContent>
       </Card>
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-primary">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-primary text-white">Dashboard</h2>
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
             {['gestor','gerente'].includes(currentUser.tipo_usuario) && (

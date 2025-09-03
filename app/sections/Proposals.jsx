@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PlusCircle, X, ArrowUpDown, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { FixedSizeList as List } from 'react-window'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { STATUS_COLORS } from '@/lib/constants'
 import ProposalsTimeline from '@/components/timeline/ProposalsTimelineComponent'
+import { queryClient } from '@/lib/query-client'
 
 export default function ProposalsSection(props) {
   return <ProposalsInner {...props} />
@@ -433,6 +435,18 @@ function ProposalsInner({
   const hoursBetween = (a,b) => { try { const ta=new Date(a).getTime(); const tb=new Date(b).getTime(); if(isNaN(ta)||isNaN(tb)) return 0; return (tb-ta)/1000/3600 } catch { return 0 } }
   const ageHours = (p) => hoursBetween(p.criado_em, new Date())
 
+  const prefetchDetails = (id) => {
+    queryClient.prefetchQuery({
+      queryKey: ['proposals', id],
+      queryFn: async () => {
+        const r = await fetch(`/api/proposals/${id}`)
+        if (!r.ok) throw new Error('Erro ao pré-carregar')
+        return r.json()
+      },
+      staleTime: 60_000,
+    })
+  }
+
   const openDetails = async (id) => {
     const prop = proposals.find(p => p.id === id)
     setDetail(prop || null)
@@ -717,13 +731,22 @@ function ProposalsInner({
                   <span>{status}</span>
                   <span className="ml-auto text-xs tabular-nums opacity-70">{groupedByStatus[status]?.length || 0}</span>
                 </div>
-                <div className="p-2 space-y-2 overflow-y-auto custom-scrollbar">
+                <div className="p-2 overflow-y-auto custom-scrollbar">
                   {(!groupedByStatus[status] || groupedByStatus[status].length === 0) && (
                     <div className="text-[11px] text-muted-foreground italic px-2 py-4 border border-dashed rounded bg-background/40">
                       Nenhuma proposta
                     </div>
                   )}
-                  {groupedByStatus[status]?.map((p) => {
+                  {groupedByStatus[status] && groupedByStatus[status].length > 0 && (
+                    <List
+                      height={480}
+                      itemCount={groupedByStatus[status].length}
+                      itemSize={140}
+                      width={250}
+                      className="pr-2"
+                    >
+                      {({ index, style }) => {
+                        const p = groupedByStatus[status][index]
                     const isHandler = String(p.atendido_por) === String(currentUser.id)
                     const canEdit = (
                       ['gestor','gerente'].includes(currentUser.tipo_usuario) || (['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && isHandler)
@@ -734,18 +757,19 @@ function ProposalsInner({
                     const ageClass = p.horas_em_analise >= 48 ? 'before:bg-gradient-to-b before:from-red-500 before:to-red-700' : p.horas_em_analise >= 24 ? 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600' : 'before:bg-gradient-to-b before:from-transparent before:to-transparent'
                     const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
                     return (
-                      <div 
-                        key={p.id} 
-                        className={`rounded p-2 backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'ring-2 ring-red-400' : 'ring-1 ring-amber-300') : ''} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}
+                      <div
+                        key={p.id}
                         style={{
+                          ...style,
                           backgroundColor: statusColors.bg,
                           color: statusColors.text,
                           borderColor: statusColors.border
                         }}
+                        className={`rounded p-2 mb-2 backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'ring-2 ring-red-400' : 'ring-1 ring-amber-300') : ''} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}
                       >
                         {/* zebra effect via idx */}
                         <div className="absolute inset-0 pointer-events-none rounded opacity-0 group-hover:opacity-5 transition-opacity bg-primary" />
-                        <div className="font-medium truncate flex items-center gap-1" title={p.consultor}>
+                        <div className="font-medium truncate flex items-center gap-1" title={p.consultor} onMouseEnter={() => prefetchDetails(p.id)}>
                           <span 
                             className="font-mono text-[10px] px-1 py-0.5 rounded flex items-center gap-1"
                             style={{
@@ -859,8 +883,9 @@ function ProposalsInner({
                           <div className="text-[10px] text-white-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
                         )}
                       </div>
-                    )
-                  })}
+                    )}}
+                    </List>
+                  )}
                 </div>
               </div>
               )
