@@ -26,7 +26,7 @@ export async function POST(request) {
 
 		const { data: user, error } = await supabase
 			.from('usuarios')
-			.select('id, nome, email, senha, tipo_usuario')
+			.select('id, nome, email, senha, tipo_usuario, must_change_password')
 			.eq('email', String(email).toLowerCase())
 			.single()
 
@@ -53,10 +53,10 @@ export async function POST(request) {
 	// Marca presença inicial do usuário no login (produção usa coluna usuarios.ultimo_refresh)
 	try { await supabase.from('usuarios').update({ ultimo_refresh: nowIso }).eq('id', user.id) } catch {}
 
-				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario }
+				const safeUser = { id: user.id, nome: user.nome, email: user.email, tipo_usuario: user.tipo_usuario, must_change_password: !!user.must_change_password }
 
 				// Cria resposta e define cookie de sessão (HttpOnly, SameSite=Lax, sem Max-Age/Expires)
-				const response = NextResponse.json({ user: safeUser, sessionId, token })
+				const response = NextResponse.json({ user: safeUser, sessionId, token, requirePasswordReset: !!user.must_change_password })
 				const isProd = process.env.NODE_ENV === 'production'
 				try {
 					response.cookies.set('crm_auth', token, {

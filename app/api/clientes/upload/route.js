@@ -21,6 +21,7 @@ export async function POST(request) {
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   const user = auth.user
   try {
+  // analista_cliente permitido (mesma regra de escopo que consultor)
     const form = await request.formData()
     const file = form.get('file')
     const clienteId = form.get('cliente_id')

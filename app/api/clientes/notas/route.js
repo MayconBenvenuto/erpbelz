@@ -14,8 +14,10 @@ export async function GET(request) {
   const auth = await requireAuth(request)
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   if (!clienteId) return handleCORS(NextResponse.json({ error: 'cliente_id obrigatório' }, { status: 400 }), origin)
+  // analista_cliente permitido
   const user = auth.user
   try {
+  // analista_cliente permitido
     // ownership verificado via policies, mas checamos para feedback rápido
     const { data: cliente } = await supabase.from('clientes_consultor').select('id, consultor_id').eq('id', clienteId).single()
     if (!cliente) return handleCORS(NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 }), origin)
@@ -34,6 +36,7 @@ export async function POST(request) {
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   const user = auth.user
   try {
+  // analista_cliente permitido
     const body = await request.json().catch(()=>({}))
     const { cliente_id, nota } = body
     if (!cliente_id || !nota) return handleCORS(NextResponse.json({ error: 'cliente_id e nota obrigatórios' }, { status: 400 }), origin)

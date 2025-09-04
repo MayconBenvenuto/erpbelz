@@ -28,19 +28,10 @@ Recent updates (2025-09-01):
 ## User Roles & Permissions
 
 ### Analyst (analista)
-- ✅ Create proposals
-- ✅ View proposals
-- ✅ Edit proposal status (only their own proposals)
-- ❌ Delete proposals
-- ❌ Manage users
 
 ### Manager (gestor)
-- ❌ Create proposals
-- ✅ View all proposals
-- ✅ Edit proposal status
-- ✅ Delete proposals
-- ✅ Manage users
-- ✅ View reports
+
+Nota sobre analista_cliente: este papel pode acessar a Carteira de Clientes (listar, criar, editar, anexar docs e notas) somente para registros cujo consultor_id seja seu próprio id. Não tem acesso às seções de Propostas ou Movimentação.
 
 ## Key Security Patterns
 
@@ -208,7 +199,7 @@ CREATE TABLE usuarios (
   nome TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   senha TEXT NOT NULL,
-  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor','analista')) NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor','gerente','analista_implantacao','analista_movimentacao','consultor','analista_cliente')) NOT NULL,
   criado_em TIMESTAMPTZ DEFAULT NOW()
 );
 ```

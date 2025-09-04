@@ -24,7 +24,7 @@ const createSchema = z.object({
 	email: z.string().email(),
 	senha: z.string().min(6),
 	// incluir gerente no schema; gestor não pode ser criado via UI para evitar perda de controle inicial
-	tipo_usuario: z.enum(['gerente','analista_implantacao','analista_movimentacao','consultor'])
+	tipo_usuario: z.enum(['gerente','analista_implantacao','analista_movimentacao','consultor','analista_cliente'])
 })
 
 export async function POST(request) {
@@ -43,7 +43,7 @@ export async function POST(request) {
 	if (!ROLES.includes(parsed.data.tipo_usuario)) {
 		return handleCORS(NextResponse.json({ error: 'Tipo de usuário inválido' }, { status: 400 }), origin)
 	}
-	const { data, error } = await supabase.from('usuarios').insert({ ...parsed.data, senha: hashed }).select('id, nome, email, tipo_usuario').single()
+	const { data, error } = await supabase.from('usuarios').insert({ ...parsed.data, senha: hashed, must_change_password: true }).select('id, nome, email, tipo_usuario, must_change_password').single()
 	if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
 	return handleCORS(NextResponse.json(data), origin)
 }
