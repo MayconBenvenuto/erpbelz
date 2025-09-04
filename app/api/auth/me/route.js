@@ -17,7 +17,7 @@ export async function GET(request) {
   try {
     const { data: userRow, error } = await supabase
       .from('usuarios')
-      .select('id, nome, email, tipo_usuario')
+  .select('id, nome, email, tipo_usuario, must_change_password')
       .eq('id', auth.user.id)
       .single()
 
@@ -25,7 +25,7 @@ export async function GET(request) {
       return handleCORS(NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 }), origin)
     }
 
-    return handleCORS(NextResponse.json({ user: userRow }), origin)
+  return handleCORS(NextResponse.json({ user: userRow }), origin)
   } catch {
     return handleCORS(NextResponse.json({ error: 'Erro ao buscar usuário' }, { status: 500 }), origin)
   }

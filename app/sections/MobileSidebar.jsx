@@ -47,8 +47,8 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
                 </button>
               </SheetClose>
             )}
-            {/* Propostas agora visível também para consultor */}
-            {true && (
+            {/* Propostas não exibida para analista_cliente */}
+            {currentUser?.tipo_usuario !== 'analista_cliente' && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('propostas')}
@@ -81,7 +81,7 @@ export default function MobileSidebar({ currentUser, activeTab, setActiveTab, on
               </SheetClose>
             )}
 
-            {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) || currentUser?.tipo_usuario === 'consultor' || currentUser?.tipo_usuario === 'gestor') && (
+            {(['analista_implantacao', 'analista_movimentacao'].includes(currentUser?.tipo_usuario) || currentUser?.tipo_usuario === 'consultor' || currentUser?.tipo_usuario === 'gestor') && currentUser?.tipo_usuario !== 'analista_cliente' && (
               <SheetClose asChild>
                 <button
                   onClick={() => setActiveTab('movimentacao')}
