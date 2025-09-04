@@ -67,78 +67,37 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
           )}
 
           {/* Novas seções em desenvolvimento - apenas navegação; permissões futuras podem ser aplicadas */}
-          <button
-            onClick={() => setActiveTab('simulador')}
-            aria-current={activeTab === 'simulador' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'simulador' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <Calculator className="w-5 h-5" />
-            <span className="font-medium">Simulador</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('financeiro')}
-            aria-current={activeTab === 'financeiro' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'financeiro' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <DollarSign className="w-5 h-5" />
-            <span className="font-medium">Financeiro</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('processos')}
-            aria-current={activeTab === 'processos' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'processos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <Workflow className="w-5 h-5" />
-            <span className="font-medium">Processos</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('ia-belz')}
-            aria-current={activeTab === 'ia-belz' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'ia-belz' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <Cpu className="w-5 h-5" />
-            <span className="font-medium">IA Belz</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('universidade')}
-            aria-current={activeTab === 'universidade' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'universidade' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <GraduationCap className="w-5 h-5" />
-            <span className="font-medium">Universidade</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('leads')}
-            aria-current={activeTab === 'leads' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'leads' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <Target className="w-5 h-5" />
-            <span className="font-medium">Leads</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('materiais')}
-            aria-current={activeTab === 'materiais' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'materiais' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <FolderKanban className="w-5 h-5" />
-            <span className="font-medium">Materiais</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('portal-cliente')}
-            aria-current={activeTab === 'portal-cliente' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'portal-cliente' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <ExternalLink className="w-5 h-5" />
-            <span className="font-medium">Portal Cliente</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('contatos')}
-            aria-current={activeTab === 'contatos' ? 'page' : undefined}
-            className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'contatos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
-          >
-            <Phone className="w-5 h-5" />
-            <span className="font-medium">Contatos</span>
-          </button>
+          {currentUser?.tipo_usuario === 'gestor' && (
+            <>
+              <button onClick={() => setActiveTab('simulador')} aria-current={activeTab === 'simulador' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'simulador' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <Calculator className="w-5 h-5" /><span className="font-medium">Simulador</span>
+              </button>
+              <button onClick={() => setActiveTab('financeiro')} aria-current={activeTab === 'financeiro' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'financeiro' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <DollarSign className="w-5 h-5" /><span className="font-medium">Financeiro</span>
+              </button>
+              <button onClick={() => setActiveTab('processos')} aria-current={activeTab === 'processos' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'processos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <Workflow className="w-5 h-5" /><span className="font-medium">Processos</span>
+              </button>
+              <button onClick={() => setActiveTab('ia-belz')} aria-current={activeTab === 'ia-belz' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'ia-belz' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <Cpu className="w-5 h-5" /><span className="font-medium">IA Belz</span>
+              </button>
+              <button onClick={() => setActiveTab('universidade')} aria-current={activeTab === 'universidade' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'universidade' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <GraduationCap className="w-5 h-5" /><span className="font-medium">Universidade</span>
+              </button>
+              <button onClick={() => setActiveTab('leads')} aria-current={activeTab === 'leads' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'leads' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <Target className="w-5 h-5" /><span className="font-medium">Leads</span>
+              </button>
+              <button onClick={() => setActiveTab('materiais')} aria-current={activeTab === 'materiais' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'materiais' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <FolderKanban className="w-5 h-5" /><span className="font-medium">Materiais</span>
+              </button>
+              <button onClick={() => setActiveTab('portal-cliente')} aria-current={activeTab === 'portal-cliente' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'portal-cliente' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <ExternalLink className="w-5 h-5" /><span className="font-medium">Portal Cliente</span>
+              </button>
+              <button onClick={() => setActiveTab('contatos')} aria-current={activeTab === 'contatos' ? 'page' : undefined} className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'contatos' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}>
+                <Phone className="w-5 h-5" /><span className="font-medium">Contatos</span>
+              </button>
+            </>
+          )}
 
           {/* Seção Implantação removida */}
 
