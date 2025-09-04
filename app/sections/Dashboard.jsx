@@ -720,7 +720,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
                       <div className="flex items-center gap-2">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] ${getStatusBadgeClasses(status)}`}
+                          className={`text-[11px] ${getStatusBadgeClasses(status)}`}
                         >
                           {status.charAt(0).toUpperCase() + status.slice(1)}
                         </Badge>
