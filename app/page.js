@@ -776,16 +776,20 @@ function AppContent() {
               </TabsContent>
             )}
 
-            {/* Abas em desenvolvimento - acesso liberado para todos autenticados por enquanto */}
-            <TabsContent value="simulador"><EmDesenvolvimento titulo="Simulador" descricao="Ferramenta de simulação de planos e cenários." /></TabsContent>
-            <TabsContent value="financeiro"><EmDesenvolvimento titulo="Financeiro" descricao="Gestão financeira e comissionamentos." /></TabsContent>
-            <TabsContent value="processos"><EmDesenvolvimento titulo="Processos" descricao="Orquestração e automação de fluxos internos." /></TabsContent>
-            <TabsContent value="ia-belz"><EmDesenvolvimento titulo="IA Belz" descricao="Recursos de inteligência artificial e insights." /></TabsContent>
-            <TabsContent value="universidade"><EmDesenvolvimento titulo="Universidade" descricao="Portal de treinamentos e capacitações." /></TabsContent>
-            <TabsContent value="leads"><EmDesenvolvimento titulo="Leads" descricao="Gestão de leads e funil comercial." /></TabsContent>
-            <TabsContent value="materiais"><EmDesenvolvimento titulo="Materiais" descricao="Repositório central de materiais e documentos." /></TabsContent>
-            <TabsContent value="portal-cliente"><EmDesenvolvimento titulo="Portal do Cliente" descricao="Área dedicada para interação com clientes." /></TabsContent>
-            <TabsContent value="contatos"><EmDesenvolvimento titulo="Contatos" descricao="Diretório e gestão de contatos estratégicos." /></TabsContent>
+            {/* Abas em desenvolvimento - apenas gestor */}
+            {currentUser.tipo_usuario === 'gestor' && (
+              <>
+                <TabsContent value="simulador"><EmDesenvolvimento titulo="Simulador" descricao="Ferramenta de simulação de planos e cenários." /></TabsContent>
+                <TabsContent value="financeiro"><EmDesenvolvimento titulo="Financeiro" descricao="Gestão financeira e comissionamentos." /></TabsContent>
+                <TabsContent value="processos"><EmDesenvolvimento titulo="Processos" descricao="Orquestração e automação de fluxos internos." /></TabsContent>
+                <TabsContent value="ia-belz"><EmDesenvolvimento titulo="IA Belz" descricao="Recursos de inteligência artificial e insights." /></TabsContent>
+                <TabsContent value="universidade"><EmDesenvolvimento titulo="Universidade" descricao="Portal de treinamentos e capacitações." /></TabsContent>
+                <TabsContent value="leads"><EmDesenvolvimento titulo="Leads" descricao="Gestão de leads e funil comercial." /></TabsContent>
+                <TabsContent value="materiais"><EmDesenvolvimento titulo="Materiais" descricao="Repositório central de materiais e documentos." /></TabsContent>
+                <TabsContent value="portal-cliente"><EmDesenvolvimento titulo="Portal do Cliente" descricao="Área dedicada para interação com clientes." /></TabsContent>
+                <TabsContent value="contatos"><EmDesenvolvimento titulo="Contatos" descricao="Diretório e gestão de contatos estratégicos." /></TabsContent>
+              </>
+            )}
 
           </Tabs>
         </main>

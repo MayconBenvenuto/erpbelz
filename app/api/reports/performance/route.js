@@ -289,7 +289,7 @@ export async function GET(request) {
   // Métricas derivadas de etapa (tempo médio por etapa)
   const tempoPorEtapa = (() => {
     const acc = {}
-    for (const [pid, tl] of Object.entries(timelineByProposal)) {
+  for (const [, tl] of Object.entries(timelineByProposal)) {
       for (let i=0;i<tl.length-1;i++) {
         const cur = tl[i]
         const next = tl[i+1]

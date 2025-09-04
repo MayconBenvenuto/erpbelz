@@ -11,7 +11,6 @@ export async function GET(request) {
   }
 
   try {
-    console.log('🧪 [TEST] Iniciando teste do sistema de alertas...')
     
     // 1. Buscar propostas em análise
     const { data: proposals, error } = await supabase
@@ -33,9 +32,6 @@ export async function GET(request) {
     // Propostas críticas há mais de 72h  
     const stale72h = proposals.filter(p => new Date(p.criado_em) <= ago72)
 
-    console.log(`🔍 [TEST] Propostas em análise: ${proposals.length}`)
-    console.log(`⏰ [TEST] Propostas +48h: ${stale48h.length}`)
-    console.log(`🚨 [TEST] Propostas +72h críticas: ${stale72h.length}`)
 
     // 2. Buscar gestores para notificação
     const { data: gestores, error: gestorError } = await supabase
@@ -44,7 +40,7 @@ export async function GET(request) {
       .eq('tipo_usuario', 'gestor')
 
     if (gestorError) {
-      console.error('❌ [TEST] Erro ao buscar gestores:', gestorError)
+  // Erro ao buscar gestores é retornado mais abaixo
     }
 
     const result = {
@@ -71,11 +67,9 @@ export async function GET(request) {
       ]
     }
 
-    console.log('✅ [TEST] Análise concluída')
     return handleCORS(NextResponse.json(result), origin)
 
   } catch (error) {
-    console.error('❌ [TEST] Erro:', error)
     return handleCORS(NextResponse.json({ 
       error: 'Erro no teste',
       message: error.message 
@@ -92,10 +86,9 @@ export async function POST(request) {
   }
 
   try {
-    console.log('🚀 [TEST] Executando trigger manual de teste...')
 
     // Chama o endpoint real de stale-check simulando um gestor
-    const baseUrl = `http://${request.headers.get('host') || 'localhost:3000'}`
+  // baseUrl removido (não utilizado)
     
     // Para este teste, vamos criar um token temporário ou usar bypass
     // Alternativa: chamar a lógica diretamente sem passar pela autenticação
@@ -117,7 +110,6 @@ export async function POST(request) {
       return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
     }
 
-    console.log(`📧 [TEST] Propostas elegíveis para notificação: ${(proposals || []).length}`)
 
     // Busca gestores
     const { data: gestores } = await supabase
@@ -145,7 +137,6 @@ export async function POST(request) {
     return handleCORS(NextResponse.json(result), origin)
 
   } catch (error) {
-    console.error('❌ [TEST] Erro no trigger:', error)
     return handleCORS(NextResponse.json({ 
       error: 'Erro no trigger de teste',
       message: error.message 
