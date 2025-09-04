@@ -15,8 +15,10 @@ export async function GET(request) {
   const auth = await requireAuth(request)
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   if (!clienteId) return handleCORS(NextResponse.json({ error: 'cliente_id obrigatório' }, { status: 400 }), origin)
+  // analista_cliente permitido
   const user = auth.user
   try {
+  // analista_cliente permitido
     const { data: cliente } = await supabase.from('clientes_consultor').select('id, consultor_id').eq('id', clienteId).single()
     if (!cliente) return handleCORS(NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 }), origin)
     if (user.tipo_usuario === 'consultor' && cliente.consultor_id !== user.id) return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)

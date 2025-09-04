@@ -42,8 +42,11 @@ Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas (implant
 | analista_implantacao | ✅ (suas) | ❌ | ✅ (suas) | ❌ | ❌ | ❌ | ✅ (limitado) |
 | analista_movimentacao | ❌ | ✅ (suas) | ✅ (suas mov.) | ❌ | ❌ | ❌ | ✅ (limitado) |
 | consultor | ✅ (suas) | ✅ (suas) | ❌ | ❌ | ❌ | ❌ | ❌ |
+| analista_cliente | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ (limitado) |
 
 Notas:
+
+- analista_cliente: não enxerga abas de Propostas nem Movimentação; TEM acesso à Carteira de Clientes (escopo próprio — atua como consultor para cadastro/gestão de seus clientes). Acesso também a dashboard (próprio) e seções gerais futuras (ex.: Portal Cliente) sem dados sensíveis.
 
 
 Autenticação: cookie de sessão + JWT interno com rate limiting.

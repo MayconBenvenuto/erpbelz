@@ -177,7 +177,7 @@ function AppContent() {
   // Solicitações
   fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
     // Carteira de clientes: consultor e gestor
-    const needsClientes = currentUser && ['consultor','gestor'].includes(currentUser.tipo_usuario)
+  const needsClientes = currentUser && ['consultor','gestor','analista_cliente'].includes(currentUser.tipo_usuario)
     if (needsClientes) fetches.push(fetch('/api/clientes', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
   const needsAdminData = currentUser && (currentUser.tipo_usuario === 'gestor')
@@ -770,7 +770,7 @@ function AppContent() {
               </TabsContent>
             )}
 
-            {['consultor','gestor'].includes(currentUser.tipo_usuario) && (
+            {['consultor','gestor','analista_cliente'].includes(currentUser.tipo_usuario) && (
               <TabsContent value="carteira" className="space-y-6">
                 {(() => { const Carteira = require('./sections/CarteiraClientes.jsx').default; return <Carteira currentUser={currentUser} token={token} initialClientes={clientes} /> })()}
               </TabsContent>
@@ -799,12 +799,12 @@ function AppContent() {
             <CommandItem onSelect={() => { setActiveTab('dashboard'); setCommandOpen(false) }} value="dashboard">
               <BarChart3 className="mr-2" /> Dashboard
             </CommandItem>
-            {hasPermission(currentUser,'viewPropostas') && (
+            {hasPermission(currentUser,'viewPropostas') && currentUser.tipo_usuario !== 'analista_cliente' && (
               <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
                 <FileText className="mr-2" /> Propostas
               </CommandItem>
             )}
-            {hasPermission(currentUser,'viewMovimentacao') && (
+            {hasPermission(currentUser,'viewMovimentacao') && currentUser.tipo_usuario !== 'analista_cliente' && (
               <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
                 <Repeat className="mr-2" /> Movimentação
               </CommandItem>
@@ -825,7 +825,7 @@ function AppContent() {
             <CommandItem onSelect={() => { scheduleLoadData(true); setCommandOpen(false) }} value="recarregar">
               <Repeat className="mr-2" /> Recarregar Dados
             </CommandItem>
-            {hasPermission(currentUser,'createPropostas') && currentUser.tipo_usuario !== 'analista_movimentacao' && (
+            {hasPermission(currentUser,'createPropostas') && currentUser.tipo_usuario !== 'analista_movimentacao' && currentUser.tipo_usuario !== 'analista_cliente' && (
               <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-proposal-btn]')?.click() }, 50) }} value="nova-proposta">
                 <PlusCircle className="mr-2" /> Nova Proposta
               </CommandItem>

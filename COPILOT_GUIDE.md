@@ -98,4 +98,13 @@ await sendEmail({ to, subject, text, html: renderBrandedEmail({ title, ctaText, 
 
 —
 
-Atualizado em: 20/08/2025
+### Perfis de usuário (RBAC) atuais
+
+- gestor: acesso completo
+- gerente: quase completo (sem gestão de usuários / relatórios avançados)
+- analista_implantacao: foca em propostas (implantação); sem movimentação, usuários e relatórios
+- analista_movimentacao: foca em movimentação; sem propostas, usuários e relatórios
+- consultor: cria e acompanha propostas próprias (sem gestão de usuários / relatórios)
+- analista_cliente (NOVO 04/09/2025): papel de atendimento ao cliente – acesso ao Dashboard (escopo próprio) + Carteira de Clientes (pode cadastrar e gerenciar somente seus clientes). Sem acesso a Propostas e Movimentação.
+
+Atualizado em: 04/09/2025
