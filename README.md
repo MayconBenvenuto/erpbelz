@@ -1,4 +1,4 @@
-﻿# Sistema de Gestão - Belz
+# Sistema de Gestão - Belz
 
 ## 📚 Documentação
 
