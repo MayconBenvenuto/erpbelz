@@ -17,7 +17,9 @@ CREATE TABLE usuarios (
   nome TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   senha TEXT NOT NULL,
-  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor', 'analista', 'consultor')) NOT NULL,
+  tipo_usuario TEXT CHECK (tipo_usuario IN ('gestor','gerente','analista_implantacao','analista_movimentacao','consultor','analista_cliente')) NOT NULL,
+  must_change_password BOOLEAN NOT NULL DEFAULT true,
+  senha_alterada_em TIMESTAMP WITH TIME ZONE,
   "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

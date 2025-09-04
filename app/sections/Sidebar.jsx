@@ -54,7 +54,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
           </button>
 
           {/* Propostas */}
-          {hasPermission(currentUser,'viewPropostas') && (
+          {/* Propostas indisponível para analista_cliente */}
+          {hasPermission(currentUser,'viewPropostas') && currentUser?.tipo_usuario !== 'analista_cliente' && (
             <button
               onClick={() => setActiveTab('propostas')}
               aria-current={activeTab === 'propostas' ? 'page' : undefined}
@@ -141,7 +142,7 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
 
           {/* Seção Implantação removida */}
 
-          {currentUser?.tipo_usuario !== 'analista_movimentacao' && hasPermission(currentUser,'viewMovimentacao') && (
+          {currentUser?.tipo_usuario !== 'analista_movimentacao' && currentUser?.tipo_usuario !== 'analista_cliente' && hasPermission(currentUser,'viewMovimentacao') && (
             <button
               onClick={() => setActiveTab('movimentacao')}
               aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
@@ -152,8 +153,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
             </button>
           )}
 
-          {/* Carteira de Clientes: consultor e gestor */}
-          {['consultor','gestor'].includes(currentUser?.tipo_usuario) && (
+          {/* Carteira de Clientes: consultor, gestor e analista_cliente */}
+          {['consultor','gestor','analista_cliente'].includes(currentUser?.tipo_usuario) && (
             <button
               onClick={() => setActiveTab('carteira')}
               aria-current={activeTab === 'carteira' ? 'page' : undefined}

@@ -19,6 +19,7 @@ export async function GET(request) {
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error, code: 'unauthorized' }, { status: auth.status }), origin)
   const user = auth.user
   try {
+  // analista_cliente tem acesso semelhante ao consultor (escopo próprio)
     let query = supabase
       .from('clientes_consultor')
       .select('id, consultor_id, cnpj, razao_social, responsavel, cargo_responsavel, email_responsavel, whatsapp_responsavel, criado_em, atualizado_em')
@@ -64,6 +65,7 @@ export async function POST(request) {
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   const user = auth.user
   try {
+  // analista_cliente permitido
     const body = await request.json().catch(()=>({}))
     const parsed = createSchema.safeParse(body)
     if (!parsed.success) return handleCORS(NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues }, { status: 400 }), origin)
@@ -127,6 +129,7 @@ export async function PATCH(request) {
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   const user = auth.user
   try {
+  // analista_cliente permitido
     const body = await request.json().catch(()=>({}))
     const parsed = patchSchema.safeParse(body)
     if (!parsed.success) return handleCORS(NextResponse.json({ error: 'Dados inválidos', issues: parsed.error.issues, code: 'invalid_body' }, { status: 400 }), origin)
