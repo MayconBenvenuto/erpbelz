@@ -29,9 +29,11 @@ export async function GET(req, { params }) {
   // autorização
   const isGestor = user.tipo === 'gestor'
   const isGerente = user.tipo === 'gerente'
-    const isAnalistaAutorizado = ['analista_implantacao', 'analista_movimentacao'].includes(user.tipo) && data.atendido_por === user.userId
-    const isConsultorProprietario = user.tipo === 'consultor' && data.criado_por === user.userId
-  if (!(isGestor || isGerente || isAnalistaAutorizado || isConsultorProprietario)) {
+  // analista_movimentacao pode ver detalhes mesmo sem assumir; analista_implantacao só se for o responsável
+  const isAnalistaMovimentacao = user.tipo === 'analista_movimentacao'
+  const isAnalistaImplantacaoResp = user.tipo === 'analista_implantacao' && data.atendido_por === user.userId
+  const isConsultorProprietario = user.tipo === 'consultor' && data.criado_por === user.userId
+  if (!(isGestor || isGerente || isAnalistaMovimentacao || isAnalistaImplantacaoResp || isConsultorProprietario)) {
       return NextResponse.json({ message: 'Sem permissão para ver detalhes' }, { status: 403 })
     }
 
