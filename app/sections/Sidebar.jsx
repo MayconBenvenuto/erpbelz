@@ -14,8 +14,53 @@
 import Image from 'next/image'
 import { FileText, BarChart3, Users, TrendingUp, Repeat, Briefcase, Calculator, DollarSign, Workflow, Cpu, GraduationCap, Target, FolderKanban, ExternalLink, Phone } from 'lucide-react'
 import { hasPermission } from '@/lib/rbac'
+import { useEffect, useRef } from 'react'
+import { queryClient, queryKeys } from '@/lib/query-client'
+import { preloadProposalsSection, preloadReportsSection, preloadMovimentacaoSection, preloadUsersSection, preloadDashboardSection } from '@/components/lazy-sections'
+
+function usePrefetchOnHover() {
+  const scheduled = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (scheduled.current) return
+    scheduled.current = true
+    // Em idle, pré-carrega dados mais prováveis para reduzir TTI das abas
+  if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        try {
+      queryClient.prefetchQuery({ queryKey: queryKeys.dashboardStats, queryFn: async () => (await (await fetch('/api/reports/dashboard')).json()) })
+      queryClient.prefetchQuery({ queryKey: queryKeys.proposals, queryFn: async () => (await (await fetch('/api/proposals?fields=list&page=1&pageSize=50')).json()) })
+      queryClient.prefetchQuery({ queryKey: queryKeys.users, queryFn: async () => (await (await fetch('/api/users')).json()) })
+      queryClient.prefetchQuery({ queryKey: queryKeys.solicitacoes, queryFn: async () => (await (await fetch('/api/solicitacoes?fields=list&page=1&pageSize=50')).json()) })
+        } catch {}
+      })
+    }
+  }, [])
+}
 
 export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
+  usePrefetchOnHover()
+
+  const prefetchPropostas = () => {
+    preloadProposalsSection();
+    try { queryClient.prefetchQuery({ queryKey: queryKeys.proposals, queryFn: async () => (await (await fetch('/api/proposals?fields=list&page=1&pageSize=50')).json()) }) } catch {}
+  }
+  const prefetchDashboard = () => {
+    preloadDashboardSection();
+    try { queryClient.prefetchQuery({ queryKey: queryKeys.dashboardStats, queryFn: async () => (await (await fetch('/api/reports/dashboard')).json()) }) } catch {}
+  }
+  const prefetchMovimentacao = () => {
+    preloadMovimentacaoSection();
+    try { queryClient.prefetchQuery({ queryKey: queryKeys.solicitacoes, queryFn: async () => (await (await fetch('/api/solicitacoes?fields=list&page=1&pageSize=50')).json()) }) } catch {}
+  }
+  const prefetchUsuarios = () => {
+    preloadUsersSection();
+    try { queryClient.prefetchQuery({ queryKey: queryKeys.users, queryFn: async () => (await (await fetch('/api/users')).json()) }) } catch {}
+  }
+  const prefetchRelatorios = () => {
+    preloadReportsSection();
+    try { queryClient.prefetchQuery({ queryKey: queryKeys.reports, queryFn: async () => (await (await fetch('/api/reports')).json()) }) } catch {}
+  }
   return (
   <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-card border-r border-border shadow-lg flex-col z-40" role="navigation" aria-label="Menu lateral">
       <div className="p-6 border-b">
@@ -45,6 +90,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
           )}
           {/* Dashboard: sempre a primeira opção para todos os perfis */}
           <button
+            onMouseEnter={prefetchDashboard}
+            onFocus={prefetchDashboard}
             onClick={() => setActiveTab('dashboard')}
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'dashboard' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
@@ -55,9 +102,11 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
 
           {/* Propostas */}
           {/* Propostas indisponível para analista_cliente */}
-          {hasPermission(currentUser,'viewPropostas') && currentUser?.tipo_usuario !== 'analista_cliente' && (
+      {hasPermission(currentUser,'viewPropostas') && currentUser?.tipo_usuario !== 'analista_cliente' && (
             <button
-              onClick={() => setActiveTab('propostas')}
+        onMouseEnter={prefetchPropostas}
+        onFocus={prefetchPropostas}
+        onClick={() => setActiveTab('propostas')}
               aria-current={activeTab === 'propostas' ? 'page' : undefined}
               className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'propostas' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
             >
@@ -101,9 +150,11 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
 
           {/* Seção Implantação removida */}
 
-          {currentUser?.tipo_usuario !== 'analista_movimentacao' && currentUser?.tipo_usuario !== 'analista_cliente' && hasPermission(currentUser,'viewMovimentacao') && (
+      {currentUser?.tipo_usuario !== 'analista_movimentacao' && currentUser?.tipo_usuario !== 'analista_cliente' && hasPermission(currentUser,'viewMovimentacao') && (
             <button
-              onClick={() => setActiveTab('movimentacao')}
+        onMouseEnter={prefetchMovimentacao}
+        onFocus={prefetchMovimentacao}
+        onClick={() => setActiveTab('movimentacao')}
               aria-current={activeTab === 'movimentacao' ? 'page' : undefined}
               className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'movimentacao' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
             >
@@ -128,6 +179,8 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
             <>
               {hasPermission(currentUser,'manageUsers') && (
               <button
+                onMouseEnter={prefetchUsuarios}
+                onFocus={prefetchUsuarios}
                 onClick={() => setActiveTab('usuarios')}
                 aria-current={activeTab === 'usuarios' ? 'page' : undefined}
                 className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'usuarios' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
@@ -136,9 +189,11 @@ export default function Sidebar({ currentUser, activeTab, setActiveTab }) {
                 <span className="font-medium">Usuários</span>
               </button>
               )}
-              {hasPermission(currentUser,'viewRelatorios') && (
+        {hasPermission(currentUser,'viewRelatorios') && (
                 <button
-                  onClick={() => setActiveTab('relatorios')}
+          onMouseEnter={prefetchRelatorios}
+          onFocus={prefetchRelatorios}
+          onClick={() => setActiveTab('relatorios')}
                   aria-current={activeTab === 'relatorios' ? 'page' : undefined}
                   className={`belz5-sidebar-item w-full text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${activeTab === 'relatorios' ? 'belz5-sidebar-item-active' : 'text-gray-300'}`}
                 >

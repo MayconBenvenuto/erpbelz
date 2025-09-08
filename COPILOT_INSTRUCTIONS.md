@@ -2,7 +2,7 @@
 
 ## 📋 Visão Geral do Projeto
 
-Este é um **CRM (Customer Relationship Management)** desenvolvido para a **Belz**, focado em gestão de propostas de planos de saúde. O sistema implementa controle de acesso baseado em roles, segurança robusta e interface moderna.
+Este é um **ERP (Enterprise Resource Planning)** desenvolvido para a **Belz**, focado em gestão de propostas de planos de saúde e movimentações. O sistema implementa controle de acesso baseado em roles, segurança robusta e interface moderna.
 
 ### 🎯 Objetivo Principal
 
@@ -61,7 +61,7 @@ emergent-crm-adm/
 │   ├── api/[[...path]]/          # API routes centralizadas
 │   ├── globals.css               # Estilos globais + Montserrat
 │   ├── layout.js                 # Layout raiz
-│   └── page.js                   # Página principal do CRM
+│   └── page.js                   # Página principal do ERP
 ├── components/ui/                # Componentes Shadcn/UI
 ├── lib/
 │   ├── security.js               # Funções de segurança
@@ -573,7 +573,7 @@ const useAutoRefresh = (callback, interval = 30000) => {
 #### **State Management**
 
 ```javascript
-// Estados principais do CRM
+// Estados principais do ERP
 const [currentUser, setCurrentUser] = useState(null);
 const [activeTab, setActiveTab] = useState('propostas');
 const [proposals, setProposals] = useState([]);
@@ -695,11 +695,11 @@ SMTP_PASS=
 SMTP_SECURE=false
 SMTP_DEBUG=false
 EMAIL_FROM=comunicacao@belzseguros.com.br
-EMAIL_FROM_NAME=CRM Belz
+EMAIL_FROM_NAME=ERP Belz
 
 # Apps
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
-CRM_APP_URL=http://localhost:3000
+ERP_APP_URL=http://localhost:3000
 
 # Integrações
 CNPJA_API_KEY=
@@ -867,14 +867,14 @@ git push origin main
 - Endpoint: `GET /api/alerts/proposals/stale`
 - Critério: status `em análise` e idade ≥ `STALE_PROPOSAL_ALERT_HOURS` (default 24)
 - Destinatários: todos gestores + `PRIMARY_GESTOR_EMAIL`
-- Autorização: header `X-Cron-Key` (cron) OU usuário gestor autenticado
-- Evite duplicidade reduzindo frequência do cron ou implementando dedupe futuro (não implementado ainda)
+- Autorização: usuário gestor autenticado (sem cron)
+- Idempotente por execução (dedupe por janela temporal quando aplicável)
 
 ---
 
 ## 📝 Conclusão
 
-Este CRM da Belz é um sistema robusto e seguro para gestão de propostas de planos de saúde. Ao desenvolver novas funcionalidades ou fazer manutenções, sempre priorize:
+Este ERP da Belz é um sistema robusto e seguro para gestão de propostas de planos de saúde. Ao desenvolver novas funcionalidades ou fazer manutenções, sempre priorize:
 
 1. **Segurança** - Autenticação, autorização e sanitização
 2. **Usabilidade** - Interface intuitiva e responsiva  

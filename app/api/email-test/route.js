@@ -19,8 +19,8 @@ export async function POST(request) {
 	}
 	const html = renderBrandedEmail({
 		title: 'Atualização de status da proposta',
-		ctaText: 'Abrir CRM',
-		ctaUrl: (process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app').replace(/\/+$/, ''),
+		ctaText: 'Abrir ERP',
+		ctaUrl: (process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app').replace(/\/+$/, ''),
 		contentHtml: `
 			<p>Uma proposta teve alteração de status.</p>
 			<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">

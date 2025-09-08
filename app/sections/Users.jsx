@@ -94,7 +94,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
   // Persistência leve dos filtros por usuário
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('crm:users:filters')||'{}')
+  const saved = JSON.parse(localStorage.getItem('erp:users:filters')||localStorage.getItem('crm:users:filters')||'{}')
       if (saved.search) setSearch(saved.search)
       if (saved.roleFilter) setRoleFilter(saved.roleFilter)
       if (saved.sortBy) setSortBy(saved.sortBy)
@@ -102,7 +102,10 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
     } catch {}
   }, [])
   useEffect(() => {
-    try { localStorage.setItem('crm:users:filters', JSON.stringify({ search, roleFilter, sortBy, sortAsc })) } catch {}
+    try {
+      localStorage.setItem('erp:users:filters', JSON.stringify({ search, roleFilter, sortBy, sortAsc }))
+      try { localStorage.removeItem('crm:users:filters') } catch {}
+    } catch {}
   }, [search, roleFilter, sortBy, sortAsc])
 
   const toggleSort = (col) => {

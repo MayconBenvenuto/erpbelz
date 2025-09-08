@@ -28,7 +28,7 @@ export async function validateCNPJ(cnpj) {
   try {
     console.log('🔍 Tentando ReceitaWS...')
     const response = await tryFetch(`https://receitaws.com.br/v1/cnpj/${cleanCNPJ}`, {
-      headers: { 'User-Agent': 'CRM-Propostas/1.0' }
+  headers: { 'User-Agent': 'ERP-Propostas/1.0' }
     }, 2, 6000)
 
     if (response.ok) {
@@ -93,7 +93,7 @@ export async function validateCNPJ(cnpj) {
     console.log('🔍 Tentando CNPJA...')
     const response = await tryFetch(`https://api.cnpja.com/office/${cleanCNPJ}`, {
       headers: { 
-        'User-Agent': 'CRM-Propostas/1.0',
+  'User-Agent': 'ERP-Propostas/1.0',
         'Accept': 'application/json'
       }
     }, 2, 6000)

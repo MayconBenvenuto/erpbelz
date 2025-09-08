@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, cacheJson } from '@/lib/api-helpers'
 import { hashPassword } from '@/lib/security'
 import { ROLES } from '@/lib/rbac'
 
@@ -14,9 +14,17 @@ export async function GET(request) {
 	const auth = await requireAuth(request)
 	if (auth.error) return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
 
-	const { data, error } = await supabase.from('usuarios').select('id, nome, email, tipo_usuario, criado_em')
+	const { searchParams } = new URL(request.url)
+	const fields = (searchParams.get('fields') || 'list').toLowerCase()
+	// Atualmente, 'list' já é o conjunto mínimo necessário para UI (Equipe)
+	const selectCols = fields === 'list'
+		? 'id, nome, email, tipo_usuario, criado_em'
+		: 'id, nome, email, tipo_usuario, criado_em' // fallback igual por segurança
+
+	const { data, error } = await supabase.from('usuarios').select(selectCols)
 	if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
-	return handleCORS(NextResponse.json(data || []), origin)
+	// Cache privado com ETag para navegação entre seções mais rápida
+	return cacheJson(request, origin, data || [], { maxAge: 120, swr: 300 })
 }
 
 const createSchema = z.object({

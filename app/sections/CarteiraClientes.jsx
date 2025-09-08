@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { ExternalLink } from 'lucide-react'
 
 export default function CarteiraClientesSection({ currentUser, token }) {
   const [clientes, setClientes] = useState([])
@@ -32,7 +33,9 @@ export default function CarteiraClientesSection({ currentUser, token }) {
   const loadClientes = useCallback(async (query) => {
     setLoading(true)
     try {
-      const url = query ? `/api/clientes?q=${encodeURIComponent(query)}` : '/api/clientes'
+      const url = query
+        ? `/api/clientes?q=${encodeURIComponent(query)}&fields=list&page=1&pageSize=50`
+        : '/api/clientes?fields=list&page=1&pageSize=50'
       const res = await fetch(url, { headers: authHeaders })
       const data = await res.json().catch(()=>[])
       if (res.ok) {
@@ -194,6 +197,76 @@ export default function CarteiraClientesSection({ currentUser, token }) {
 
   return (
     <div className="space-y-6">
+      {/* Atalhos de trabalho para Analista Cliente */}
+      {['analista_cliente','gestor'].includes(currentUser?.tipo_usuario) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Atalhos de Trabalho</CardTitle>
+            <CardDescription className="text-xs">Links úteis usados no dia a dia (abre em nova guia)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {/* Planilhas */}
+              <a
+                href="https://docs.google.com/spreadsheets/d/1NK7tGQCioDRoTFlI7bCSlLqXLKdUyfoe-_uCNHO7bi0/edit?gid=1533137706#gid=1533137706"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Planilha de Boletos/Movimentação"
+              >
+                <ExternalLink className="w-4 h-4" /> Planilha: Boletos/Movimentação
+              </a>
+              <a
+                href="https://docs.google.com/spreadsheets/d/1eRgoxc6oqtdVNMWwYJiWHhe_SmEEW9LaL0-zSTGj8kc/edit?gid=11585494#gid=11585494"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Planilha de Implantação"
+              >
+                <ExternalLink className="w-4 h-4" /> Planilha: Implantação
+              </a>
+
+              {/* Sites Operadoras */}
+              <a
+                href="https://wwwn.bradescoseguros.com.br/pnegocios2/wps/portal/portaldenegociosnovo/!ut/p/z1/04_Sj9CPykssy0xPLMnMz0vMAfIjo8zifdx9PA0sLYz8DJzdjAwCHcOCTdx9jQxNfE30wwkpiAJKG-AAjgZA_VGElBTkRhikOyoqAgBzNoDA/dz/d5/L2dBISEvZ0FBIS9nQSEh/"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Portal Bradesco Seguros"
+              >
+                <ExternalLink className="w-4 h-4" /> Bradesco (Portal de Negócios)
+              </a>
+              <a
+                href="https://corretor.sulamericaseguros.com.br/?accessError=2#/"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Portal Corretor SulAmérica"
+              >
+                <ExternalLink className="w-4 h-4" /> SulAmérica (Corretor)
+              </a>
+              <a
+                href="https://institucional.amil.com.br/"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Portal Amil"
+              >
+                <ExternalLink className="w-4 h-4" /> Amil
+              </a>
+              <a
+                href="https://remote.unimedrecife.com.br:444/connecta/Default.aspx?ReturnUrl=%2fconnecta%2fContent%2fContrato%2fCoParticipacao.aspx"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+                title="Unimed Recife Connecta"
+              >
+                <ExternalLink className="w-4 h-4" /> Unimed Recife (Connecta)
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-semibold">Carteira de Clientes</h2>
@@ -249,7 +322,7 @@ export default function CarteiraClientesSection({ currentUser, token }) {
         </Dialog>
       </div>
 
-      <Card>
+  <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Clientes ({filtered.length})</CardTitle>

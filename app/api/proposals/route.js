@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 import { z } from 'zod'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, cacheJson } from '@/lib/api-helpers'
 import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
 import { hasPermission } from '@/lib/rbac'
 import { sendEmail } from '@/lib/email'
@@ -24,8 +24,8 @@ export async function GET(request) {
 		return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
 	}
 
-	const buildBase = () => {
-		let q = supabase.from('propostas').select('*')
+	const buildBase = (columns = '*') => {
+		let q = supabase.from('propostas').select(columns)
 		if (auth.user.tipo_usuario === 'consultor') {
 			// Consultor: vê apenas propostas que criou ou cujo email de consultor é o seu
 			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
@@ -46,24 +46,47 @@ export async function GET(request) {
 	try {
 		const { searchParams } = new URL(request.url)
 		const code = (searchParams.get('code') || '').trim()
+		const fields = (searchParams.get('fields') || '').trim()
+		const columns = fields === 'list'
+			? 'id,codigo,cnpj,cliente_nome,cliente_email,consultor,consultor_email,operadora,quantidade_vidas,valor,previsao_implantacao,status,criado_por,atendido_por,criado_em,updated_at,atendido_em'
+			: '*'
 		if (code) {
-			let q = buildBase().ilike('codigo', code)
+			let q = buildBase(columns).ilike('codigo', code)
 			const { data: one, error: err } = await q.limit(1)
 			if (!err && Array.isArray(one) && one.length > 0) {
-				return handleCORS(NextResponse.json(one), origin)
+				return cacheJson(request, origin, one, { maxAge: 60, swr: 300 })
 			}
 		}
 	} catch (_) {}
 
-	// 1) Tentativa com ordenação por código (preferencial)
-	let { data, error } = await buildBase()
-		.order('codigo', { ascending: true })
-		.order('criado_em', { ascending: true })
-	if (error) {
-		// 2) Fallback: ordena por criado_em (asc)
-		const fallback = await buildBase().order('criado_em', { ascending: true })
-		data = fallback.data
-		error = fallback.error
+	// Paginação e seleção de colunas
+	let data, error, count
+	try {
+		const { searchParams } = new URL(request.url)
+		const page = Number(searchParams.get('page') || '')
+		const pageSize = Number(searchParams.get('pageSize') || '')
+		const fields = (searchParams.get('fields') || '').trim()
+		const columns = fields === 'list'
+			? 'id,codigo,cnpj,cliente_nome,cliente_email,consultor,consultor_email,operadora,quantidade_vidas,valor,previsao_implantacao,status,criado_por,atendido_por,criado_em,updated_at,atendido_em'
+			: '*'
+		let q = buildBase(columns)
+		q = q.order('codigo', { ascending: true }).order('criado_em', { ascending: true })
+		if (Number.isInteger(page) && page > 0 && Number.isInteger(pageSize) && pageSize > 0) {
+			const from = (page - 1) * pageSize
+			const to = from + pageSize - 1
+			const r = await q.range(from, to)
+			data = r.data; error = r.error
+			// count em chamada separada para não transferir linhas
+			try {
+				const rc = await buildBase('id').select('id', { count: 'exact', head: true })
+				count = rc.count || 0
+			} catch { count = 0 }
+		} else {
+			const r = await q
+			data = r.data; error = r.error
+		}
+	} catch (e) {
+		return handleCORS(NextResponse.json({ error: 'Erro ao consultar' }, { status: 500 }), origin)
 	}
 
 	if (error) {
@@ -81,7 +104,17 @@ export async function GET(request) {
 		}
 		return { ...p, horas_em_analise: horas, dias_em_analise: dias }
 	})
-	return handleCORS(NextResponse.json(enriched), origin)
+
+	// Compat: sem paginação => array; com paginação => objeto com meta
+	try {
+		const { searchParams } = new URL(request.url)
+		const page = Number(searchParams.get('page') || '')
+		const pageSize = Number(searchParams.get('pageSize') || '')
+		if (Number.isInteger(page) && page > 0 && Number.isInteger(pageSize) && pageSize > 0) {
+			return cacheJson(request, origin, { data: enriched, page, pageSize, total: count ?? enriched.length }, { maxAge: 60, swr: 300 })
+		}
+	} catch {}
+	return cacheJson(request, origin, enriched, { maxAge: 60, swr: 300 })
 }
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
@@ -211,8 +244,8 @@ export async function POST(request) {
 		const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} criada`
 		const html = renderBrandedEmail({
 			title: 'Nova proposta criada',
-			ctaText: 'Abrir CRM',
-			ctaUrl: process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/',
+			ctaText: 'Abrir ERP',
+			ctaUrl: process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/',
 			contentHtml: `
 				<p>Uma nova proposta <strong>${codigo}</strong> foi criada.</p>
 				<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px;">

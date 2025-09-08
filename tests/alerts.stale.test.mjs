@@ -36,6 +36,7 @@ vi.mock('@/lib/api-helpers', () => ({
   supabase: supabaseMockInstance,
   handleCORS: (r) => r,
   requireAuth: vi.fn(async () => ({ user: { id: 'u1', email: 'gestor@belz.com.br', tipo_usuario: 'gestor' } })),
+  ensureGestor: () => null,
 }))
 
 // Mock envio de e-mail

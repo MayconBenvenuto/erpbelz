@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, ensureGestor } from '@/lib/api-helpers'
 import { sendEmail } from '@/lib/email'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCNPJ, formatCurrency } from '@/lib/utils'
@@ -11,20 +11,13 @@ const PRIMARY_GESTOR_EMAIL = process.env.PRIMARY_GESTOR_EMAIL || 'mayconbenvenut
 // Parâmetro de alerta (idade mínima em horas). Default 24h.
 const ALERT_HOURS = parseInt(process.env.STALE_PROPOSAL_ALERT_HOURS || '24')
 
-// Proteção: pode ser chamado por
-// 1) Cron com header X-Cron-Key == process.env.CRON_SECRET
-// 2) Usuário autenticado gestor
+// Proteção: apenas usuário autenticado gestor (sem cron)
 async function authorize(request) {
-  const cronKey = request.headers.get('x-cron-key')
-  if (cronKey && process.env.CRON_SECRET && cronKey === process.env.CRON_SECRET) {
-    return { mode: 'cron' }
-  }
   const auth = await requireAuth(request)
   if (auth.error) return { error: auth.error, status: auth.status }
-  if (auth.user.tipo_usuario !== 'gestor') {
-    return { error: 'Apenas gestor ou cron autorizado', status: 403 }
-  }
-  return { mode: 'user', user: auth.user }
+  const guard = ensureGestor(auth.user)
+  if (guard) return { error: guard.error, status: guard.status }
+  return { user: auth.user }
 }
 
 function buildEmailTable(rows) {
@@ -103,8 +96,8 @@ export async function GET(request) {
     `
     const html = renderBrandedEmail({
       title: 'Propostas pendentes de análise',
-      ctaText: 'Abrir CRM',
-      ctaUrl: process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/',
+      ctaText: 'Abrir ERP',
+      ctaUrl: process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/',
       contentHtml,
   preheader: `Alerta de ${enriched.length} proposta(s) com ${ALERT_HOURS}+ horas` ,
     })
@@ -122,11 +115,10 @@ export async function GET(request) {
   }
 
   return handleCORS(NextResponse.json({
-    mode: authz.mode,
     proposals_found: enriched.length,
     alerted: Boolean(emailResult),
     recipients: (emailResult || []).length,
-  emails: emailResult,
-  threshold_hours: ALERT_HOURS,
+    emails: emailResult,
+    threshold_hours: ALERT_HOURS,
   }), origin)
 }

@@ -378,7 +378,7 @@ export async function PATCH(request, { params }) {
     const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
     let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
   const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
+  const appUrl = process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
 
     if (updated.cnpj) {
       try {
@@ -404,11 +404,11 @@ export async function PATCH(request, { params }) {
     // Envia para o analista (criado_por)
   if (!userErr && analyst?.email) {
   const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
-      const linkCRM = appUrl
+  const linkCRM = appUrl
   const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o Sistema de Gestão: ${linkCRM}\n\n— Sistema de Gestão - Belz`
       const html = renderBrandedEmail({
         title: 'Atualização de status da proposta',
-        ctaText: 'Abrir CRM',
+  ctaText: 'Abrir ERP',
         ctaUrl: linkCRM,
         preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `
@@ -433,7 +433,7 @@ export async function PATCH(request, { params }) {
   const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— Sistema de Gestão - Belz`
       const html2 = renderBrandedEmail({
         title: 'Atualização de status da proposta',
-        ctaText: 'Abrir CRM',
+  ctaText: 'Abrir ERP',
         ctaUrl: appUrl,
         preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `

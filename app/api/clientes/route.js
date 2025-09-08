@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, cacheJson } from '@/lib/api-helpers'
 import { sanitizeInput } from '@/lib/security'
 import { z } from 'zod'
 // Importa validação externa (consulta múltiplas APIs) evitando fetch loopback
@@ -15,14 +15,20 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const q = (searchParams.get('q') || '').trim().toLowerCase()
   const filtroConsultor = searchParams.get('consultor_id')
+  const fields = (searchParams.get('fields') || 'list').toLowerCase()
+  const page = parseInt(searchParams.get('page') || '', 10)
+  const pageSize = parseInt(searchParams.get('pageSize') || '', 10)
   const auth = await requireAuth(request)
   if (auth.error) return handleCORS(NextResponse.json({ error: auth.error, code: 'unauthorized' }, { status: auth.status }), origin)
   const user = auth.user
   try {
   // analista_cliente tem acesso semelhante ao consultor (escopo próprio)
+    // Campos padrão de "list" (mantidos por compatibilidade)
+    const listColumns = 'id, consultor_id, cnpj, razao_social, responsavel, cargo_responsavel, email_responsavel, whatsapp_responsavel, criado_em, atualizado_em'
+
     let query = supabase
       .from('clientes_consultor')
-      .select('id, consultor_id, cnpj, razao_social, responsavel, cargo_responsavel, email_responsavel, whatsapp_responsavel, criado_em, atualizado_em')
+      .select(listColumns, { count: 'exact' })
       .order('criado_em', { ascending: false })
 
     // Restrição de visibilidade para consultor
@@ -33,17 +39,41 @@ export async function GET(request) {
       query = query.eq('consultor_id', filtroConsultor)
     }
 
+    // Paginação (opcional). Se page e pageSize válidos forem informados, aplicamos range.
+    const usePagination = Number.isInteger(page) && page > 0 && Number.isInteger(pageSize) && pageSize > 0
+
     if (q) {
-      // Filtro simples client-side será aplicado depois (supabase sem ilike múltiplo OR fácil aqui)
+      // Filtro client-side mantendo compatibilidade. Em seguida aplica paginação em memória.
       const { data, error } = await query
       if (error) return handleCORS(NextResponse.json({ error: error.message, code: 'db_error' }, { status: 500 }), origin)
-      const filtered = (data || []).filter(r => [r.cnpj, r.razao_social, r.responsavel, r.email_responsavel].some(v => (v || '').toLowerCase().includes(q)))
-      return handleCORS(NextResponse.json(filtered), origin)
+      const arr = Array.isArray(data) ? data : []
+      const filtered = arr.filter(r => [r.cnpj, r.razao_social, r.responsavel, r.email_responsavel].some(v => (v || '').toLowerCase().includes(q)))
+
+      if (usePagination) {
+        const total = filtered.length
+        const start = (page - 1) * pageSize
+        const end = start + pageSize
+        const sliced = filtered.slice(start, end)
+        return cacheJson(request, origin, { data: sliced, page, pageSize, total }, { maxAge: 60, swr: 300 })
+      }
+      return cacheJson(request, origin, filtered, { maxAge: 60, swr: 300 })
     }
 
-    const { data, error } = await query
+    if (usePagination) {
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+      query = query.range(from, to)
+    }
+
+    const { data, error, count } = await query
     if (error) return handleCORS(NextResponse.json({ error: error.message, code: 'db_error' }, { status: 500 }), origin)
-    return handleCORS(NextResponse.json(data || []), origin)
+
+    if (usePagination) {
+      const payload = { data: data || [], page, pageSize, total: Number.isFinite(count) ? count : (data?.length || 0) }
+      return cacheJson(request, origin, payload, { maxAge: 60, swr: 300 })
+    }
+    // Retorno padrão (array) mantido para compatibilidade
+    return cacheJson(request, origin, data || [], { maxAge: 60, swr: 300 })
   } catch (e) {
     return handleCORS(NextResponse.json({ error: 'Falha ao carregar clientes', code: 'unexpected' }, { status: 500 }), origin)
   }
