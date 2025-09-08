@@ -23,8 +23,8 @@ const createSchema = z.object({
 	nome: z.string().min(2),
 	email: z.string().email(),
 	senha: z.string().min(6),
-	// incluir gerente no schema; gestor não pode ser criado via UI para evitar perda de controle inicial
-	tipo_usuario: z.enum(['gerente','analista_implantacao','analista_movimentacao','consultor','analista_cliente'])
+	// permitir criação de qualquer papel suportado, incluindo 'gestor'
+	tipo_usuario: z.enum(['gestor','gerente','analista_implantacao','analista_movimentacao','consultor','analista_cliente'])
 })
 
 export async function POST(request) {

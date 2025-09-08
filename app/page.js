@@ -796,7 +796,16 @@ function AppContent() {
       </div>
       {/* Command Palette */}
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} description="Digite para filtrar ações ou navegue com setas.">
-        <CommandInput placeholder="Buscar ações, abas ou comandos..." autoFocus />
+        <CommandInput placeholder="Buscar ações, abas, PRP..." autoFocus onValueChange={(val)=>{
+          const v = String(val||'').trim().toUpperCase()
+          // padrão simples PRP + dígitos
+          if (/^PRP\d{3,}$/.test(v)) {
+            setActiveTab('propostas')
+            setCommandOpen(false)
+            // opcional: emitir evento para destacar proposta
+            setTimeout(()=>{ window.dispatchEvent(new CustomEvent('proposals:focus-code',{ detail: { code: v } })) }, 50)
+          }
+        }} />
         <CommandList>
           <CommandEmpty>Nenhum resultado.</CommandEmpty>
           <CommandGroup heading="Navegação">

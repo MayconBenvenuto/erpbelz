@@ -4,13 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Clock, TrendingUp, RefreshCw, Target, AlertTriangle } from 'lucide-react'
+import { Users, Clock, TrendingUp, RefreshCw, Target, AlertTriangle, Download } from 'lucide-react'
 import { formatCurrency, formatCNPJ, getStatusBadgeClasses } from '@/lib/utils'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts'
+import OperadoraBadge from '@/components/ui/operadora-badge'
 
 export default function ReportsSection({ users, sessions, proposals, onRefresh, currentUser, token }) {
   const [refreshing, setRefreshing] = useState(false)
@@ -39,6 +40,7 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
   const analystUsers = useMemo(() => (Array.isArray(users) ? users.filter(u => u.tipo_usuario !== 'gestor') : []), [users])
   const analystIds = new Set(analystUsers.map(u => u.id))
   const [onlineUsers, setOnlineUsers] = useState([])
+  const [windowSec, setWindowSec] = useState(120)
   const filteredSessions = Array.isArray(sessions) ? sessions.filter(s => analystIds.has(s.usuario_id)) : []
 
   // Função para saber se usuário está online (view + fallback sessão ativa)
@@ -66,16 +68,16 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
   const loadOnlineUsers = useCallback(async () => {
     if (currentUser?.tipo_usuario !== 'gestor') return
     try {
-      const res = await fetch('/api/users/online', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      const res = await fetch(`/api/users/online?window_seconds=${windowSec}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       const data = await res.json()
       if (res.ok) setOnlineUsers(Array.isArray(data.data) ? data.data : [])
     } catch {}
-  }, [currentUser?.tipo_usuario, token])
+  }, [currentUser?.tipo_usuario, token, windowSec])
 
   useEffect(() => { loadOnlineUsers() }, [loadOnlineUsers])
   useEffect(() => {
     if (currentUser?.tipo_usuario !== 'gestor') return
-    const id = setInterval(loadOnlineUsers, 60000)
+  const id = setInterval(loadOnlineUsers, 60000)
     return () => clearInterval(id)
   }, [currentUser?.tipo_usuario, loadOnlineUsers])
 
@@ -349,6 +351,15 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                           <Bar dataKey="vidas_total" fill="#6b7cff" />
                         </BarChart>
                       </ResponsiveContainer>
+                      {/* Lista compacta com logos para consistência visual */}
+                      <div className="mt-2 space-y-1">
+                        {(perf.vidasPorOperadora || []).slice(0,5).map((o) => (
+                          <div key={o.operadora} className="flex items-center justify-between text-xs">
+                            <OperadoraBadge nome={o.operadora} size={14} />
+                            <span className="font-medium">{o.vidas_total}</span>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 </CardContent>
@@ -463,6 +474,38 @@ export default function ReportsSection({ users, sessions, proposals, onRefresh, 
                 <p className="text-sm text-muted-foreground">Usuários Online</p>
                 <p className="text-2xl font-bold text-green-600">{onlineCount}</p>
               </div>
+              {currentUser?.tipo_usuario === 'gestor' && (
+                <div className="ml-auto flex items-center gap-2">
+                  <select value={windowSec} onChange={e=>setWindowSec(parseInt(e.target.value)||120)} className="text-xs border rounded px-1 py-0.5 bg-background">
+                    <option value={60}>1 min</option>
+                    <option value={120}>2 min</option>
+                    <option value={300}>5 min</option>
+                    <option value={600}>10 min</option>
+                  </select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async ()=>{
+                      try {
+                        const url = `/api/users/online?format=csv&window_seconds=${windowSec}`
+                        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+                        if (!res.ok) { toast.error('Falha ao exportar'); return }
+                        const blob = await res.blob()
+                        const href = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = href
+                        a.download = `usuarios_online_${Date.now()}.csv`
+                        document.body.appendChild(a)
+                        a.click()
+                        a.remove()
+                        URL.revokeObjectURL(href)
+                      } catch { toast.error('Erro de rede na exportação') }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

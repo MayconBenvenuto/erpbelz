@@ -24,22 +24,38 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
+  const onlyOverdue = ['1','true','yes'].includes(String(searchParams.get('atrasadas')||'').toLowerCase())
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
+  const todayISO = new Date().toISOString().slice(0,10)
 
     let data = []
     let count = 0
     let error = null
     if (user.tipo === 'gestor' || user.tipo === 'gerente') {
-      const r = await supabase.from('solicitacoes').select('*', { count: 'exact' }).order('codigo', { ascending: true }).range(from, to)
+      let q = supabase.from('solicitacoes').select('*', { count: 'exact' })
+      if (onlyOverdue) {
+        q = q.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
+      }
+      const r = await q.order('codigo', { ascending: true }).range(from, to)
       data = r.data || []; count = r.count || 0; error = r.error
     } else if (user.tipo === 'consultor') {
-      const r = await supabase.from('solicitacoes').select('*', { count: 'exact' }).eq('criado_por', user.userId).order('codigo', { ascending: true }).range(from, to)
+      let q = supabase.from('solicitacoes').select('*', { count: 'exact' }).eq('criado_por', user.userId)
+      if (onlyOverdue) {
+        q = q.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
+      }
+      const r = await q.order('codigo', { ascending: true }).range(from, to)
       data = r.data || []; count = r.count || 0; error = r.error
     } else if (user.tipo === 'analista_movimentacao') {
       // Unassigned + assigned to me
-      const r1 = await supabase.from('solicitacoes').select('*').is('atendido_por', null)
-      const r2 = await supabase.from('solicitacoes').select('*').eq('atendido_por', user.userId)
+      let q1 = supabase.from('solicitacoes').select('*').is('atendido_por', null)
+      let q2 = supabase.from('solicitacoes').select('*').eq('atendido_por', user.userId)
+      if (onlyOverdue) {
+        q1 = q1.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
+        q2 = q2.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
+      }
+      const r1 = await q1
+      const r2 = await q2
       error = r1.error || r2.error
       const map = new Map()
       ;[...(r1.data||[]), ...(r2.data||[])].forEach(s => map.set(s.id, s))

@@ -12,6 +12,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { STATUS_COLORS } from '@/lib/constants'
+import OperadoraBadge from '@/components/ui/operadora-badge'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -285,8 +286,8 @@ function ProposalsTimeline({ proposals = [], currentUser: _currentUser }) {
                               </div>
                             )}
                             {event.details.operadora && (
-                              <div>
-                                <span className="font-medium">Operadora:</span> {event.details.operadora}
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Operadora:</span> <OperadoraBadge nome={event.details.operadora} />
                               </div>
                             )}
                             {event.details.valor && (

@@ -125,7 +125,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Novo Usuário</DialogTitle>
-              <DialogDescription>Adicione um novo usuário (gerente, analista de implantação, analista de movimentação, analista cliente ou consultor).</DialogDescription>
+              <DialogDescription>Adicione um novo usuário (gestor, gerente, analista de implantação, analista de movimentação, analista cliente ou consultor).</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -147,6 +147,7 @@ export default function UsersSection({ currentUser, users, proposals, userGoals,
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+  <SelectItem value="gestor">Gestor</SelectItem>
   <SelectItem value="gerente">Gerente</SelectItem>
   <SelectItem value="analista_implantacao">Analista de Implantação</SelectItem>
   <SelectItem value="analista_movimentacao">Analista de Movimentação</SelectItem>
