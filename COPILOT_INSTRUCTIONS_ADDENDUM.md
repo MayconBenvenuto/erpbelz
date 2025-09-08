@@ -177,6 +177,16 @@ Removida referência inexistente `setArquivos([])` que causava `ReferenceError` 
 ## 🚀 Próximas Extensões Sugeridas (Opcional)
 
 - Filtro adicional no painel: operadora / consultor.
+
+## Logos de Operadoras e Componente OperadoraBadge
+
+- Sempre que exibir o campo "operadora" na UI (listas, tabelas, cards, detalhes, legendas de gráfico), use o componente `OperadoraBadge` para garantir consistência visual.
+- Fonte de verdade de logos: utilitário `getOperadoraLogoFile(nome)` em `lib/utils.js` (com fallback para iniciais via `getOperadoraInitials`).
+- Caminho dos assets: `public/seguradoras/*`.
+- Exemplo de uso:
+  - Import: `import OperadoraBadge from '@/components/ui/operadora-badge'`
+  - Render: `<OperadoraBadge nome={p.operadora} size={14} className="truncate" />`
+- Não hardcodear listas de operadoras: importar `OPERADORAS` de `lib/constants.js` para selects/filtros.
 - Exportação CSV das métricas agregadas.
 - Série temporal (evolução diária) para implantação.
 - Webhook para evento de implantação.

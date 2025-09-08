@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Activity, Clock, CheckCircle2, XCircle, User, Calendar, FileText } from 'lucide-react'
@@ -81,6 +81,23 @@ const getRelativeTime = (date) => {
 
 function SimpleTimeline({ solicitacoes = [] }) {
   const [selectedNode, setSelectedNode] = useState(null)
+  const [detailVisible, setDetailVisible] = useState(false)
+
+  // Exibe animação de entrada quando um nó é selecionado
+  useEffect(() => {
+    if (selectedNode) setDetailVisible(true)
+  }, [selectedNode])
+
+  const toggleNode = (id) => {
+    const isSelected = selectedNode === id
+    if (isSelected) {
+      // animação de saída antes de desmontar
+      setDetailVisible(false)
+      setTimeout(() => setSelectedNode(null), 180)
+    } else {
+      setSelectedNode(id)
+    }
+  }
   // Processar dados para timeline (simplificado)
   const timelineData = solicitacoes
     .map(sol => ({
@@ -114,7 +131,7 @@ function SimpleTimeline({ solicitacoes = [] }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Activity className="h-4 w-4" />
-          Linha do Tempo
+          Linha do Tempo - Movimentação
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
@@ -138,12 +155,12 @@ function SimpleTimeline({ solicitacoes = [] }) {
                       ${config.color} hover:shadow-md hover:scale-105
                       ${isSelected ? 'ring-2 ring-primary/30 scale-105' : ''}
                     `}
-                    onClick={() => setSelectedNode(isSelected ? null : event.id)}
+          onClick={() => toggleNode(event.id)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        setSelectedNode(isSelected ? null : event.id)
+            toggleNode(event.id)
                       }
                     }}
                     aria-label={`Detalhes da solicitação ${event.codigo}`}
@@ -161,7 +178,7 @@ function SimpleTimeline({ solicitacoes = [] }) {
                     </div>
                     <Badge 
                       variant="secondary" 
-                      className={`text-[8px] px-1 py-0 h-4 mt-1 ${config.textColor}`}
+                      className={`text-[8px] px-1 py-0 h-4 mt-1 border ${config.textColor} ${config.borderColor} bg-white/90 dark:bg-white/10`}
                     >
                       {config.label}
                     </Badge>
@@ -174,7 +191,7 @@ function SimpleTimeline({ solicitacoes = [] }) {
 
         {/* Painel de detalhes */}
         {selectedNode && (
-          <div className="mt-4 transition-all duration-300">
+          <div className={`mt-4 transform transition-all duration-200 ${detailVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
             {(() => {
               const event = timelineData.find(e => e.id === selectedNode)
               if (!event) return null
@@ -183,7 +200,7 @@ function SimpleTimeline({ solicitacoes = [] }) {
               const Icon = config.icon
 
               return (
-                <Card className={`${config.bgColor} ${config.borderColor} border`}>
+                <Card className={`${config.bgColor} ${config.borderColor} border text-neutral-800 dark:text-neutral-100`}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <div className={`${config.color} p-2 rounded-full flex-shrink-0`}>
@@ -193,17 +210,17 @@ function SimpleTimeline({ solicitacoes = [] }) {
                       <div className="flex-1 space-y-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <h4 className="font-medium text-base">{event.codigo}</h4>
-                          <Badge className={`text-xs ${config.textColor}`}>{config.label}</Badge>
+                          <Badge className={`text-xs ${config.textColor} border ${config.borderColor} bg-white/90 dark:bg-white/10 shadow-sm`}>{config.label}</Badge>
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                             <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="font-medium">Empresa:</span>
                             <span className="truncate">{event.razao_social}</span>
                           </div>
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                             <Activity className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="font-medium">Tipo:</span>
                             <span className="capitalize">
@@ -211,28 +228,28 @@ function SimpleTimeline({ solicitacoes = [] }) {
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                             <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="font-medium">Criada em:</span>
                             <span>{formatDate(event.timestamp)}</span>
                           </div>
                           
                           {event.atualizado_em && event.atualizado_em !== event.timestamp && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                               <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span className="font-medium">Atualizada em:</span>
                               <span>{formatDate(event.atualizado_em)}</span>
                             </div>
                           )}
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                             <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="font-medium">Criada por:</span>
                             <span>{event.criado_por_nome || 'Sistema'}</span>
                           </div>
                           
                           {event.atendido_por_nome && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                               <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span className="font-medium">Atendida por:</span>
                               <span>{event.atendido_por_nome}</span>
@@ -242,17 +259,17 @@ function SimpleTimeline({ solicitacoes = [] }) {
                         
                         {event.observacoes && (
                           <div className="pt-3 border-t border-muted">
-                            <div className="flex items-start gap-2">
+                            <div className="flex items-start gap-2 text-neutral-700 dark:text-neutral-300">
                               <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <div>
                                 <span className="font-medium text-sm">Observações:</span>
-                                <p className="text-sm text-muted-foreground mt-1">{event.observacoes}</p>
+                                <p className="text-sm mt-1">{event.observacoes}</p>
                               </div>
                             </div>
                           </div>
                         )}
                         
-                        <div className="pt-2 text-xs text-muted-foreground">
+                        <div className="pt-2 text-xs text-neutral-600 dark:text-neutral-400">
                           <p>Última atividade: {getRelativeTime(event.atualizado_em || event.timestamp)}</p>
                         </div>
                       </div>
