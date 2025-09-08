@@ -32,7 +32,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência do filtro de status por usuário
   useEffect(() => {
     try {
-      const key = `crm:dashboard:statusFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:statusFilter:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setStatusFilter(saved)
     } catch (_) {}
@@ -41,7 +41,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:statusFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:statusFilter:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, statusFilter)
     } catch (_) {}
   }, [statusFilter, currentUser?.id])
@@ -49,7 +49,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência do filtro de consultor por usuário
   useEffect(() => {
     try {
-      const key = `crm:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setConsultorFilter(saved)
     } catch (_) {}
@@ -58,7 +58,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:consultorFilter:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, consultorFilter)
     } catch (_) {}
   }, [consultorFilter, currentUser?.id])
@@ -66,7 +66,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência do filtro de vidas por usuário
   useEffect(() => {
     try {
-      const key = `crm:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setVidasFilter(saved)
     } catch (_) {}
@@ -75,7 +75,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:vidasFilter:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, vidasFilter)
     } catch (_) {}
   }, [vidasFilter, currentUser?.id])
@@ -83,7 +83,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência do filtro de período
   useEffect(() => {
     try {
-      const key = `crm:dashboard:periodFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:periodFilter:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setPeriodFilter(saved)
     } catch (_) {}
@@ -92,7 +92,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:periodFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:periodFilter:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, periodFilter)
     } catch (_) {}
   }, [periodFilter, currentUser?.id])
@@ -100,7 +100,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência do filtro de operadora
   useEffect(() => {
     try {
-      const key = `crm:dashboard:operadoraFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:operadoraFilter:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setOperadoraFilter(saved)
     } catch (_) {}
@@ -109,7 +109,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:operadoraFilter:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:operadoraFilter:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, operadoraFilter)
     } catch (_) {}
   }, [operadoraFilter, currentUser?.id])
@@ -117,7 +117,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
   // Persistência da aba ativa (somente gestor/gerente usa)
   useEffect(() => {
     try {
-      const key = `crm:dashboard:tab:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:tab:${currentUser?.id || 'anon'}`
       const saved = localStorage.getItem(key)
       if (saved) setActiveDashTab(saved)
     } catch (_) {}
@@ -126,7 +126,7 @@ export default function DashboardSection({ currentUser, proposals, userGoals, us
 
   useEffect(() => {
     try {
-      const key = `crm:dashboard:tab:${currentUser?.id || 'anon'}`
+  const key = `erp:dashboard:tab:${currentUser?.id || 'anon'}`
       localStorage.setItem(key, activeDashTab)
     } catch (_) {}
   }, [activeDashTab, currentUser?.id])

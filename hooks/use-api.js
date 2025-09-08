@@ -12,12 +12,23 @@ export function useProposals(filters = {}) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value)
       })
+  // Padrão: lista mínima + primeira página para reduzir payload inicial
+  if (!params.has('fields')) params.set('fields', 'list')
+  if (!params.has('page')) params.set('page', '1')
+  if (!params.has('pageSize')) params.set('pageSize', '50')
       
       const response = await fetch(`/api/proposals?${params}`)
       if (!response.ok) throw new Error('Erro ao carregar propostas')
       return response.json()
     },
-    staleTime: 2 * 60 * 1000, // 2 minutos para propostas (dados críticos)
+    // Aumenta janela de dado fresco para evitar flicker entre abas
+    staleTime: 5 * 60 * 1000,
+    // Sempre retorna um array para os consumidores (paginação retorna { data, page, ... })
+    select: (data) => {
+      if (Array.isArray(data)) return data
+      if (data && Array.isArray(data.data)) return data.data
+      return []
+    },
   })
 }
 
@@ -86,11 +97,11 @@ export function useUsers() {
   return useQuery({
     queryKey: queryKeys.users,
     queryFn: async () => {
-      const response = await fetch('/api/users')
+  const response = await fetch('/api/users?fields=list')
       if (!response.ok) throw new Error('Erro ao carregar usuários')
       return response.json()
     },
-    staleTime: 10 * 60 * 1000, // 10 minutos (dados menos críticos)
+  staleTime: 15 * 60 * 1000,
   })
 }
 
@@ -115,12 +126,21 @@ export function useSolicitacoes(filters = {}) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value)
       })
+  if (!params.has('fields')) params.set('fields', 'list')
+  if (!params.has('page')) params.set('page', '1')
+  if (!params.has('pageSize')) params.set('pageSize', '50')
       
       const response = await fetch(`/api/solicitacoes?${params}`)
       if (!response.ok) throw new Error('Erro ao carregar solicitações')
       return response.json()
     },
-    staleTime: 3 * 60 * 1000, // 3 minutos
+    staleTime: 5 * 60 * 1000,
+    // Unifica forma de consumo: retorna sempre array
+    select: (data) => {
+      if (Array.isArray(data)) return data
+      if (data && Array.isArray(data.data)) return data.data
+      return []
+    },
   })
 }
 
@@ -155,20 +175,20 @@ export function useDashboardStats() {
       if (!response.ok) throw new Error('Erro ao carregar estatísticas')
       return response.json()
     },
-    staleTime: 1 * 60 * 1000, // 1 minuto para dashboard
+  staleTime: 2 * 60 * 1000,
   })
 }
 
 // Reports
 export function useReportsData() {
   return useQuery({
-    queryKey: queryKeys.reports,
+    queryKey: queryKeys.reportsPerformance,
     queryFn: async () => {
-      const response = await fetch('/api/reports')
+      const response = await fetch('/api/reports/performance')
       if (!response.ok) throw new Error('Erro ao carregar relatórios')
       return response.json()
     },
-    staleTime: 5 * 60 * 1000,
+  staleTime: 10 * 60 * 1000,
   })
 }
 

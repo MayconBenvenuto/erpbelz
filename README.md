@@ -1,4 +1,4 @@
-# Sistema de Gestão - Belz
+# Sistema de Gestão - Belz (ERP)
 
 ## 📚 Documentação
 
@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_sessoes_ultimo_ping ON public.sessoes (ultimo_pin
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario_id ON public.sessoes (usuario_id);
 ```
 
-Sistema de CRM desenvolvido para a Belz, focado na gestão de propostas (implantação) e movimentações (solicitações). Arquitetura: Next.js (App Router) servindo frontend + rotas /api no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (gestor, gerente, analistas especializados e consultor). Virtualização customizada substitui dependências externas para listas grandes.
+Sistema ERP desenvolvido para a Belz, focado na gestão de propostas (implantação) e movimentações (solicitações). Arquitetura: Next.js (App Router) servindo frontend + rotas /api no mesmo projeto, com Supabase (Postgres) e Shadcn/UI; segurança robusta e controle de acesso por perfis (gestor, gerente, analistas especializados e consultor). Virtualização customizada substitui dependências externas para listas grandes.
 
 ## 🎯 Funcionalidades
 
@@ -125,7 +125,7 @@ SMTP_PORT=587
 SMTP_USER=usuario
 SMTP_PASS=senha
 EMAIL_FROM=comunicacao@belzseguros.com.br
-EMAIL_FROM_NAME=CRM Belz
+EMAIL_FROM_NAME=ERP Belz
 # TLS/SNI – defina quando o certificado do provedor for curinga (ex.: *.skymail.net.br)
 SMTP_TLS_SERVERNAME=skymail.net.br
 # NUNCA desabilite verificação de certificado em produção; use apenas para diagnóstico local
@@ -134,7 +134,7 @@ SMTP_TLS_SERVERNAME=skymail.net.br
 # Integrações
 CNPJA_API_KEY=
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
-CRM_APP_URL=http://localhost:3000
+ERP_APP_URL=http://localhost:3000
  
 # Fallback de e-mail (opcional)
 # Se não houver SMTP, defina a chave do Resend e o backend usará este provedor automaticamente
@@ -280,19 +280,15 @@ Identifica propostas com status `em análise` cujo tempo desde `criado_em` ≥ `
 Características:
 
 - Sem limite superior de idade: continua notificando enquanto permanecer `em análise`
-- Idempotente por execução (não grava estado); para diminuir repetição ajuste a frequência do cron
-- Pode ser chamado manualmente autenticado como gestor
+- Idempotente por execução (não grava estado)
+- Disparo manual, autenticado como gestor (sem cron)
 
-Autorização:
-
-1. Cron externo: enviar header `X-Cron-Key: <CRON_SECRET>` (quando definido)
-2. Usuário gestor autenticado (cookie / Bearer)
+Autorização: Usuário gestor autenticado (cookie / Bearer). Cron não é suportado.
 
 Variáveis de ambiente:
 
 - `STALE_PROPOSAL_ALERT_HOURS` (default 24)
 - `PRIMARY_GESTOR_EMAIL`
-- `CRON_SECRET` (opcional)
 
 Resposta (exemplo abreviado):
 
@@ -300,7 +296,7 @@ Resposta (exemplo abreviado):
 {"proposals_found":3,"alerted":true,"threshold_hours":24}
 ```
 
-Agendamento sugerido: a cada hora. Ajuste conforme necessidade de ruído vs. rapidez.
+Agendamento: não aplicável (sem cron). Execute manualmente quando necessário (gestor).
 
 ## 📈 Dashboard do Gestor (novo)
 
@@ -371,7 +367,7 @@ NODE_ENV=production
 CORS_ORIGINS=https://seudominio.com
 JWT_SECRET=chave_ainda_mais_forte_para_producao
 NEXT_PUBLIC_BASE_URL=https://seudominio.com
-CRM_APP_URL=https://seudominio.com
+ERP_APP_URL=https://seudominio.com
 RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_WINDOW=900000
 ```

@@ -1,6 +1,6 @@
 // Service Worker para cache de assets e offline capability
-const CACHE_NAME = 'belz-erp-v1'
-const API_CACHE_NAME = 'belz-erp-api-v1'
+const CACHE_NAME = 'belz-erp-v2'
+const API_CACHE_NAME = 'belz-erp-api-v2'
 
 // Assets estáticos para cache
 const STATIC_ASSETS = [
@@ -14,7 +14,12 @@ const STATIC_ASSETS = [
 const CACHEABLE_APIS = [
   '/api/users',
   '/api/goals',
-  '/api/clientes'
+  // Carteira de clientes: suporta ETag + SWR e paginação (usa também variantes com query)
+  '/api/clientes',
+  '/api/proposals',
+  '/api/solicitacoes',
+  '/api/reports/performance',
+  '/api/reports/dashboard'
 ]
 
 self.addEventListener('install', (event) => {
@@ -52,7 +57,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Cache para APIs específicas
+  // Cache para APIs específicas com estratégia stale-while-revalidate
   if (url.pathname.startsWith('/api/')) {
     const isCacheableAPI = CACHEABLE_APIS.some(api => url.pathname.startsWith(api))
     

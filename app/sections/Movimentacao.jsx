@@ -41,7 +41,13 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
   useEffect(() => {
     if (parentToken) { setToken(parentToken); return }
     if (typeof window !== 'undefined') {
-      try { const sess = sessionStorage.getItem('crm_token'); if (sess) { setToken(sess); return } } catch {}
+      try {
+        // prefere ERP, mantém compat com legado CRM
+        const sessErp = sessionStorage.getItem('erp_token')
+        if (sessErp) { setToken(sessErp); return }
+        const sessLegacy = sessionStorage.getItem('crm_token')
+        if (sessLegacy) { setToken(sessLegacy); return }
+      } catch {}
       const legacy = localStorage.getItem('token'); if (legacy) setToken(legacy)
     }
   }, [parentToken])

@@ -54,7 +54,7 @@ export default function TopUserActions({ currentUser, onRefresh, onLogout, isRef
       const payload = currentUser.must_change_password ? { nova: pwdForm.nova, atual: pwdForm.atual || undefined } : { atual: pwdForm.atual, nova: pwdForm.nova }
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${localStorage.getItem('crm_token')||''}` },
+        headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''}` },
         body: JSON.stringify(payload)
       })
       const data = await res.json().catch(()=>({}))

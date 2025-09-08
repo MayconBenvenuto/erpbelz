@@ -48,6 +48,13 @@ export async function POST(request) {
 			const response = NextResponse.json({ success: true })
 			const isProd = process.env.NODE_ENV === 'production'
 			try {
+				response.cookies.set('erp_auth', '', {
+					httpOnly: true,
+					sameSite: 'lax',
+					secure: isProd,
+					path: '/',
+					expires: new Date(0)
+				})
 				response.cookies.set('crm_auth', '', {
 					httpOnly: true,
 					sameSite: 'lax',
@@ -58,6 +65,7 @@ export async function POST(request) {
 			} catch (_) {
 				const flags = [`Path=/`, `SameSite=Lax`, `HttpOnly`, `Expires=${new Date(0).toUTCString()}`]
 				if (isProd) flags.push('Secure')
+				response.headers.append('Set-Cookie', `erp_auth=; ${flags.join('; ')}`)
 				response.headers.append('Set-Cookie', `crm_auth=; ${flags.join('; ')}`)
 			}
 

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api-helpers'
-import { supabase } from '@/lib/api-helpers'
+import { requireAuth, supabase, cacheJson } from '@/lib/api-helpers'
 
 // Janela (deixa servidor em sincronia caso view não esteja criada ainda)
 const WINDOW_SECONDS = 120
@@ -13,6 +12,7 @@ export async function GET(request) {
   const format = (searchParams.get('format') || '').toLowerCase()
   const wnd = parseInt(searchParams.get('window_seconds') || '', 10)
   const windowSeconds = Number.isFinite(wnd) && wnd > 0 && wnd < 24*3600 ? wnd : WINDOW_SECONDS
+  const origin = request.headers.get('origin') || '*'
 
   // Tenta usar a view (se existir) – pode projetar last_active_at; produção pode não ter
   try {
@@ -25,9 +25,12 @@ export async function GET(request) {
         for (const u of filtered) {
           csv.push(`${u.id};"${(u.nome||'').replaceAll('"','""')}";${u.email};${u.tipo_usuario};${u.last_active_at || ''}`)
         }
-        return new NextResponse(csv.join('\n'), { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="usuarios_online_${Date.now()}.csv"` } })
+        const res = new NextResponse(csv.join('\n'), { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="usuarios_online_${Date.now()}.csv"` } })
+        res.headers.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=60')
+        res.headers.set('Vary', 'Authorization, Cookie, Origin')
+        return res
       }
-      return NextResponse.json({ data: filtered, window_seconds: windowSeconds })
+      return cacheJson(request, origin, { data: filtered, window_seconds: windowSeconds }, { maxAge: 15, swr: 60 })
     }
   } catch {}
 
@@ -51,9 +54,12 @@ export async function GET(request) {
       for (const u of payload) {
         csv.push(`${u.id};"${(u.nome||'').replaceAll('"','""')}";${u.email};${u.tipo_usuario};${u.last_active_at || ''}`)
       }
-      return new NextResponse(csv.join('\n'), { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="usuarios_online_${Date.now()}.csv"` } })
+      const res = new NextResponse(csv.join('\n'), { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="usuarios_online_${Date.now()}.csv"` } })
+      res.headers.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=60')
+      res.headers.set('Vary', 'Authorization, Cookie, Origin')
+      return res
     }
-    return NextResponse.json({ data: payload, window_seconds: windowSeconds })
+    return cacheJson(request, origin, { data: payload, window_seconds: windowSeconds }, { maxAge: 15, swr: 60 })
   } catch {
     return NextResponse.json({ data: [], window_seconds: WINDOW_SECONDS })
   }

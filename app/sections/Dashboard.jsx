@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatCurrency, getOperadoraLogoFile } from '@/lib/utils'
 import { STATUS_OPTIONS, STATUS_COLORS, SOLICITACAO_STATUS, SOLICITACAO_STATUS_COLORS, OPERADORAS } from '@/lib/constants'
-import { Activity, BarChart3, CheckCircle2, Clock, FileText, LayoutGrid, LineChart as LineChartIcon, Target, Users } from 'lucide-react'
+import { Activity, BarChart3, CheckCircle2, Clock, FileText, LayoutGrid, LineChart as LineChartIcon, Target, Users, ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import {
 	BarChart,
@@ -268,6 +268,77 @@ export default function DashboardSection({ currentUser: _currentUser, proposals 
 				</div>
 			</div>
 
+			{/* Atalhos de trabalho (somente gestor) */}
+			{_currentUser?.tipo_usuario === 'gestor' && (
+				<Card>
+					<CardHeader className="pb-3">
+						<CardTitle className="text-base">Atalhos de Trabalho</CardTitle>
+						<CardDescription className="text-xs">Links úteis usados no dia a dia (abre em nova guia)</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+							{/* Planilhas */}
+							<a
+								href="https://docs.google.com/spreadsheets/d/1NK7tGQCioDRoTFlI7bCSlLqXLKdUyfoe-_uCNHO7bi0/edit?gid=1533137706#gid=1533137706"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Planilha de Boletos/Movimentação"
+							>
+								<ExternalLink className="w-4 h-4" /> Planilha: Boletos/Movimentação
+							</a>
+							<a
+								href="https://docs.google.com/spreadsheets/d/1eRgoxc6oqtdVNMWwYJiWHhe_SmEEW9LaL0-zSTGj8kc/edit?gid=11585494#gid=11585494"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Planilha de Implantação"
+							>
+								<ExternalLink className="w-4 h-4" /> Planilha: Implantação
+							</a>
+
+							{/* Sites Operadoras */}
+							<a
+								href="https://wwwn.bradescoseguros.com.br/pnegocios2/wps/portal/portaldenegociosnovo/!ut/p/z1/04_Sj9CPykssy0xPLMnMz0vMAfIjo8zifdx9PA0sLYz8DJzdjAwCHcOCTdx9jQxNfE30wwkpiAJKG-AAjgZA_VGElBTkRhikOyoqAgBzNoDA/dz/d5/L2dBISEvZ0FBIS9nQSEh/"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Portal Bradesco Seguros"
+							>
+								<ExternalLink className="w-4 h-4" /> Bradesco (Portal de Negócios)
+							</a>
+							<a
+								href="https://corretor.sulamericaseguros.com.br/?accessError=2#/"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Portal Corretor SulAmérica"
+							>
+								<ExternalLink className="w-4 h-4" /> SulAmérica (Corretor)
+							</a>
+							<a
+								href="https://institucional.amil.com.br/"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Portal Amil"
+							>
+								<ExternalLink className="w-4 h-4" /> Amil
+							</a>
+							<a
+								href="https://remote.unimedrecife.com.br:444/connecta/Default.aspx?ReturnUrl=%2fconnecta%2fContent%2fContrato%2fCoParticipacao.aspx"
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border hover:bg-muted transition-colors"
+								title="Unimed Recife Connecta"
+							>
+								<ExternalLink className="w-4 h-4" /> Unimed Recife (Connecta)
+							</a>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Barra de Filtros */}
 			<Card>
 				<CardContent className="pt-6">
@@ -473,7 +544,7 @@ export default function DashboardSection({ currentUser: _currentUser, proposals 
 								<FileText className="h-4 w-4 text-muted-foreground" />
 							</CardHeader>
 							<CardContent>
-								<div className="text-2xl font-bold text-primary">{mPropostas.total}</div>
+								<div className="text-2xl font-bold text-white">{mPropostas.total}</div>
 								<p className="text-xs text-muted-foreground">Total cadastradas</p>
 							</CardContent>
 						</Card>
@@ -711,7 +782,7 @@ export default function DashboardSection({ currentUser: _currentUser, proposals 
 								<Activity className="h-4 w-4 text-muted-foreground" />
 							</CardHeader>
 							<CardContent>
-								<div className="text-2xl font-bold text-primary">{mMov.total}</div>
+								<div className="text-2xl font-bold text-white">{mMov.total}</div>
 								<p className="text-xs text-muted-foreground">Total no período</p>
 							</CardContent>
 						</Card>
@@ -799,7 +870,7 @@ export default function DashboardSection({ currentUser: _currentUser, proposals 
 								<Users className="h-4 w-4 text-muted-foreground" />
 							</CardHeader>
 							<CardContent>
-								<div className="text-2xl font-bold text-primary">{mEquipe.total}</div>
+								<div className="text-2xl font-bold text-white">{mEquipe.total}</div>
 								<p className="text-xs text-muted-foreground">Cadastrados</p>
 							</CardContent>
 						</Card>

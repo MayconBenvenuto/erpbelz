@@ -1,4 +1,4 @@
-# Sistema de Alertas - Propostas Estagnadas
+# Sistema de Alertas (sem cron) - Propostas Estagnadas e SLA de Movimentação
 
 ## Visão Geral
 
@@ -9,7 +9,7 @@ O sistema monitora automaticamente propostas que permanecem no status "em análi
 ### 1. Detecção Automática
 - **Critério**: Propostas com status "em análise" há mais de 48h
 - **Janela de notificação**: Entre 48h e 72h (evita spam de notificações repetidas)
-- **Execução**: Disparo manual ou via serviço externo de cron
+- **Execução**: Disparo manual por gestor autenticado (sem cron)
 
 ### 2. Destinatários
 - **Padrão**: Todos os usuários com `tipo_usuario = 'gestor'`
@@ -19,7 +19,7 @@ O sistema monitora automaticamente propostas que permanecem no status "em análi
 - Lista de propostas estagnadas
 - Código, empresa, operadora, valor
 - Data de criação e tempo parado
-- Link direto para o CRM
+- Link direto para o ERP
 
 ## Configuração
 
@@ -29,12 +29,10 @@ O sistema monitora automaticamente propostas que permanecem no status "em análi
 # Opcional: e-mail específico para receber alertas (substitui busca por gestores)
 GESTOR_NOTIFY_EMAIL=mayconbenvenuto@belzseguros.com.br
 
-# Para uso em cron externo/manual
-SYSTEM_TOKEN=<token_jwt_do_sistema>
-APP_URL=https://admbelz.vercel.app
+# Sem cron: apenas login de gestor e execução manual
 ```
 
-// Configure variáveis somente no ambiente de deploy / serviço de cron usado.
+// Configure variáveis somente no ambiente de deploy. Cron não é utilizado neste sistema.
 
 ## Endpoints da API
 
@@ -58,10 +56,17 @@ GET /api/alerts/stale-proposals
 - **Função**: Mostra status atual sem enviar e-mails
 - **Resposta**: Contadores e lista detalhada
 
-### 3. Trigger Manual
+### 3. SLA Movimentação (manual por gestor)
 
 ```http
-POST /api/alerts/stale-propostas
+POST /api/solicitacoes/stale-check
+```
+
+- Autenticação: gestor
+- Critério: `sla_previsto < hoje` e `status` não final (≠ 'concluída'/'cancelada')
+- Destinatários: `criado_por`, `atendido_por` e usuários do `historico[].usuario_id` (deduplicado)
+- Antispam: grava evento `sla_atrasado_notificado` no `historico` para evitar reenvio
+
 ```
 
 - **Autenticação**: Required (gestor)
@@ -83,7 +88,7 @@ POST /api/alerts/stale-propostas
 
 ## Logs e Monitoramento
 
-// Use cron-job.org, EasyCron ou scheduler da plataforma para agendamento automático.
+// Execução manual: acione as rotas acima autenticado como gestor.
 
 ### Logs da Aplicação
 
@@ -93,19 +98,11 @@ console.log('[ALERTS] Verificação executada', { notified: N })
 console.error('[ALERTS] Erro na verificação', { error })
 ```
 
-## Configuração Manual
+## Execução
 
-### 1. Cron Local
-
-```bash
-# Crontab para execução local às 9:00
-0 9 * * * curl -X POST -H "Authorization: Bearer $TOKEN" $APP_URL/api/proposals/stale-check
-```
-
-### 2. Webhooks Externos
-
-- Configure webhook no Vercel/Heroku para chamar `/api/proposals/stale-check`
-- Use serviços como cron-job.org ou EasyCron
+- Faça login como gestor e acione:
+	- POST `/api/proposals/stale-check`
+	- POST `/api/solicitacoes/stale-check`
 
 ## Customização
 
@@ -125,7 +122,7 @@ const subject = `[Sistema] Propostas estagnadas há 48h` // Customizar assunto
 // Modificar conteúdo HTML/texto conforme necessário
 ```
 
-// Horário de execução definido pelo seu serviço de agendamento externo.
+// Sem serviço de agendamento: execução é manual por gestor autenticado.
 
 ## Troubleshooting
 

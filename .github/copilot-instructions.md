@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions - CRM Belz
+# GitHub Copilot Instructions - ERP Belz
 
 ## Project Overview
-This is a CRM system for Belz company focused on health insurance proposal management with role-based access control and modern security practices.
+This is an ERP system for Belz company focused on health insurance proposal and movimentação management with role-based access control and modern security practices.
 
 Current architecture:
 - Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
