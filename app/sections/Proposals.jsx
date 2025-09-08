@@ -167,11 +167,20 @@ function ProposalsInner({
   // Persistência de filtros por usuário
   useEffect(() => {
     try {
-      const key = `crm:proposals:filters:${currentUser?.id || 'anon'}`
-      const saved = localStorage.getItem(key)
+      const erpKey = `erp:proposals:filters:${currentUser?.id || 'anon'}`
+      const crmKey = `crm:proposals:filters:${currentUser?.id || 'anon'}`
+      let saved = localStorage.getItem(erpKey)
+      if (!saved) {
+        // tenta migrar do legado CRM
+        const legacy = localStorage.getItem(crmKey)
+        if (legacy) {
+          localStorage.setItem(erpKey, legacy)
+          try { localStorage.removeItem(crmKey) } catch {}
+          saved = legacy
+        }
+      }
       if (saved) {
         const parsed = JSON.parse(saved)
-        // valida chaves básicas
         if (parsed && typeof parsed === 'object') {
           setFilters({ ...defaultFilters, ...parsed })
         }
@@ -182,8 +191,10 @@ function ProposalsInner({
 
   useEffect(() => {
     try {
-      const key = `crm:proposals:filters:${currentUser?.id || 'anon'}`
-      localStorage.setItem(key, JSON.stringify(filters))
+      const erpKey = `erp:proposals:filters:${currentUser?.id || 'anon'}`
+      localStorage.setItem(erpKey, JSON.stringify(filters))
+      // remove chave antiga silenciosamente
+      try { localStorage.removeItem(`crm:proposals:filters:${currentUser?.id || 'anon'}`) } catch {}
     } catch (_) {}
   }, [filters, currentUser?.id])
 
@@ -261,7 +272,20 @@ function ProposalsInner({
     const now = Date.now()
     // Persistência leve para não repetir alertas em page reload: sessionStorage
     let persisted = {}
-    try { persisted = JSON.parse(sessionStorage.getItem('crm:proposalAlerts')||'{}') } catch {}
+    try {
+      persisted = JSON.parse(sessionStorage.getItem('erp:proposalAlerts')||'{}')
+      if (!Object.keys(persisted).length) {
+        // migrar do legado
+        const legacy = sessionStorage.getItem('crm:proposalAlerts')
+        if (legacy) {
+          persisted = JSON.parse(legacy)
+          try {
+            sessionStorage.setItem('erp:proposalAlerts', legacy)
+            sessionStorage.removeItem('crm:proposalAlerts')
+          } catch {}
+        }
+      }
+    } catch {}
     let changed = false
     filteredProposals.forEach(p => {
       if (p.atendido_por) return
@@ -291,8 +315,11 @@ function ProposalsInner({
       }
     })
     if (changed) {
-      try { sessionStorage.setItem('crm:proposalAlerts', JSON.stringify(persisted)) } catch {}
-  }
+      try {
+        sessionStorage.setItem('erp:proposalAlerts', JSON.stringify(persisted))
+        sessionStorage.removeItem('crm:proposalAlerts')
+      } catch {}
+    }
   }, [filteredProposals, currentUser.tipo_usuario])
 
   // Limpa cache de alertas para propostas removidas
@@ -541,16 +568,22 @@ function ProposalsInner({
             {currentUser.tipo_usuario === 'consultor' && 'Minhas Propostas'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {currentUser.tipo_usuario === 'gestor' && 'Visualize e monitore todas as propostas'}
+            {currentUser.tipo_usuario === 'gestor' && 'Crie, monitore e gerencie todas as propostas'}
             {currentUser.tipo_usuario === 'gerente' && 'Crie, monitore e gerencie propostas'}
             {['analista_implantacao', 'analista_movimentacao'].includes(currentUser.tipo_usuario) && 'Crie, edite e gerencie suas propostas'}
             {currentUser.tipo_usuario === 'consultor' && 'Crie novas propostas e acompanhe o andamento'}
           </p>
         </div>
-        {(['analista_implantacao', 'analista_movimentacao','gerente'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
+  {(['analista_implantacao', 'analista_movimentacao','gerente','gestor'].includes(currentUser.tipo_usuario) || currentUser.tipo_usuario === 'consultor') && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="self-start">{currentUser.tipo_usuario === 'consultor' ? (<><PlusCircle className="w-4 h-4 mr-2" />Solicitar Proposta</>) : (<><PlusCircle className="w-4 h-4 mr-2" />Nova Proposta</>)}</Button>
+              <Button className="self-start" data-new-proposal-btn>
+                {currentUser.tipo_usuario === 'consultor' ? (
+                  <><PlusCircle className="w-4 h-4 mr-2" />Solicitar Proposta</>
+                ) : (
+                  <><PlusCircle className="w-4 h-4 mr-2" />Nova Proposta</>
+                )}
+              </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
@@ -776,7 +809,7 @@ function ProposalsInner({
             {statusOptions.map(status => {
               const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
               return (
-              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden min-w-[270px] w-[270px]">
+              <div key={status} className="border rounded-md bg-card flex flex-col max-h-[560px] shadow-sm overflow-hidden min-w-[300px] w-[300px]">
                 <div 
                   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10 after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
                   style={{
@@ -796,10 +829,10 @@ function ProposalsInner({
                   )}
                   {groupedByStatus[status] && groupedByStatus[status].length > 0 && (
                     <VirtualList
-                      height={480}
+                      height={780}
                       itemCount={groupedByStatus[status].length}
-                      itemSize={140}
-                      width={250}
+                      itemSize={212}
+                      width={270}
                       className="pr-2"
                     >
                       {({ index, style }) => {
@@ -814,19 +847,19 @@ function ProposalsInner({
                     const ageClass = p.horas_em_analise >= 48 ? 'before:bg-gradient-to-b before:from-red-500 before:to-red-700' : p.horas_em_analise >= 24 ? 'before:bg-gradient-to-b before:from-amber-400 before:to-amber-600' : 'before:bg-gradient-to-b before:from-transparent before:to-transparent'
                     const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
                     return (
-                      <div
-                        key={p.id}
-                        style={{
-                          ...style,
-                          backgroundColor: statusColors.bg,
-                          color: statusColors.text,
-                          borderColor: statusColors.border
-                        }}
-                        className={`rounded p-2 mb-2 backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'ring-2 ring-red-400' : 'ring-1 ring-amber-300') : ''} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}
-                      >
+                      <div key={p.id} style={style} className="w-full h-full">
+                        <div className="h-full p-2">
+                          <div
+                            style={{
+                              backgroundColor: statusColors.bg,
+                              color: statusColors.text,
+                              borderColor: statusColors.border
+                            }}
+                            className={`rounded p-2 h-full backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md ${isWaiting ? (isLate ? 'ring-2 ring-red-400' : 'ring-1 ring-amber-300') : ''} before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:transition-all before:duration-300 ${ageClass}`}
+                          >
                         {/* zebra effect via idx */}
                         <div className="absolute inset-0 pointer-events-none rounded opacity-0 group-hover:opacity-5 transition-opacity bg-primary" />
-                        <div className="font-medium truncate flex items-center gap-1" title={p.consultor} onMouseEnter={() => prefetchDetails(p.id)}>
+                        <div className="font-medium truncate flex items-center gap-1 flex-wrap" title={p.consultor} onMouseEnter={() => prefetchDetails(p.id)}>
                           <span 
                             className="font-mono text-[10px] px-1 py-0.5 rounded flex items-center gap-1"
                             style={{
@@ -852,9 +885,9 @@ function ProposalsInner({
                               </span>
                             )}
                           </span>
-                          <OperadoraBadge nome={p.operadora} className="truncate" size={14} />
+                          <OperadoraBadge nome={p.operadora} className="truncate max-w-[120px]" size={14} />
                           {isWaiting && (
-                            <span className={`ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded ${isLate ? 'bg-red-600' : 'bg-amber-500'} text-white font-semibold tracking-wide uppercase`}>
+                            <span className={`ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded ${isLate ? 'bg-red-600' : 'bg-amber-500'} text-white font-semibold tracking-wide uppercase whitespace-nowrap`}>
                               {isLate ? 'SLA!' : 'Livre'}
                             </span>
                           )}
@@ -864,10 +897,10 @@ function ProposalsInner({
                             </span>
                           )}
                         </div>
-                        <div className="flex justify-between gap-2 flex-wrap text-[11px]">
-                          <span className="font-mono" title={p.cnpj}>{formatCNPJ(p.cnpj)}</span>
-                          <span>{p.quantidade_vidas} vidas</span>
-                          <span>{formatCurrency(p.valor)}</span>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+                          <span className="font-mono col-span-2 truncate" title={p.cnpj}>{formatCNPJ(p.cnpj)}</span>
+                          <span className="truncate" title={`${p.quantidade_vidas} vidas`}>{p.quantidade_vidas} vidas</span>
+                          <span className="truncate" title={formatCurrency(p.valor)}>{formatCurrency(p.valor)}</span>
                         </div>
                         {/* Solicitante visível antes de assumir */}
                         {isWaiting && p.consultor && (
@@ -878,8 +911,8 @@ function ProposalsInner({
                         )}
                         {(p.cliente_nome || p.cliente_email) && (
                           <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-                            <span className="truncate max-w-[140px]" title={p.cliente_nome}>{p.cliente_nome}</span>
-                            {p.cliente_email && <span className="truncate max-w-[140px]" title={p.cliente_email}>({p.cliente_email})</span>}
+                            <span className="truncate max-w-[160px]" title={p.cliente_nome}>{p.cliente_nome}</span>
+                            {p.cliente_email && <span className="truncate max-w-[160px]" title={p.cliente_email}>({p.cliente_email})</span>}
                           </div>
                         )}
                         {/* Ações */}
@@ -935,10 +968,12 @@ function ProposalsInner({
                               </span>
                             )
                           })()}
+                            </div>
+                            {currentUser.tipo_usuario === 'gestor' && (
+                              <div className="text-[10px] text-white-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
+                            )}
+                          </div>
                         </div>
-                        {currentUser.tipo_usuario === 'gestor' && (
-                          <div className="text-[10px] text-white-foreground">Analista: {(users.find(u => u.id === p.criado_por)?.nome) || '-'}</div>
-                        )}
                       </div>
                     )}}
                     </VirtualList>

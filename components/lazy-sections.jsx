@@ -3,14 +3,20 @@ import { lazy, Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 
-// Lazy load das seções pesadas
-const ProposalsSection = lazy(() => import('@/app/sections/Proposals'))
-const ReportsSection = lazy(() => import('@/app/sections/Reports'))
-const MovimentacaoSection = lazy(() => import('@/app/sections/Movimentacao'))
-const UsersSection = lazy(() => import('@/app/sections/Users'))
+// Lazy load das seções pesadas com prefetch dos chunks em idle
+const loadProposalsSection = () => import(/* webpackPrefetch: true */ '@/app/sections/Proposals')
+const loadReportsSection = () => import(/* webpackPrefetch: true */ '@/app/sections/Reports')
+const loadMovimentacaoSection = () => import(/* webpackPrefetch: true */ '@/app/sections/Movimentacao')
+const loadUsersSection = () => import(/* webpackPrefetch: true */ '@/app/sections/Users')
+const loadDashboardSection = () => import(/* webpackPrefetch: true */ '@/app/sections/Dashboard')
 
-// Dashboard e sidebar são leves, mantemos normalmente
-import DashboardSection from '@/app/sections/Dashboard'
+const ProposalsSection = lazy(loadProposalsSection)
+const ReportsSection = lazy(loadReportsSection)
+const MovimentacaoSection = lazy(loadMovimentacaoSection)
+const UsersSection = lazy(loadUsersSection)
+const DashboardSectionLazy = lazy(loadDashboardSection)
+
+// Sidebar e Header são leves, mantemos normalmente
 import Sidebar from '@/app/sections/Sidebar'
 import Header from '@/app/sections/Header'
 import EmDesenvolvimento from '@/app/sections/EmDesenvolvimento'
@@ -50,11 +56,19 @@ export const LazyUsersSection = (props) => (
   </Suspense>
 )
 
-// Export das seções que não precisam de lazy loading
-export {
-  DashboardSection,
-  Sidebar,
-  Header,
-  EmDesenvolvimento,
-  SectionLoader
-}
+// Dashboard agora também lazy para reduzir bundle inicial
+export const DashboardSection = (props) => (
+  <Suspense fallback={<SectionLoader message="Carregando dashboard..." />}>
+    <DashboardSectionLazy {...props} />
+  </Suspense>
+)
+
+// Export das seções leves
+export { Sidebar, Header, EmDesenvolvimento, SectionLoader }
+
+// Exporta preloads dos módulos para acionar o download do chunk ao passar o mouse
+export const preloadProposalsSection = () => { try { loadProposalsSection() } catch {} }
+export const preloadReportsSection = () => { try { loadReportsSection() } catch {} }
+export const preloadMovimentacaoSection = () => { try { loadMovimentacaoSection() } catch {} }
+export const preloadUsersSection = () => { try { loadUsersSection() } catch {} }
+export const preloadDashboardSection = () => { try { loadDashboardSection() } catch {} }

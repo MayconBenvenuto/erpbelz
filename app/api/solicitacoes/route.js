@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { cacheJson } from '@/lib/api-helpers'
 import { verifyToken, sanitizeInput, sanitizeForLog, checkRateLimit } from '@/lib/security'
 import { supabase } from '@/lib/api-helpers'
 
@@ -24,6 +25,10 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
+    const fields = (searchParams.get('fields') || '').trim()
+    const columns = fields === 'list'
+      ? 'id,codigo,tipo,subtipo,razao_social,cnpj,apolice_da_belz,acesso_empresa,operadora,observacoes,sla_previsto,status,atendido_por,criado_por,criado_em,atualizado_em'
+      : '*'
   const onlyOverdue = ['1','true','yes'].includes(String(searchParams.get('atrasadas')||'').toLowerCase())
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
@@ -33,14 +38,14 @@ export async function GET(req) {
     let count = 0
     let error = null
     if (user.tipo === 'gestor' || user.tipo === 'gerente') {
-      let q = supabase.from('solicitacoes').select('*', { count: 'exact' })
+      let q = supabase.from('solicitacoes').select(columns, { count: 'exact' })
       if (onlyOverdue) {
         q = q.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
       }
       const r = await q.order('codigo', { ascending: true }).range(from, to)
       data = r.data || []; count = r.count || 0; error = r.error
     } else if (user.tipo === 'consultor') {
-      let q = supabase.from('solicitacoes').select('*', { count: 'exact' }).eq('criado_por', user.userId)
+      let q = supabase.from('solicitacoes').select(columns, { count: 'exact' }).eq('criado_por', user.userId)
       if (onlyOverdue) {
         q = q.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
       }
@@ -48,8 +53,8 @@ export async function GET(req) {
       data = r.data || []; count = r.count || 0; error = r.error
     } else if (user.tipo === 'analista_movimentacao') {
       // Unassigned + assigned to me
-      let q1 = supabase.from('solicitacoes').select('*').is('atendido_por', null)
-      let q2 = supabase.from('solicitacoes').select('*').eq('atendido_por', user.userId)
+      let q1 = supabase.from('solicitacoes').select(columns).is('atendido_por', null)
+      let q2 = supabase.from('solicitacoes').select(columns).eq('atendido_por', user.userId)
       if (onlyOverdue) {
         q1 = q1.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
         q2 = q2.not('sla_previsto','is', null).lt('sla_previsto', todayISO).neq('status','concluída').neq('status','cancelada')
@@ -78,7 +83,9 @@ export async function GET(req) {
         })
       } catch(_) {}
     }
-    return NextResponse.json({ data, page, pageSize, total: count })
+  // Cache privado curto para suavizar trocas de aba e rolagem (ETag condicional)
+  const origin = req.headers.get('origin')
+  return cacheJson(req, origin, { data, page, pageSize, total: count }, { maxAge: 45, swr: 180 })
   } catch (e) {
     console.error('Erro GET solicitacoes', sanitizeForLog(e))
     return NextResponse.json({ message: 'Erro ao listar' }, { status: 500 })

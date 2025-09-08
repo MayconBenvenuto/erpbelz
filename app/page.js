@@ -67,16 +67,29 @@ function AppContent() {
   // Persistência de sessão no sessionStorage (sessão do navegador, não persiste após fechar)
   const saveSessionToStorage = (user, sessionId, tokenValue) => {
     try {
-      sessionStorage.setItem('crm_user', JSON.stringify(user))
-      sessionStorage.setItem('crm_session', sessionId)
-      sessionStorage.setItem('crm_last_activity', Date.now().toString())
-  if (tokenValue) sessionStorage.setItem('crm_token', tokenValue)
+      // Novo prefixo ERP
+      sessionStorage.setItem('erp_user', JSON.stringify(user))
+      sessionStorage.setItem('erp_session', sessionId)
+      sessionStorage.setItem('erp_last_activity', Date.now().toString())
+      if (tokenValue) sessionStorage.setItem('erp_token', tokenValue)
+      // Cleanup chaves antigas (CRM)
+      try {
+        sessionStorage.removeItem('crm_user')
+        sessionStorage.removeItem('crm_session')
+        sessionStorage.removeItem('crm_last_activity')
+        sessionStorage.removeItem('crm_token')
+      } catch(_) {}
     } catch (_) {
       // ignore quota or storage errors
     }
   }
   const clearSessionFromStorage = () => {
     try {
+      sessionStorage.removeItem('erp_user')
+      sessionStorage.removeItem('erp_session')
+      sessionStorage.removeItem('erp_last_activity')
+      sessionStorage.removeItem('erp_token')
+      // Legacy cleanup
       sessionStorage.removeItem('crm_user')
       sessionStorage.removeItem('crm_session')
       sessionStorage.removeItem('crm_last_activity')
@@ -87,19 +100,47 @@ function AppContent() {
   }
   const loadSessionFromStorage = () => {
     try {
-      const user = sessionStorage.getItem('crm_user')
-      const session = sessionStorage.getItem('crm_session')
-      const lastActivity = sessionStorage.getItem('crm_last_activity')
-    const savedToken = sessionStorage.getItem('crm_token')
-    // aceita sessão baseada em cookie (sem token salvo no storage)
-    if (user && session && lastActivity) {
+      // Tenta ler ERP primeiro
+      let user = sessionStorage.getItem('erp_user')
+      let session = sessionStorage.getItem('erp_session')
+      let lastActivity = sessionStorage.getItem('erp_last_activity')
+      let savedToken = sessionStorage.getItem('erp_token')
+
+      // Se não existir, tenta migrar do legado CRM
+      if (!user || !session) {
+        const legacyUser = sessionStorage.getItem('crm_user')
+        const legacySession = sessionStorage.getItem('crm_session')
+        const legacyLast = sessionStorage.getItem('crm_last_activity')
+        const legacyToken = sessionStorage.getItem('crm_token')
+        if (legacyUser && legacySession) {
+          // Migra para as novas chaves
+          sessionStorage.setItem('erp_user', legacyUser)
+          sessionStorage.setItem('erp_session', legacySession)
+          if (legacyLast) sessionStorage.setItem('erp_last_activity', legacyLast)
+          if (legacyToken) sessionStorage.setItem('erp_token', legacyToken)
+          try {
+            sessionStorage.removeItem('crm_user')
+            sessionStorage.removeItem('crm_session')
+            sessionStorage.removeItem('crm_last_activity')
+            sessionStorage.removeItem('crm_token')
+          } catch(_) {}
+          // Reatribui variáveis locais
+          user = legacyUser
+          session = legacySession
+          lastActivity = legacyLast
+          savedToken = legacyToken
+        }
+      }
+
+      // aceita sessão baseada em cookie (sem token salvo no storage)
+      if (user && session && lastActivity) {
         const timeSinceLastActivity = Date.now() - parseInt(lastActivity)
         // Sessão válida por 24h (apenas enquanto o navegador estiver aberto)
         if (timeSinceLastActivity < 24 * 60 * 60 * 1000) {
           setCurrentUser(JSON.parse(user))
           setSessionId(session)
           setLastActivity(parseInt(lastActivity))
-      if (savedToken) setToken(savedToken)
+          if (savedToken) setToken(savedToken)
           return true
         }
       }
@@ -178,7 +219,7 @@ function AppContent() {
   fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
     // Carteira de clientes: consultor e gestor
   const needsClientes = currentUser && ['consultor','gestor','analista_cliente'].includes(currentUser.tipo_usuario)
-    if (needsClientes) fetches.push(fetch('/api/clientes', { headers: authHeaders, ...common }))
+  if (needsClientes) fetches.push(fetch('/api/clientes?fields=list&page=1&pageSize=50', { headers: authHeaders, ...common }))
       // Users e Sessions: apenas gestor precisa
   const needsAdminData = currentUser && (currentUser.tipo_usuario === 'gestor')
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
@@ -198,7 +239,11 @@ function AppContent() {
       }
       if (needsClientes) {
         const clientesRes = responses[idx++]
-        if (clientesRes?.ok) setClientes(await clientesRes.json())
+        if (clientesRes?.ok) {
+          const json = await clientesRes.json()
+          const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
+          setClientes(arr)
+        }
       }
   if (needsAdminData) {
         const usersRes = responses[idx++]
@@ -537,7 +582,11 @@ function AppContent() {
     const now = Date.now()
     setLastActivity(now)
     if (currentUser) {
-      try { sessionStorage.setItem('crm_last_activity', now.toString()) } catch (_) {}
+      try {
+        sessionStorage.setItem('erp_last_activity', now.toString())
+        // limpeza legado
+        sessionStorage.removeItem('crm_last_activity')
+      } catch (_) {}
     }
   }, [currentUser])
 

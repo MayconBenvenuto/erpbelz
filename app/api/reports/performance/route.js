@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, cacheJson } from '@/lib/api-helpers'
 
 // Probabilidades para forecast ponderado por estágio
 const STATUS_PROB = {
@@ -355,5 +355,6 @@ export async function GET(request) {
     meta_info: { sla_dias: SLA_IMPLANTACAO_DIAS, estagnacao_dias: ESTAGNAÇÃO_DIAS, prob_status: STATUS_PROB }
   }
 
-  return handleCORS(NextResponse.json(result, { status: 200 }), origin)
+  // Dashboard é consultado com frequência; aplicar cache privado com ETag
+  return cacheJson(request, origin, result, { maxAge: 60, swr: 180, status: 200 })
 }

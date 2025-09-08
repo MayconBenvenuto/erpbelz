@@ -51,7 +51,7 @@ export async function POST(request) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const appUrl = process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
+  const appUrl = process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
 
   async function enrichEmpresaLabel(p) {
     const cnpjFmt = p.cnpj ? formatCNPJ(p.cnpj) : undefined
@@ -93,8 +93,8 @@ export async function POST(request) {
     `<li><p><strong>Proposta:</strong> ${i.codigo}<br/><strong>Empresa:</strong> ${i.empresa}<br/><strong>Operadora:</strong> ${i.operadora}<br/><strong>Valor:</strong> ${i.valor}<br/><strong>Criada em:</strong> ${new Date(i.criado_em).toLocaleString('pt-BR')}</p></li>`
   )).join('')
   const html = renderBrandedEmail({
-    title: 'Propostas sem ação há 48h',
-    ctaText: 'Abrir CRM',
+  title: 'Propostas sem ação há 48h',
+  ctaText: 'Abrir ERP',
   ctaUrl: appUrl,
     contentHtml: `
       <p>Olá,</p>

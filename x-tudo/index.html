@@ -68,7 +68,7 @@
             </div>
             <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('crm')">
                 <i data-lucide="users" class="w-5 h-5"></i>
-                <span>CRM</span>
+                <span>ERP</span>
             </div>
             <div class="sidebar-item flex items-center space-x-3 p-3 rounded-xl cursor-pointer text-gray-300 hover:text-white" onclick="showModule('simulator')">
                 <i data-lucide="calculator" class="w-5 h-5"></i>
@@ -219,7 +219,7 @@
                         <p class="text-gray-400 mb-6">Comece adicionando seus primeiros dados para ver os dashboards em ação</p>
                         <div class="flex space-x-4">
                             <button onclick="showModule('crm')" class="bg-belz-primary hover:bg-belz-secondary px-6 py-3 rounded-xl">
-                                Começar com CRM
+                                Começar com ERP
                             </button>
                             <button onclick="showModule('leads')" class="bg-belz-accent hover:bg-belz-primary px-6 py-3 rounded-xl">
                                 Importar Leads
@@ -229,10 +229,10 @@
                 </div>
             </div>
 
-            <!-- CRM Module -->
+            <!-- ERP Module -->
             <div id="crm-module" class="hidden animate-fade-in">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-semibold">CRM - Pipeline de Vendas</h2>
+                    <h2 class="text-2xl font-semibold">ERP - Pipeline de Vendas</h2>
                     <div class="flex space-x-3">
                         <button class="bg-belz-accent hover:bg-belz-primary px-4 py-2 rounded-xl flex items-center space-x-2">
                             <i data-lucide="upload" class="w-4 h-4"></i>
@@ -303,7 +303,7 @@
                     </div>
                 </div>
 
-                <!-- CRM Tools -->
+                <!-- ERP Tools -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-belz-gray rounded-2xl p-6 card-shadow">
                         <h3 class="text-lg font-semibold mb-4">Automação</h3>
@@ -1322,7 +1322,7 @@
             // Update page title
             const titles = {
                 'dashboard': 'Dashboard',
-                'crm': 'CRM - Pipeline de Vendas',
+                'crm': 'ERP - Pipeline de Vendas',
                 'simulator': 'Simulador de Plano de Saúde',
                 'financial': 'Gestão Financeira',
                 'processes': 'Gestão de Processos',
