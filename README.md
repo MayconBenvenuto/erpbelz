@@ -302,45 +302,39 @@ Resposta (exemplo abreviado):
 
 Agendamento sugerido: a cada hora. Ajuste conforme necessidade de ruído vs. rapidez.
 
-## 📈 Dashboard Analítico (Gestor)
+## 📈 Dashboard do Gestor (novo)
 
-O dashboard para gestores foi reformulado para privilegiar métricas operacionais e previsivas em vez de gráficos de funil genéricos ou heatmaps de baixo valor.
+O dashboard do gestor foi redesenhado para fornecer uma visão macro e micro por seção com navegação por abas e métricas acionáveis.
 
-### Conjunto Atual de Cards / Gráficos
+Abas e conteúdos:
 
-- Status (ABS/% toggle): barras horizontais mostrando contagem e proporção de propostas por status.
-- Top Operadoras (ABS/% + Conversão): distribuição de propostas e taxa de conversão (implantado / total) por operadora.
-- Aging Buckets: distribuição por faixas de idade em análise (ex.: 0–7h, 8–23h, 24–47h, 48–71h, ≥72h).* Faixas podem ser ajustadas no código.
-- SLA Assunção: tempo até primeira ação/assunção com métricas: média, p95, % ≤8h, % ≤24h.
-- Evolução 7 Dias: sparkline de volume diário de novas propostas / implantações recentes.
-- Value Buckets: segmentação de propostas por faixas de `valor` (configurável) para entender mix de ticket.
-- Forecast Meta: projeção de atingimento mensal extrapolando média diária MTD (month-to-date) vs meta acumulada requerida.
-- Ranking Analistas: ordenação por implantações (ou valor implantado) com destaques (medalhas, barra de conversão).
+- Geral
+  - KPIs: Total de propostas, Implantadas (com % de conversão), Pipeline (valor total), Valor Implantado (% do total)
+  - Evolução (7 dias): linhas de Propostas Criadas x Assumidas por dia
+  - Top Operadoras: pizza das 5 mais frequentes
+  - Status das Propostas: barras por status (cores padronizadas)
+  - Distribuição por Valor: buckets 0–2k, 2–5k, 5–10k, 10k+
 
-#### Movimentações (Solicitações) – Macros (Gestor)
+- Propostas
+  - KPIs: Em Andamento, Sem Responsável, Ticket Médio, Conversão (barra de progresso)
+  - Ranking de Analistas (pipeline): top 5 com mais propostas em andamento
+  - Cards de status com cores padronizadas (STATUS_COLORS)
 
-- Movimentações Totais (todas as solicitações)
-- Abertas / Em Execução (soma e breakdown)
-- Concluídas (e canceladas)
-- Atrasadas (SLA previsto ultrapassado e não concluída/cancelada) + % do total
-- Status Movimentações (barras e % por grupo)
-- SLA Assunção Movimentações (média horas da criação até primeiro status diferente de "aberta")
+- Movimentação
+  - KPIs: Solicitações Totais, SLA Vencido (abertas), Idade Média (dias), Concluídas
+  - Status das Solicitações: barras por status (SOLICITACAO_STATUS_COLORS)
+  - Resumo rápido por status
 
-Removed / Substituídos:
+- Equipe
+  - KPIs: Usuários cadastrados, Online (derivado), Maior Workload (nome), Implantações 30d (soma top 5)
+  - Top Workload (em andamento) e Top Implantações (30d), com indicador de presença
 
-- Funil de conversão estático → substituído pelos cards combinados (Status + Conversão por Operadora + Forecast)
-- Heatmap de atividade → substituído por Aging + Evolução 7 Dias (mais diretamente acionáveis)
+Outras características:
 
-### Interações / UX
-
-- Toggle ABS/% persiste na sessão (localStorage)
-- Tooltips explicam fórmulas e limites (ex.: forecast = média diária * dias úteis restantes)
-- Cálculos feitos client-side (sem novas consultas) usando dados já retornados de `/api/proposals`
-- Operações O(n) linear sobre a lista de propostas (sem agregações redundantes)
-
-### Forecast (Simplificação Atual)
-
-Projeção linear: `proj = (valor_implantado_mtd / dias_passados) * dias_totais_mes`. Percentual de progresso = `valor_implantado_mtd / meta`. Ajustes futuros podem considerar sazonalidade ou pesos por dia da semana.
+- Alerta proativo: lista de propostas sem responsável há >24h (SLA de triagem) em destaque.
+- Padrões de UI: `shadcn/ui` (Cards, Tabs, Badge, Progress) e gráficos via `recharts` usando wrapper `components/ui/chart`.
+- Cores: `STATUS_COLORS` e `SOLICITACAO_STATUS_COLORS` garantem consistência visual entre Propostas e Movimentação.
+- Desempenho: cálculos client‑side com operações lineares sobre os dados já carregados do `/api`.
 
 ## Windows: preparar/remover cache do Next.js
 

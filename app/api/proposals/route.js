@@ -42,6 +42,19 @@ export async function GET(request) {
 		return q
 	}
 
+	// Se houver busca por código exato (PRP0000), prioriza lookup direto
+	try {
+		const { searchParams } = new URL(request.url)
+		const code = (searchParams.get('code') || '').trim()
+		if (code) {
+			let q = buildBase().ilike('codigo', code)
+			const { data: one, error: err } = await q.limit(1)
+			if (!err && Array.isArray(one) && one.length > 0) {
+				return handleCORS(NextResponse.json(one), origin)
+			}
+		}
+	} catch (_) {}
+
 	// 1) Tentativa com ordenação por código (preferencial)
 	let { data, error } = await buildBase()
 		.order('codigo', { ascending: true })

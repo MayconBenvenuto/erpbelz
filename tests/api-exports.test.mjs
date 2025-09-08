@@ -51,6 +51,37 @@ describe('API routes exports', () => {
     expect(typeof sessions.GET).toBe('function')
     expect(typeof validate.POST).toBe('function')
   })
+
+  it('users POST should allow creating gestor (schema)', async () => {
+    const { vi } = await import('vitest')
+    // Garante isolamento: limpa cache de módulos antes de mockar e importar
+    vi.resetModules()
+
+    // Injeta mocks necessários ANTES da importação da rota
+    vi.mock('@/lib/api-helpers', () => {
+      return {
+        supabase: {
+          from: () => ({
+            insert: () => ({ select: () => ({ single: () => ({ data: { id: 'u2', nome: 'Novo Gestor', email: 'novo@belz.com.br', tipo_usuario: 'gestor', must_change_password: true }, error: null }) }) })
+          })
+        },
+        handleCORS: (r) => r,
+        requireAuth: vi.fn(async () => ({ user: { id: 'u1', email: 'gestor@belz.com.br', tipo_usuario: 'gestor' } })),
+      }
+    })
+
+    const route = await import('@/app/api/users/route.js')
+    expect(typeof route.POST).toBe('function')
+    const req = new Request('http://localhost/api/users', {
+      method: 'POST',
+      headers: new Headers({ 'content-type': 'application/json', 'origin': 'http://localhost:3000', 'authorization': 'Bearer fake' }),
+      body: JSON.stringify({ nome: 'Novo Gestor', email: 'novo@belz.com.br', senha: '123456', tipo_usuario: 'gestor' })
+    })
+    const res = await route.POST(req)
+    expect(res.status).toBeLessThan(400)
+    const json = await res.json()
+    expect(json.tipo_usuario).toBe('gestor')
+  })
 })
 
 // [REMOVIDO] Teste legado do backend Next.js. Sem efeito após migração para Nest.js.

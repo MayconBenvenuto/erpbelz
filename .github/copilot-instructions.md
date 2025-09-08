@@ -6,7 +6,7 @@ This is a CRM system for Belz company focused on health insurance proposal manag
 Current architecture:
 - Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
 
-Recent updates (2025-09-01):
+Recent updates (2025-09-08):
 - Sequential proposal code (codigo) PRP0000 format (unique, indexed); lists ordered asc by codigo; emails reference only codigo.
 - Inline status editing with per-row loading/disable.
 - Meta progress now backed by table metas (mes, ano, quantidade_implantacoes) instead of accumulating valor.
@@ -16,6 +16,7 @@ Recent updates (2025-09-01):
 - Added view vw_usuarios_online (derived presence status) used for reports/monitoring.
 - Reports exclude gestor from monitoring; refresh button shows spinner/disable.
 - **Standardized UI colors**: Movimentação section now uses the same color system as Propostas section for consistency.
+ - New Manager Dashboard with tabs (Geral, Propostas, Movimentação, Equipe), KPIs and charts; highlights proposals unassigned >24h.
 
 ## Tech Stack
 - **Frontend/Backend**: Next.js 14.2.3 with App Router (/api routes)
@@ -240,26 +241,10 @@ atualizar_meta, atualizar_meta_usuario (existência verificada antes de chamar).
 ## Constants
 
 ### Status Options
-```javascript
-const statusOptions = [
-  'em análise',
-  'pendencias seguradora', 
-  'boleto liberado',
-  'implantando',
-  'pendente cliente',
-  'pleito seguradora',
-  'negado',
-  'implantado'
-];
-```
+Use STATUS_OPTIONS from `lib/constants.js`. Keep docs aligned with source (do not duplicate lists here).
 
 ### Insurance Companies
-```javascript
-const operadoras = [
-  'unimed recife', 'unimed seguros', 'bradesco', 'amil', 'ampla',
-  'fox', 'hapvida', 'medsenior', 'sulamerica', 'select'
-];
-```
+Use OPERADORAS from `lib/constants.js`. Do not hardcode in new components.
 
 ### Solicitação Status & Colors
 ```javascript
@@ -390,4 +375,12 @@ Email/TLS notes:
 - Optional fallback: RESEND_API_KEY
 
 When generating code for this project, always prioritize security, follow the established patterns, and maintain consistency with the existing codebase.
+
+## Manager Dashboard Guidelines
+- Prefer KPIs + actionable charts over static funnels.
+- Use `components/ui/chart` (ChartContainer, ChartTooltipContent, ChartLegendContent) with `recharts`.
+- Tabs: Geral, Propostas, Movimentação, Equipe. Mirror structure in `app/sections/Dashboard.jsx`.
+- Always use STATUS_COLORS and SOLICITACAO_STATUS_COLORS for statuses.
+- Surface risks/SLAs: proposals without owner >24h; tickets with SLA overdue.
+- Compute client-side using loaded /api data; avoid extra queries from the dashboard.
 \n+Schema source of truth: mantenha consultas alinhadas com DOC_SUPABASE.md (bloco AUTO_DB_SCHEMA) gerado pelo script scripts/supabase-introspect.mjs. Evite duplicar DDL manual; se a estrutura mudar, rode o script para atualizar documentação.

@@ -58,6 +58,7 @@ import { toast } from 'sonner'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { STATUS_COLORS } from '@/lib/constants'
 import ProposalsTimeline from '@/components/timeline/ProposalsTimelineComponent'
+import OperadoraBadge from '@/components/ui/operadora-badge'
 import { queryClient } from '@/lib/query-client'
 
 export default function ProposalsSection(props) {
@@ -325,6 +326,19 @@ function ProposalsInner({
       return prev
     })
   }
+
+  // Escuta comando global para focar em um código PRP específico
+  useEffect(() => {
+    const handler = (ev) => {
+      try {
+        const code = String(ev?.detail?.code || '').trim()
+        if (!code) return
+        setFilters(prev => ({ ...prev, q: code }))
+      } catch (_) {}
+    }
+    try { window.addEventListener('proposals:focus-code', handler) } catch (_) {}
+    return () => { try { window.removeEventListener('proposals:focus-code', handler) } catch (_) {} }
+  }, [])
 
   const consultores = useMemo(() => {
     return Array.from(new Set(proposals.map(p => p.consultor).filter(Boolean))).sort((a, b) => normalize(a).localeCompare(normalize(b)))
@@ -838,7 +852,7 @@ function ProposalsInner({
                               </span>
                             )}
                           </span>
-                          <span className="truncate capitalize">{p.operadora}</span>
+                          <OperadoraBadge nome={p.operadora} className="truncate" size={14} />
                           {isWaiting && (
                             <span className={`ml-auto inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded ${isLate ? 'bg-red-600' : 'bg-amber-500'} text-white font-semibold tracking-wide uppercase`}>
                               {isLate ? 'SLA!' : 'Livre'}
@@ -1019,7 +1033,6 @@ function ProposalsInner({
                     className="font-mono text-xs px-1 py-0.5 rounded ml-2"
                     style={{
                       backgroundColor: (STATUS_COLORS[detail.status] || { bg: '#f6f6f6' }).bg,
-                      color: '#000000 !important',
                       fontWeight: 'bold',
                       color: (STATUS_COLORS[detail.status] || { text: '#333333' }).text,
                       border: `1px solid ${(STATUS_COLORS[detail.status] || { border: '#e2e2e2' }).border}`
@@ -1063,7 +1076,7 @@ function ProposalsInner({
                   <div className="p-4 rounded-md border bg-background/50 space-y-1">
                     <h4 className="font-semibold text-xs tracking-wide uppercase text-muted-foreground">Dados da Proposta</h4>
                     <div><span className="font-medium">CNPJ:</span> {formatCNPJ(detail.cnpj)}</div>
-                    <div><span className="font-medium">Operadora:</span> {detail.operadora}</div>
+                    <div className="flex items-center gap-1"><span className="font-medium">Operadora:</span> <OperadoraBadge nome={detail.operadora} /></div>
                     <div><span className="font-medium">Vidas:</span> {detail.quantidade_vidas}</div>
                     <div><span className="font-medium">Valor:</span> {formatCurrency(detail.valor)}</div>
                   </div>

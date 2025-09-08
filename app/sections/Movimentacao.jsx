@@ -36,6 +36,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
   const [reloading, setReloading] = useState(false)
   const [confirmStatus, setConfirmStatus] = useState(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
+  const [onlyOverdue, setOnlyOverdue] = useState(false)
 
   useEffect(() => {
     if (parentToken) { setToken(parentToken); return }
@@ -48,12 +49,14 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
   const loadSolicitacoes = useCallback(async () => {
     setReloading(true)
     try {
-      const res = await fetch('/api/solicitacoes', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      const url = new URL('/api/solicitacoes', window.location.origin)
+      if (onlyOverdue) url.searchParams.set('atrasadas','1')
+      const res = await fetch(url.toString(), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       const data = await res.json().catch(()=>({}))
       if (res.ok) setSolicitacoes(Array.isArray(data.data)?data.data:[])
       else toast.error(data.message || 'Erro ao carregar solicitações')
     } catch { toast.error('Erro de conexão') } finally { setReloading(false) }
-  }, [token])
+  }, [token, onlyOverdue])
 
   useEffect(() => { loadSolicitacoes() }, [loadSolicitacoes])
 
@@ -159,6 +162,13 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Média dias restante</CardTitle><CardDescription className="text-xs">Solicitações em andamento</CardDescription></CardHeader><CardContent><div className="text-2xl font-bold">{stats.mediaDias !== null ? stats.mediaDias.toFixed(1) : '—'}</div></CardContent></Card>
       </div>
 
+      <div className="flex items-center gap-2">
+        <Button variant={onlyOverdue ? 'default' : 'outline'} size="sm" onClick={() => setOnlyOverdue(o=>!o)}>
+          {onlyOverdue ? 'Exibindo Atrasadas' : 'Somente Atrasadas'}
+        </Button>
+        {onlyOverdue && <span className="text-xs text-muted-foreground">Mostrando apenas solicitações com SLA vencido</span>}
+      </div>
+
       <div className="overflow-x-auto pb-2 -m-1 pl-1">
         <div className="flex gap-4 w-max pr-4">
           {SOLICITACAO_STATUS.map(status => {
@@ -170,11 +180,16 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                   <span className="ml-auto text-xs opacity-75">{groupedByStatus[status]?.length || 0}</span>
                 </div>
                 <div className="p-2 space-y-2 overflow-y-auto custom-scrollbar">
-                  {groupedByStatus[status]?.map(sol => (
-                    <div key={sol.id} className="rounded border p-2 bg-background text-xs space-y-1">
+                  {groupedByStatus[status]?.map(sol => {
+                    const overdue = sol.sla_previsto && new Date(sol.sla_previsto) < hoje && !['concluída','cancelada'].includes(sol.status)
+                    return (
+                    <div key={sol.id} className={`rounded border p-2 bg-background text-xs space-y-1 ${overdue ? 'ring-1 ring-red-500/70' : ''}`}>
                       <div className="font-medium truncate flex items-center gap-1" title={sol.razao_social}>
                         <span className="font-mono text-[10px] px-1 py-0.5 bg-muted rounded">{sol.codigo || '—'}</span>
                         <span className="truncate">{sol.razao_social}</span>
+                        {sol.sla_previsto && (
+                          <span className={`ml-auto text-[10px] px-1 py-0.5 rounded ${overdue ? 'bg-red-100 text-red-700' : 'bg-muted text-foreground/70'}`}>SLA: {fmt(sol.sla_previsto)}{overdue?' • atrasada':''}</span>
+                        )}
                       </div>
                       <div className="flex justify-between gap-2 flex-wrap">
                         <span className="text-muted-foreground">{sol.tipo}{sol.subtipo ? `/${sol.subtipo}` : ''}</span>
@@ -212,7 +227,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
                         <div className="text-[13px] text-muted-foreground">Analista: {sol.atendido_por_nome}</div>
                       )}
                     </div>
-                  ))}
+                  )})}
                   {groupedByStatus[status]?.length === 0 && (
                     <p className="text-[11px] text-muted-foreground text-center py-4">Sem itens</p>
                   )}
