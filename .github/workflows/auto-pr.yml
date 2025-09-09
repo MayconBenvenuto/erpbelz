@@ -60,7 +60,74 @@ jobs:
       - name: Rodar testes
         run: yarn test --reporter=dot
 
+      - name: Tentativa de auto-resolução de conflitos básicos (dev -> testes)
+        id: auto_resolve_conflicts
+        run: |
+          set -e
+          echo "Verificando PR aberto testes->dev para detectar estado dirty..."
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls --paginate -q '.[] | select(.head.ref=="testes" and .base.ref=="dev")' || true)
+          if [ -z "$PR_JSON" ]; then
+            echo "Nenhum PR testes->dev encontrado."
+            exit 0
+          fi
+          NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          MERGEABLE_STATE=$(gh api repos/${{ github.repository }}/pulls/$NUMBER -q .mergeable_state || echo unknown)
+          echo "Estado atual: $MERGEABLE_STATE"
+          if [ "$MERGEABLE_STATE" != "dirty" ]; then
+            echo "Sem conflitos sujos a auto-resolver."
+            exit 0
+          fi
+          echo "Conflitos detectados. Tentando merge de dev em testes mantendo versão de testes para arquivos de alto churn..."
+          git fetch origin dev --depth=1
+          # Estamos já em testes (checkout inicial). Faz merge sem commit para capturar conflitos.
+          if git merge origin/dev --no-commit --no-ff; then
+            echo "Merge limpo inesperadamente (mergeable_state estava dirty). Prosseguindo com commit."
+            git commit -m "chore: merge dev into testes (auto-resolução)"
+            git push origin HEAD:testes
+            exit 0
+          fi
+          echo "Listando arquivos em conflito..."
+          CONFLICTS=$(git diff --name-only --diff-filter=U || true)
+          echo "$CONFLICTS" | sed 's/^/ - /'
+          # Arquivos para preferir versão de testes (ours):
+          KEEP_OURS_PATTERNS="app/page.js app/sections/Movimentacao.jsx app/components/CommandPalette.jsx"
+          SUCCESS=1
+          for f in $CONFLICTS; do
+            if echo "$KEEP_OURS_PATTERNS" | grep -qw "$f"; then
+              echo "Mantendo versão de testes (ours) para $f"
+              git checkout --ours -- "$f" || SUCCESS=0
+            else
+              # fallback: manter versão da base dev para arquivos lock ou configs específicos
+              if echo "$f" | grep -Eq 'package-lock.json|yarn.lock'; then
+                echo "Mantendo versão de dev (theirs) para $f"
+                git checkout --theirs -- "$f" || SUCCESS=0
+              else
+                echo "Arquivo $f não está na lista de auto-resolução. Abortando tentativa."
+                SUCCESS=0
+              fi
+            fi
+          done
+          if [ $SUCCESS -eq 1 ]; then
+            git add .
+            if git diff --cached --quiet; then
+              echo "Nada para commitar após resolução."
+            else
+              git commit -m "chore: auto-resolve conflitos básicos dev->testes"
+              git push origin HEAD:testes
+              echo "Auto-resolução concluída e push realizado."
+            fi
+          else
+            echo "Nem todos conflitos foram resolvidos automaticamente. Fazendo abort do merge."
+            git merge --abort || true
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_NO_UPDATE_NOTIFIER: 1
+          GH_PROMPT_DISABLED: 1
+
       - name: Merge automático PR testes->dev (fast-forward/squash)
+        id: merge_testes_dev
         if: success()
         uses: actions/github-script@v7
         with:
@@ -98,25 +165,29 @@ jobs:
 
             const blockedStates = ['dirty','blocked','draft','unknown'];
             if (blockedStates.includes(details.mergeable_state)) {
-              core.setFailed(`PR não mesclável automaticamente. mergeable_state=${details.mergeable_state}. Ação manual necessária (conflitos, checks ou review).`);
+              core.notice(`PR não mesclável automaticamente agora (estado ${details.mergeable_state}). Merge manual ou ajuste necessário.`);
+              core.setOutput('merged','false');
               return;
             }
 
             try {
               await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: 'squash' });
               core.notice(`PR #${pr.number} mesclado (squash).`);
+              core.setOutput('merged','true');
             } catch (e) {
               core.setFailed(`Falha ao mesclar PR testes->dev após validações: ${e.message}`);
             }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Atualizar branch dev local pós-merge
-        if: success()
+        if: success() && steps.merge_testes_dev.outputs.merged == 'true'
         run: |
           git fetch origin dev --depth=1
           git checkout dev
           git pull --ff-only origin dev
       - name: Criar PR dev -> main (se merge e testes passaram)
-        if: success()
+        if: success() && steps.merge_testes_dev.outputs.merged == 'true'
         uses: actions/github-script@v7
         with:
           script: |
