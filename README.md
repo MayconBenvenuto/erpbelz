@@ -35,19 +35,18 @@ Sistema ERP desenvolvido para a Belz, focado na gestão de propostas (implantaç
 
 ### 👥 Sistema de Usuários (Roles Atuais)
 
-| Role | Cria Propostas | Cria Movimentações | Edita Status (Próprias) | Edita Status (Todas) | Gerencia Usuários | Exclui Propostas | Dashboards |
-|------|----------------|--------------------|--------------------------|----------------------|-------------------|------------------|------------|
-| gestor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gerente | ✅ | ✅ | ✅ (atribuídas / operacionais) | ✅ (operacionais) | ❌ | ❌ | ✅ |
-| analista_implantacao | ✅ (suas) | ❌ | ✅ (suas) | ❌ | ❌ | ❌ | ✅ (limitado) |
-| analista_movimentacao | ❌ | ✅ (suas) | ✅ (suas mov.) | ❌ | ❌ | ❌ | ✅ (limitado) |
-| consultor | ✅ (suas) | ✅ (suas) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| analista_cliente | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ (limitado) |
+| Role                  | Cria Propostas | Cria Movimentações | Edita Status (Próprias)        | Edita Status (Todas) | Gerencia Usuários | Exclui Propostas | Dashboards    |
+| --------------------- | -------------- | ------------------ | ------------------------------ | -------------------- | ----------------- | ---------------- | ------------- |
+| gestor                | ✅             | ✅                 | ✅                             | ✅                   | ✅                | ✅               | ✅            |
+| gerente               | ✅             | ✅                 | ✅ (atribuídas / operacionais) | ✅ (operacionais)    | ❌                | ❌               | ✅            |
+| analista_implantacao  | ✅ (suas)      | ❌                 | ✅ (suas)                      | ❌                   | ❌                | ❌               | ✅ (limitado) |
+| analista_movimentacao | ❌             | ✅ (suas)          | ✅ (suas mov.)                 | ❌                   | ❌                | ❌               | ✅ (limitado) |
+| consultor             | ✅ (suas)      | ✅ (suas)          | ❌                             | ❌                   | ❌                | ❌               | ❌            |
+| analista_cliente      | ❌             | ❌                 | ❌                             | ❌                   | ❌                | ❌               | ✅ (limitado) |
 
 Notas:
 
 - analista_cliente: não enxerga abas de Propostas nem Movimentação; TEM acesso à Carteira de Clientes (escopo próprio — atua como consultor para cadastro/gestão de seus clientes). Acesso também a dashboard (próprio) e seções gerais futuras (ex.: Portal Cliente) sem dados sensíveis.
-
 
 Autenticação: cookie de sessão + JWT interno com rate limiting.
 
@@ -135,7 +134,7 @@ SMTP_TLS_SERVERNAME=skymail.net.br
 CNPJA_API_KEY=
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ERP_APP_URL=http://localhost:3000
- 
+
 # Fallback de e-mail (opcional)
 # Se não houver SMTP, defina a chave do Resend e o backend usará este provedor automaticamente
 RESEND_API_KEY=
@@ -149,12 +148,11 @@ EMAIL_OVERRIDE_TO=
 yarn dev
 ```
 
-Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são servidas pelo Next.
+Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/\* e são servidas pelo Next.
 
 ## 🔐 Segurança
 
 ### ✅ Implementados
-
 
 - **Autenticação JWT** com expiração configurável
 - **Hash de senhas** com bcrypt (12 rounds)
@@ -175,7 +173,6 @@ Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são s
 
 ### 🔒 Headers de Segurança
 
-
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
@@ -183,7 +180,6 @@ Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/* e são s
 - `Referrer-Policy: strict-origin-when-cross-origin`
 
 ### 🛡️ Proteções Implementadas
-
 
 - **SQL Injection**: Queries parametrizadas via Supabase
 - **XSS**: Sanitização de entrada e headers CSP
@@ -205,22 +201,30 @@ CREATE TABLE usuarios (
 );
 ```
 
-### Propostas
+### Propostas (simplificado – ver `DOC_SUPABASE.md` para schema completo)
 
 ```sql
 CREATE TABLE propostas (
   id UUID PRIMARY KEY,
-  cnpj VARCHAR(14) NOT NULL,
-  consultor VARCHAR(255) NOT NULL,
-  consultor_email VARCHAR(255) NOT NULL,
-  operadora VARCHAR(255) NOT NULL,
-  quantidade_vidas INTEGER,
-  valor DECIMAL(15,2),
-  status VARCHAR(50) DEFAULT 'em análise',
+  codigo VARCHAR NOT NULL,            -- PRP0000 (sequencial, único, usado em e-mails/UI)
+  cnpj VARCHAR(18) NOT NULL,
+  consultor TEXT NOT NULL,
+  consultor_email TEXT NOT NULL,
+  operadora TEXT NOT NULL,            -- valores em OPERADORAS (lib/constants.js)
+  quantidade_vidas INT,
+  valor NUMERIC(12,2),
+  previsao_implantacao DATE,
+  status TEXT NOT NULL,               -- valores em STATUS_OPTIONS
   criado_por UUID REFERENCES usuarios(id),
-  criado_em TIMESTAMP DEFAULT NOW()
+  atendido_por UUID,                  -- quem assumiu
+  criado_em TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 ```
+
+Status atuais (fonte da verdade: `lib/constants.js`):
+
+`recepcionado`, `análise`, `pendência`, `pleito seguradora`, `boleto liberado`, `implantado`, `proposta declinada`.
 
 ## 🚨 Alertas de Segurança
 
@@ -242,7 +246,7 @@ CREATE TABLE propostas (
 
 ## 🔧 Scripts
 
-```powershell
+````powershell
 # Desenvolvimento
 yarn dev
 
@@ -294,7 +298,7 @@ Resposta (exemplo abreviado):
 
 ```json
 {"proposals_found":3,"alerted":true,"threshold_hours":24}
-```
+````
 
 Agendamento: não aplicável (sem cron). Execute manualmente quando necessário (gestor).
 
@@ -339,14 +343,28 @@ yarn windows:next-cache:setup
 yarn windows:next-cache:remove
 ```
 
+## 🎯 Metas (modelo atualizado)
 
-## 🎯 Metas (lógica de negócio)
+Novo modelo (2025-09) utiliza tabela `metas` mensal por usuário. Versão antiga baseada em `valor_meta/valor_alcancado` permanece para compatibilidade em migrações anteriores; a visão funcional atual usa recomputo dinâmico.
 
-- A meta do analista considera o somatório das propostas com status `implantado`.
-- Transição de status aplica deltas na meta via RPC `atualizar_meta_usuario`:
-  - De qualquer status → `implantado`: soma o valor da proposta.
-  - De `implantado` → outro status: subtrai o valor da proposta.
-- O endpoint `GET /api/goals` retorna o valor alcançado calculado dinamicamente a partir das propostas `implantado` por usuário, evitando duplicações.
+```sql
+CREATE TABLE metas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID NOT NULL REFERENCES usuarios(id),
+  mes INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  ano INT NOT NULL,
+  quantidade_implantacoes INT DEFAULT 0
+);
+```
+
+Regras de atualização:
+
+1. Backend ajusta `quantidade_implantacoes` quando há transição de status envolvendo `implantado` (to/from) – delta controlado em trigger / lógica de API.
+2. `GET /api/goals` retorna metas consolidadas e recalcula progresso real somando propostas com status `implantado` (evita drift se trigger falhar).
+3. `PATCH /api/goals` (gestor) permite ajustar meta alvo (quando ainda existir colunas antigas de valor, são ignoradas na visão atual).
+4. `POST /api/goals` força recálculo de progresso armazenado.
+
+Importante: não persistir cálculos derivados no frontend; sempre consumir `/api/goals` para consistência.
 
 ## 🗃️ Migração opcional: backfill e índice (consultor_email)
 
@@ -463,3 +481,4 @@ Falhas comuns:
 
 —
 Atualizado em: 03/09/2025
+```
