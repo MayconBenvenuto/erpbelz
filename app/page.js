@@ -17,15 +17,15 @@ import { QueryProvider } from '@/components/query-provider'
 import { useServiceWorker } from '@/hooks/use-service-worker'
 
 // Lazy loaded sections (otimizadas)
-import { 
-  LazyProposalsSection, 
-  LazyReportsSection, 
-  LazyMovimentacaoSection, 
+import {
+  LazyProposalsSection,
+  LazyReportsSection,
+  LazyMovimentacaoSection,
   LazyUsersSection,
   DashboardSection,
   Sidebar,
   Header,
-  EmDesenvolvimento 
+  EmDesenvolvimento,
 } from '@/components/lazy-sections'
 
 import TopUserActions from '@/components/TopUserActions'
@@ -33,8 +33,25 @@ import MobileSidebar from '@/app/sections/MobileSidebar'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
 import { useProposals } from '@/hooks/use-api'
 import { hasPermission } from '@/lib/rbac'
-import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from '@/components/ui/command'
-import { FileText, BarChart3, Users, TrendingUp, Repeat, LogOut, PlusCircle, Search } from 'lucide-react'
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from '@/components/ui/command'
+import {
+  FileText,
+  BarChart3,
+  Users,
+  TrendingUp,
+  Repeat,
+  LogOut,
+  PlusCircle,
+  Search,
+} from 'lucide-react'
 
 function AppContent() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -46,6 +63,98 @@ function AppContent() {
 
   // Forms
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
+
+  // Fluxo esqueci a senha (mantido mesmo quando user loga, não renderiza)
+  const [forgotStep, setForgotStep] = useState('login') // login | email | code | reset | done
+  const [fpEmail, setFpEmail] = useState('')
+  const [fpCode, setFpCode] = useState('')
+  const [fpResetToken, setFpResetToken] = useState('')
+  const [fpNewPass, setFpNewPass] = useState('')
+  const [fpNewPass2, setFpNewPass2] = useState('')
+  const [fpLoading, setFpLoading] = useState(false)
+
+  // Funções fluxo esqueci a senha
+  const requestCode = async (e) => {
+    e.preventDefault()
+    setFpLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: fpEmail }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Erro ao solicitar código')
+        return
+      }
+      toast.success('Se o email existir, código enviado')
+      setForgotStep('code')
+    } catch {
+      toast.error('Erro de rede')
+    } finally {
+      setFpLoading(false)
+    }
+  }
+  const verifyCode = async (e) => {
+    e.preventDefault()
+    setFpLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: fpEmail, code: fpCode }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Código inválido')
+        return
+      }
+      setFpResetToken(data.resetToken)
+      toast.success('Código verificado')
+      setForgotStep('reset')
+    } catch {
+      toast.error('Erro de rede')
+    } finally {
+      setFpLoading(false)
+    }
+  }
+  const submitReset = async (e) => {
+    e.preventDefault()
+    if (fpNewPass !== fpNewPass2) {
+      toast.error('Senhas não coincidem')
+      return
+    }
+    setFpLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: fpEmail,
+          code: fpCode,
+          resetToken: fpResetToken,
+          novaSenha: fpNewPass,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Falha ao redefinir')
+        return
+      }
+      toast.success('Senha redefinida. Faça login.')
+      setLoginForm((prev) => ({ ...prev, email: fpEmail, password: '' }))
+      setForgotStep('done')
+      setFpCode('')
+      setFpResetToken('')
+      setFpNewPass('')
+      setFpNewPass2('')
+    } catch {
+      toast.error('Erro de rede')
+    } finally {
+      setFpLoading(false)
+    }
+  }
 
   // Dados - mantidos para compatibilidade, mas serão migrados para React Query gradualmente
   // Proposals agora via React Query
@@ -78,7 +187,7 @@ function AppContent() {
         sessionStorage.removeItem('crm_session')
         sessionStorage.removeItem('crm_last_activity')
         sessionStorage.removeItem('crm_token')
-      } catch(_) {}
+      } catch (_) {}
     } catch (_) {
       // ignore quota or storage errors
     }
@@ -123,7 +232,7 @@ function AppContent() {
             sessionStorage.removeItem('crm_session')
             sessionStorage.removeItem('crm_last_activity')
             sessionStorage.removeItem('crm_token')
-          } catch(_) {}
+          } catch (_) {}
           // Reatribui variáveis locais
           user = legacyUser
           session = legacySession
@@ -159,20 +268,20 @@ function AppContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(loginForm)
+        body: JSON.stringify(loginForm),
       })
       const result = await response.json()
       if (response.ok) {
         setCurrentUser(result.user)
         setSessionId(result.sessionId)
-  setLastActivity(Date.now())
-  setToken(result.token)
-  saveSessionToStorage(result.user, result.sessionId, result.token)
-  // Define aba inicial conforme permissões
-  const u = result.user
-  if (hasPermission(u,'viewPropostas')) setActiveTab('propostas')
-  else if (hasPermission(u,'viewMovimentacao')) setActiveTab('movimentacao')
-  else setActiveTab('dashboard')
+        setLastActivity(Date.now())
+        setToken(result.token)
+        saveSessionToStorage(result.user, result.sessionId, result.token)
+        // Define aba inicial conforme permissões
+        const u = result.user
+        if (hasPermission(u, 'viewPropostas')) setActiveTab('propostas')
+        else if (hasPermission(u, 'viewMovimentacao')) setActiveTab('movimentacao')
+        else setActiveTab('dashboard')
         toast.success('Login realizado com sucesso!')
       } else {
         toast.error(result.error || 'Erro no login')
@@ -191,13 +300,13 @@ function AppContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ sessionId })
+          body: JSON.stringify({ sessionId }),
         })
       }
       setCurrentUser(null)
       setSessionId(null)
       setLastActivity(Date.now())
-  setToken(null)
+      setToken(null)
       clearSessionFromStorage()
       toast.success('Logout realizado com sucesso!')
     } catch {
@@ -208,29 +317,34 @@ function AppContent() {
   // Carregar dados
   const loadData = useCallback(async () => {
     try {
-  // Consultor agora também carrega propostas (mas não goals e sessions administrativos)
+      // Consultor agora também carrega propostas (mas não goals e sessions administrativos)
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
       const common = { credentials: 'include' }
       const fetches = []
-    // Propostas
-  // Proposals já carregadas via React Query; opcionalmente refetch paralelo
-  refetchProposals()
-  // Solicitações
-  fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
-    // Carteira de clientes: consultor e gestor
-  const needsClientes = currentUser && ['consultor','gestor','analista_cliente'].includes(currentUser.tipo_usuario)
-  if (needsClientes) fetches.push(fetch('/api/clientes?fields=list&page=1&pageSize=50', { headers: authHeaders, ...common }))
+      // Propostas
+      // Proposals já carregadas via React Query; opcionalmente refetch paralelo
+      refetchProposals()
+      // Solicitações
+      fetches.push(fetch('/api/solicitacoes', { headers: authHeaders, ...common }))
+      // Carteira de clientes: consultor e gestor
+      const needsClientes =
+        currentUser &&
+        ['consultor', 'gestor', 'analista_cliente'].includes(currentUser.tipo_usuario)
+      if (needsClientes)
+        fetches.push(
+          fetch('/api/clientes?fields=list&page=1&pageSize=50', { headers: authHeaders, ...common })
+        )
       // Users e Sessions: apenas gestor precisa
-  const needsAdminData = currentUser && (currentUser.tipo_usuario === 'gestor')
+      const needsAdminData = currentUser && currentUser.tipo_usuario === 'gestor'
       if (needsAdminData) fetches.push(fetch('/api/users', { headers: authHeaders, ...common }))
-  // Metas: agora também para consultor (exibe progresso pessoal)
-  const needsGoals = true
-  if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
+      // Metas: agora também para consultor (exibe progresso pessoal)
+      const needsGoals = true
+      if (needsGoals) fetches.push(fetch('/api/goals', { headers: authHeaders, ...common }))
       if (needsAdminData) fetches.push(fetch('/api/sessions', { headers: authHeaders, ...common }))
 
-  const responses = await Promise.all(fetches)
+      const responses = await Promise.all(fetches)
       let idx = 0
-  const solicitacoesRes = responses[idx++]
+      const solicitacoesRes = responses[idx++]
       // proposals via react-query
       if (solicitacoesRes?.ok) {
         const json = await solicitacoesRes.json()
@@ -241,11 +355,11 @@ function AppContent() {
         const clientesRes = responses[idx++]
         if (clientesRes?.ok) {
           const json = await clientesRes.json()
-          const arr = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
+          const arr = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : []
           setClientes(arr)
         }
       }
-  if (needsAdminData) {
+      if (needsAdminData) {
         const usersRes = responses[idx++]
         if (usersRes?.ok) setUsers(await usersRes.json())
       }
@@ -263,15 +377,24 @@ function AppContent() {
             const onlineJson = await onlineRes.json()
             // Anexa campo transient isOnline aos usuarios (não persiste)
             if (Array.isArray(onlineJson.data)) {
-              setUsers(prev => prev.map(u => ({ ...u, isOnline: onlineJson.data.some(o => String(o.id) === String(u.id)) })))
+              setUsers((prev) =>
+                prev.map((u) => ({
+                  ...u,
+                  isOnline: onlineJson.data.some((o) => String(o.id) === String(u.id)),
+                }))
+              )
             }
           }
         } catch {}
       }
-    // Atualiza ultimo_refresh otimista no cliente para refletir atividade (será consolidado via ping)
+      // Atualiza ultimo_refresh otimista no cliente para refletir atividade (será consolidado via ping)
       try {
         if (currentUser) {
-      setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ultimo_refresh: new Date().toISOString() } : u))
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.id === currentUser.id ? { ...u, ultimo_refresh: new Date().toISOString() } : u
+            )
+          )
         }
       } catch {}
     } catch (error) {
@@ -281,23 +404,29 @@ function AppContent() {
 
   // Debounce simples para evitar múltiplos loadData encadeados (ex: criar + atualizar status)
   const loadDataDebouncedRef = useRef({ timer: null, pending: false })
-  const scheduleLoadData = useCallback((immediate = false) => {
-    const ref = loadDataDebouncedRef.current
-    if (immediate) {
-      if (ref.timer) { clearTimeout(ref.timer); ref.timer = null }
-      loadData()
-      return
-    }
-    ref.pending = true
-    if (ref.timer) return
-    ref.timer = setTimeout(() => {
-      ref.timer = null
-      if (ref.pending) {
-        ref.pending = false
+  const scheduleLoadData = useCallback(
+    (immediate = false) => {
+      const ref = loadDataDebouncedRef.current
+      if (immediate) {
+        if (ref.timer) {
+          clearTimeout(ref.timer)
+          ref.timer = null
+        }
         loadData()
+        return
       }
-    }, 250)
-  }, [loadData])
+      ref.pending = true
+      if (ref.timer) return
+      ref.timer = setTimeout(() => {
+        ref.timer = null
+        if (ref.pending) {
+          ref.pending = false
+          loadData()
+        }
+      }, 250)
+    },
+    [loadData]
+  )
 
   // Atalho de teclado para abrir palette (Ctrl+K / Cmd+K)
   useEffect(() => {
@@ -305,7 +434,7 @@ function AppContent() {
       const isMac = navigator.platform.toUpperCase().includes('MAC')
       if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setCommandOpen(o => !o)
+        setCommandOpen((o) => !o)
       }
       if (e.key === 'Escape') setCommandOpen(false)
     }
@@ -326,7 +455,7 @@ function AppContent() {
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       })
       const result = await response.json()
       if (response.ok) {
@@ -335,7 +464,7 @@ function AppContent() {
         // Otimista: insere nova proposta imediatamente sem esperar round-trip completo
         if (result && result.id) {
           queryClient.setQueryData(queryKeys.proposals, (old = []) => {
-            if (old.some(p => p.id === result.id)) return old
+            if (old.some((p) => p.id === result.id)) return old
             return [...old, result]
           })
         }
@@ -382,19 +511,22 @@ function AppContent() {
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
       const payload = { status: String(newStatus).trim().toLowerCase() }
-      const doPatch = () => fetch(`/api/proposals/${proposalId}`, {
-        method: 'PATCH',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      })
+      const doPatch = () =>
+        fetch(`/api/proposals/${proposalId}`, {
+          method: 'PATCH',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
       // Otimista via React Query
       const prevCache = queryClient.getQueryData(queryKeys.proposals)
-      queryClient.setQueryData(queryKeys.proposals, (old = []) => old.map(p => p.id === proposalId ? { ...p, status: payload.status } : p))
+      queryClient.setQueryData(queryKeys.proposals, (old = []) =>
+        old.map((p) => (p.id === proposalId ? { ...p, status: payload.status } : p))
+      )
       let response = await doPatch()
       if (!response.ok && response.status === 404) {
         // pequena espera para caso de claim implícito
-        await new Promise(r => setTimeout(r, 180))
+        await new Promise((r) => setTimeout(r, 180))
         const retry = await doPatch()
         if (retry.ok) response = retry
       }
@@ -438,12 +570,14 @@ function AppContent() {
       rollback = () => {
         prevSnapshots.forEach(([key, data]) => queryClient.setQueryData(key, data))
       }
-      updateAllProposalsCaches(list => list.map(p => p.id === proposalId ? { ...p, ...payload } : p))
+      updateAllProposalsCaches((list) =>
+        list.map((p) => (p.id === proposalId ? { ...p, ...payload } : p))
+      )
       const response = await fetch(`/api/proposals/${proposalId}`, {
         method: 'PATCH',
         headers,
         credentials: 'include',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       })
       if (response.ok) {
         toast.success('Proposta atualizada com sucesso!')
@@ -473,18 +607,26 @@ function AppContent() {
         try {
           const msg = JSON.parse(ev.data)
           if (msg?.type === 'proposal_updated' && msg?.data?.id) {
-            setProposals(prev => {
-              const exists = prev.some(p => p.id === msg.data.id)
-              return exists ? prev.map(p => p.id === msg.data.id ? { ...p, ...msg.data } : p) : [...prev, msg.data]
+            setProposals((prev) => {
+              const exists = prev.some((p) => p.id === msg.data.id)
+              return exists
+                ? prev.map((p) => (p.id === msg.data.id ? { ...p, ...msg.data } : p))
+                : [...prev, msg.data]
             })
           }
         } catch (_) {}
       }
       es.onerror = () => {
-        try { es.close() } catch {}
+        try {
+          es.close()
+        } catch {}
       }
     } catch {}
-    return () => { try { es && es.close() } catch {} }
+    return () => {
+      try {
+        es && es.close()
+      } catch {}
+    }
   }, [currentUser])
 
   // SSE presença online em tempo quase real (gestor)
@@ -497,13 +639,26 @@ function AppContent() {
         try {
           const msg = JSON.parse(ev.data)
           if (msg?.type === 'online_presence' && Array.isArray(msg.ids)) {
-            setUsers(prev => prev.map(u => ({ ...u, isOnline: msg.ids.some(id => String(id) === String(u.id)) })))
+            setUsers((prev) =>
+              prev.map((u) => ({
+                ...u,
+                isOnline: msg.ids.some((id) => String(id) === String(u.id)),
+              }))
+            )
           }
         } catch {}
       }
-      es.onerror = () => { try { es.close() } catch {} }
+      es.onerror = () => {
+        try {
+          es.close()
+        } catch {}
+      }
     } catch {}
-    return () => { try { es && es.close() } catch {} }
+    return () => {
+      try {
+        es && es.close()
+      } catch {}
+    }
   }, [currentUser])
 
   // Handlers de usuários
@@ -517,7 +672,7 @@ function AppContent() {
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       })
       const result = await response.json()
       if (response.ok) {
@@ -542,7 +697,11 @@ function AppContent() {
         method: 'PATCH',
         headers,
         credentials: 'include',
-        body: JSON.stringify({ usuario_id: usuarioId, valor_meta: valorMeta, ...(typeof valorAlcancado === 'number' ? { valor_alcancado: valorAlcancado } : {}) })
+        body: JSON.stringify({
+          usuario_id: usuarioId,
+          valor_meta: valorMeta,
+          ...(typeof valorAlcancado === 'number' ? { valor_alcancado: valorAlcancado } : {}),
+        }),
       })
       if (response.ok) {
         toast.success('Meta atualizada')
@@ -562,10 +721,14 @@ function AppContent() {
     if (!usuarioId) return
     if (!window.confirm('Confirmar exclusão deste usuário? Esta ação é irreversível.')) return
     try {
-      const headers = { }
+      const headers = {}
       if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch(`/api/users?id=${encodeURIComponent(usuarioId)}`, { method: 'DELETE', headers, credentials: 'include' })
-      const data = await res.json().catch(()=>({}))
+      const res = await fetch(`/api/users?id=${encodeURIComponent(usuarioId)}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
         toast.success('Usuário excluído')
         await loadData()
@@ -596,7 +759,7 @@ function AppContent() {
 
   // Effects
   useEffect(() => {
-  loadSessionFromStorage()
+    loadSessionFromStorage()
   }, [])
 
   useEffect(() => {
@@ -641,13 +804,16 @@ function AppContent() {
             method: 'POST',
             headers,
             credentials: 'include',
-            body: JSON.stringify({ sessionId })
+            body: JSON.stringify({ sessionId }),
           })
         } catch {}
       }
       const pingInterval = setInterval(ping, 60000)
       ping()
-      return () => { clearInterval(interval); clearInterval(pingInterval) }
+      return () => {
+        clearInterval(interval)
+        clearInterval(pingInterval)
+      }
     }
   }, [currentUser, autoRefreshData, sessionId, token])
 
@@ -655,8 +821,10 @@ function AppContent() {
     if (currentUser) {
       const handleActivity = () => updateActivity()
       const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
-      events.forEach(event => document.addEventListener(event, handleActivity, true))
-      return () => { events.forEach(event => document.removeEventListener(event, handleActivity, true)) }
+      events.forEach((event) => document.addEventListener(event, handleActivity, true))
+      return () => {
+        events.forEach((event) => document.removeEventListener(event, handleActivity, true))
+      }
     }
   }, [currentUser, updateActivity])
 
@@ -675,23 +843,179 @@ function AppContent() {
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
-              <Image src="/logo-belz.jpg" alt="Logo Belz" width={120} height={60} className="mx-auto rounded-lg" priority />
+              <Image
+                src="/logo-belz.jpg"
+                alt="Logo Belz"
+                width={120}
+                height={60}
+                className="mx-auto rounded-lg"
+                priority
+              />
             </div>
-            <CardTitle className="text-2xl text-primary font-montserrat">Sistema de Gestão - Belz</CardTitle>
+            <CardTitle className="text-2xl text-primary font-montserrat">
+              Sistema de Gestão - Belz
+            </CardTitle>
             <CardDescription>Faça login para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="seu@email.com" value={loginForm.email} onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))} required />
+            {forgotStep === 'email' && (
+              <form onSubmit={requestCode} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fp-email">Email cadastrado</Label>
+                  <Input
+                    id="fp-email"
+                    type="email"
+                    value={fpEmail}
+                    onChange={(e) => setFpEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setForgotStep('login')}
+                    disabled={fpLoading}
+                  >
+                    Voltar
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={fpLoading}>
+                    {fpLoading ? 'Enviando...' : 'Enviar código'}
+                  </Button>
+                </div>
+              </form>
+            )}
+            {forgotStep === 'code' && (
+              <form onSubmit={verifyCode} className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enviamos um código de 6 dígitos para o email informado (se existir).
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="fp-code">Código</Label>
+                  <Input
+                    id="fp-code"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={fpCode}
+                    onChange={(e) => setFpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setForgotStep('email')}
+                    disabled={fpLoading}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={fpLoading || fpCode.length !== 6}
+                  >
+                    {fpLoading ? 'Verificando...' : 'Verificar'}
+                  </Button>
+                </div>
+              </form>
+            )}
+            {forgotStep === 'reset' && (
+              <form onSubmit={submitReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fp-pass1">Nova senha</Label>
+                  <Input
+                    id="fp-pass1"
+                    type="password"
+                    value={fpNewPass}
+                    onChange={(e) => setFpNewPass(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fp-pass2">Confirmar senha</Label>
+                  <Input
+                    id="fp-pass2"
+                    type="password"
+                    value={fpNewPass2}
+                    onChange={(e) => setFpNewPass2(e.target.value)}
+                    required
+                  />
+                </div>
+                <ul className="text-xs text-muted-foreground space-y-0.5">
+                  <li>Mínimo 8 caracteres</li>
+                  <li>Ao menos 1 maiúscula, 1 minúscula e 1 dígito</li>
+                </ul>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setForgotStep('code')}
+                    disabled={fpLoading}
+                  >
+                    Voltar
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={fpLoading}>
+                    {fpLoading ? 'Salvando...' : 'Redefinir'}
+                  </Button>
+                </div>
+              </form>
+            )}
+            {forgotStep === 'done' && (
+              <div className="space-y-4 text-center">
+                <p className="text-sm">Senha redefinida com sucesso.</p>
+                <Button className="w-full" onClick={() => setForgotStep('login')}>
+                  Voltar para login
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" placeholder="Sua senha" value={loginForm.password} onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))} required />
+            )}
+            {forgotStep === 'login' && (
+              <div className="space-y-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={loginForm.email}
+                      onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={loginForm.password}
+                      onChange={(e) =>
+                        setLoginForm((prev) => ({ ...prev, password: e.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? 'Entrando...' : 'Entrar'}
+                  </Button>
+                </form>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotStep('email')
+                      setFpEmail(loginForm.email || '')
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Esqueci a senha
+                  </button>
+                </div>
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Entrando...' : 'Entrar'}</Button>
-            </form>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -707,13 +1031,32 @@ function AppContent() {
         <Header
           activeTab={activeTab}
           currentUser={currentUser}
-          leftSlot={<div className="md:hidden"><MobileSidebar currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={autoRefreshData} onLogout={handleLogout} /></div>}
-          rightSlot={<TopUserActions currentUser={currentUser} onRefresh={autoRefreshData} onLogout={handleLogout} />}
+          leftSlot={
+            <div className="md:hidden">
+              <MobileSidebar
+                currentUser={currentUser}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onRefresh={autoRefreshData}
+                onLogout={handleLogout}
+              />
+            </div>
+          }
+          rightSlot={
+            <TopUserActions
+              currentUser={currentUser}
+              onRefresh={autoRefreshData}
+              onLogout={handleLogout}
+            />
+          }
         />
-  <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
           {/* Command Palette Trigger Hint */}
           <div className="hidden md:flex justify-end -mt-2 mb-2 pr-1">
-            <button onClick={()=>setCommandOpen(true)} className="group inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border px-2 py-1 rounded-md bg-background/50">
+            <button
+              onClick={() => setCommandOpen(true)}
+              className="group inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border px-2 py-1 rounded-md bg-background/50"
+            >
               <Search className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
               <span>Comandos</span>
               <kbd className="font-mono text-[9px] px-1 py-0.5 rounded bg-muted">Ctrl+K</kbd>
@@ -721,38 +1064,43 @@ function AppContent() {
           </div>
           {/** Para consultor: restringe Propostas/Dashboard */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {hasPermission(currentUser,'viewPropostas') && (
-            <TabsContent value="propostas" className="space-y-6">
-              {(() => {
-                const proposalsForView = currentUser.tipo_usuario === 'gestor'
-                  ? proposals
-                  : currentUser.tipo_usuario === 'consultor'
-                    ? proposals.filter(p => (
-                        String(p.criado_por) === String(currentUser.id) ||
-                        (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                      ))
-                    : proposals.filter(p => (
-                        // Analista: vê as que criou, as que assumiu ou ainda não atribuídas (para poder assumir)
-                        String(p.criado_por) === String(currentUser.id) ||
-                        String(p.atendido_por) === String(currentUser.id) ||
-                        !p.atendido_por
-                      ))
-        return (
-                  <LazyProposalsSection
-                    currentUser={currentUser}
-                    proposals={proposalsForView}
-                    operadoras={operadoras}
-                    statusOptions={statusOptions}
-                    onCreateProposal={handleCreateProposal}
-                    onUpdateProposalStatus={handleUpdateProposalStatus}
-                    onPatchProposal={handlePatchProposal}
-                    isLoading={isLoading}
-          users={users}
-                    userGoals={userGoals}
-                  />
-                )
-              })()}
-            </TabsContent>
+            {hasPermission(currentUser, 'viewPropostas') && (
+              <TabsContent value="propostas" className="space-y-6">
+                {(() => {
+                  const proposalsForView =
+                    currentUser.tipo_usuario === 'gestor'
+                      ? proposals
+                      : currentUser.tipo_usuario === 'consultor'
+                        ? proposals.filter(
+                            (p) =>
+                              String(p.criado_por) === String(currentUser.id) ||
+                              (p.consultor_email &&
+                                String(p.consultor_email).toLowerCase() ===
+                                  String(currentUser.email || '').toLowerCase())
+                          )
+                        : proposals.filter(
+                            (p) =>
+                              // Analista: vê as que criou, as que assumiu ou ainda não atribuídas (para poder assumir)
+                              String(p.criado_por) === String(currentUser.id) ||
+                              String(p.atendido_por) === String(currentUser.id) ||
+                              !p.atendido_por
+                          )
+                  return (
+                    <LazyProposalsSection
+                      currentUser={currentUser}
+                      proposals={proposalsForView}
+                      operadoras={operadoras}
+                      statusOptions={statusOptions}
+                      onCreateProposal={handleCreateProposal}
+                      onUpdateProposalStatus={handleUpdateProposalStatus}
+                      onPatchProposal={handlePatchProposal}
+                      isLoading={isLoading}
+                      users={users}
+                      userGoals={userGoals}
+                    />
+                  )
+                })()}
+              </TabsContent>
             )}
 
             {true && (
@@ -762,31 +1110,43 @@ function AppContent() {
                     const role = currentUser.tipo_usuario
                     if (role === 'gestor' || role === 'gerente') return proposals
                     if (role === 'consultor') {
-                      return proposals.filter(p => (
-                        String(p.criado_por) === String(currentUser.id) ||
-                        (p.consultor_email && String(p.consultor_email).toLowerCase() === String(currentUser.email || '').toLowerCase())
-                      ))
+                      return proposals.filter(
+                        (p) =>
+                          String(p.criado_por) === String(currentUser.id) ||
+                          (p.consultor_email &&
+                            String(p.consultor_email).toLowerCase() ===
+                              String(currentUser.email || '').toLowerCase())
+                      )
                     }
                     if (role === 'analista_implantacao') {
-                      return proposals.filter(p => (
-                        String(p.criado_por) === String(currentUser.id) ||
-                        String(p.atendido_por) === String(currentUser.id) ||
-                        !p.atendido_por
-                      ))
+                      return proposals.filter(
+                        (p) =>
+                          String(p.criado_por) === String(currentUser.id) ||
+                          String(p.atendido_por) === String(currentUser.id) ||
+                          !p.atendido_por
+                      )
                     }
                     if (role === 'analista_movimentacao') {
-                      return proposals.filter(p => (
-                        String(p.criado_por) === String(currentUser.id) ||
-                        String(p.atendido_por) === String(currentUser.id) ||
-                        !p.atendido_por
-                      ))
+                      return proposals.filter(
+                        (p) =>
+                          String(p.criado_por) === String(currentUser.id) ||
+                          String(p.atendido_por) === String(currentUser.id) ||
+                          !p.atendido_por
+                      )
                     }
                     return []
                   })()
 
                   if (currentUser.tipo_usuario === 'consultor') {
-                    const ConsultorDashboardSection = require('./sections/ConsultorDashboard.jsx').default
-                    return <ConsultorDashboardSection currentUser={currentUser} proposals={proposalsForView} userGoals={userGoals} />
+                    const ConsultorDashboardSection =
+                      require('./sections/ConsultorDashboard.jsx').default
+                    return (
+                      <ConsultorDashboardSection
+                        currentUser={currentUser}
+                        proposals={proposalsForView}
+                        userGoals={userGoals}
+                      />
+                    )
                   }
                   return (
                     <DashboardSection
@@ -801,103 +1161,244 @@ function AppContent() {
               </TabsContent>
             )}
 
-            {hasPermission(currentUser,'viewMovimentacao') && (
+            {hasPermission(currentUser, 'viewMovimentacao') && (
               <TabsContent value="movimentacao" className="space-y-6">
                 <LazyMovimentacaoSection currentUser={currentUser} token={token} />
               </TabsContent>
             )}
 
-            {hasPermission(currentUser,'manageUsers') && (
+            {hasPermission(currentUser, 'manageUsers') && (
               <TabsContent value="usuarios" className="space-y-6">
-                <LazyUsersSection currentUser={currentUser} users={users} proposals={proposals} userGoals={userGoals} onCreateUser={handleCreateUser} onUpdateUserGoal={handleUpdateUserGoal} onDeleteUser={handleDeleteUser} isLoading={isLoading} />
+                <LazyUsersSection
+                  currentUser={currentUser}
+                  users={users}
+                  proposals={proposals}
+                  userGoals={userGoals}
+                  onCreateUser={handleCreateUser}
+                  onUpdateUserGoal={handleUpdateUserGoal}
+                  onDeleteUser={handleDeleteUser}
+                  isLoading={isLoading}
+                />
               </TabsContent>
             )}
 
-            {hasPermission(currentUser,'viewRelatorios') && (
+            {hasPermission(currentUser, 'viewRelatorios') && (
               <TabsContent value="relatorios" className="space-y-6">
-                <LazyReportsSection users={users} sessions={sessions} proposals={proposals} onRefresh={autoRefreshData} />
+                <LazyReportsSection
+                  users={users}
+                  sessions={sessions}
+                  proposals={proposals}
+                  onRefresh={autoRefreshData}
+                />
               </TabsContent>
             )}
 
-            {['consultor','gestor','analista_cliente'].includes(currentUser.tipo_usuario) && (
+            {['consultor', 'gestor', 'analista_cliente'].includes(currentUser.tipo_usuario) && (
               <TabsContent value="carteira" className="space-y-6">
-                {(() => { const Carteira = require('./sections/CarteiraClientes.jsx').default; return <Carteira currentUser={currentUser} token={token} initialClientes={clientes} /> })()}
+                {(() => {
+                  const Carteira = require('./sections/CarteiraClientes.jsx').default
+                  return (
+                    <Carteira currentUser={currentUser} token={token} initialClientes={clientes} />
+                  )
+                })()}
               </TabsContent>
             )}
 
             {/* Abas em desenvolvimento - apenas gestor */}
             {currentUser.tipo_usuario === 'gestor' && (
               <>
-                <TabsContent value="simulador"><EmDesenvolvimento titulo="Simulador" descricao="Ferramenta de simulação de planos e cenários." /></TabsContent>
-                <TabsContent value="financeiro"><EmDesenvolvimento titulo="Financeiro" descricao="Gestão financeira e comissionamentos." /></TabsContent>
-                <TabsContent value="processos"><EmDesenvolvimento titulo="Processos" descricao="Orquestração e automação de fluxos internos." /></TabsContent>
-                <TabsContent value="ia-belz"><EmDesenvolvimento titulo="IA Belz" descricao="Recursos de inteligência artificial e insights." /></TabsContent>
-                <TabsContent value="universidade"><EmDesenvolvimento titulo="Universidade" descricao="Portal de treinamentos e capacitações." /></TabsContent>
-                <TabsContent value="leads"><EmDesenvolvimento titulo="Leads" descricao="Gestão de leads e funil comercial." /></TabsContent>
-                <TabsContent value="materiais"><EmDesenvolvimento titulo="Materiais" descricao="Repositório central de materiais e documentos." /></TabsContent>
-                <TabsContent value="portal-cliente"><EmDesenvolvimento titulo="Portal do Cliente" descricao="Área dedicada para interação com clientes." /></TabsContent>
-                <TabsContent value="contatos"><EmDesenvolvimento titulo="Contatos" descricao="Diretório e gestão de contatos estratégicos." /></TabsContent>
+                <TabsContent value="simulador">
+                  <EmDesenvolvimento
+                    titulo="Simulador"
+                    descricao="Ferramenta de simulação de planos e cenários."
+                  />
+                </TabsContent>
+                <TabsContent value="financeiro">
+                  <EmDesenvolvimento
+                    titulo="Financeiro"
+                    descricao="Gestão financeira e comissionamentos."
+                  />
+                </TabsContent>
+                <TabsContent value="processos">
+                  <EmDesenvolvimento
+                    titulo="Processos"
+                    descricao="Orquestração e automação de fluxos internos."
+                  />
+                </TabsContent>
+                <TabsContent value="ia-belz">
+                  <EmDesenvolvimento
+                    titulo="IA Belz"
+                    descricao="Recursos de inteligência artificial e insights."
+                  />
+                </TabsContent>
+                <TabsContent value="universidade">
+                  <EmDesenvolvimento
+                    titulo="Universidade"
+                    descricao="Portal de treinamentos e capacitações."
+                  />
+                </TabsContent>
+                <TabsContent value="leads">
+                  <EmDesenvolvimento
+                    titulo="Leads"
+                    descricao="Gestão de leads e funil comercial."
+                  />
+                </TabsContent>
+                <TabsContent value="materiais">
+                  <EmDesenvolvimento
+                    titulo="Materiais"
+                    descricao="Repositório central de materiais e documentos."
+                  />
+                </TabsContent>
+                <TabsContent value="portal-cliente">
+                  <EmDesenvolvimento
+                    titulo="Portal do Cliente"
+                    descricao="Área dedicada para interação com clientes."
+                  />
+                </TabsContent>
+                <TabsContent value="contatos">
+                  <EmDesenvolvimento
+                    titulo="Contatos"
+                    descricao="Diretório e gestão de contatos estratégicos."
+                  />
+                </TabsContent>
               </>
             )}
-
           </Tabs>
         </main>
       </div>
       {/* Command Palette */}
-      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen} description="Digite para filtrar ações ou navegue com setas.">
-        <CommandInput placeholder="Buscar ações, abas, PRP..." autoFocus onValueChange={(val)=>{
-          const v = String(val||'').trim().toUpperCase()
-          // padrão simples PRP + dígitos
-          if (/^PRP\d{3,}$/.test(v)) {
-            setActiveTab('propostas')
-            setCommandOpen(false)
-            // opcional: emitir evento para destacar proposta
-            setTimeout(()=>{ window.dispatchEvent(new CustomEvent('proposals:focus-code',{ detail: { code: v } })) }, 50)
-          }
-        }} />
+      <CommandDialog
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        description="Digite para filtrar ações ou navegue com setas."
+      >
+        <CommandInput
+          placeholder="Buscar ações, abas, PRP..."
+          autoFocus
+          onValueChange={(val) => {
+            const v = String(val || '')
+              .trim()
+              .toUpperCase()
+            // padrão simples PRP + dígitos
+            if (/^PRP\d{3,}$/.test(v)) {
+              setActiveTab('propostas')
+              setCommandOpen(false)
+              // opcional: emitir evento para destacar proposta
+              setTimeout(() => {
+                window.dispatchEvent(
+                  new CustomEvent('proposals:focus-code', { detail: { code: v } })
+                )
+              }, 50)
+            }
+          }}
+        />
         <CommandList>
           <CommandEmpty>Nenhum resultado.</CommandEmpty>
           <CommandGroup heading="Navegação">
-            <CommandItem onSelect={() => { setActiveTab('dashboard'); setCommandOpen(false) }} value="dashboard">
+            <CommandItem
+              onSelect={() => {
+                setActiveTab('dashboard')
+                setCommandOpen(false)
+              }}
+              value="dashboard"
+            >
               <BarChart3 className="mr-2" /> Dashboard
             </CommandItem>
-            {hasPermission(currentUser,'viewPropostas') && currentUser.tipo_usuario !== 'analista_cliente' && (
-              <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false) }} value="propostas">
-                <FileText className="mr-2" /> Propostas
-              </CommandItem>
-            )}
-            {hasPermission(currentUser,'viewMovimentacao') && currentUser.tipo_usuario !== 'analista_cliente' && (
-              <CommandItem onSelect={() => { setActiveTab('movimentacao'); setCommandOpen(false) }} value="movimentacao">
-                <Repeat className="mr-2" /> Movimentação
-              </CommandItem>
-            )}
-            {hasPermission(currentUser,'manageUsers') && (
-              <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false) }} value="usuarios">
+            {hasPermission(currentUser, 'viewPropostas') &&
+              currentUser.tipo_usuario !== 'analista_cliente' && (
+                <CommandItem
+                  onSelect={() => {
+                    setActiveTab('propostas')
+                    setCommandOpen(false)
+                  }}
+                  value="propostas"
+                >
+                  <FileText className="mr-2" /> Propostas
+                </CommandItem>
+              )}
+            {hasPermission(currentUser, 'viewMovimentacao') &&
+              currentUser.tipo_usuario !== 'analista_cliente' && (
+                <CommandItem
+                  onSelect={() => {
+                    setActiveTab('movimentacao')
+                    setCommandOpen(false)
+                  }}
+                  value="movimentacao"
+                >
+                  <Repeat className="mr-2" /> Movimentação
+                </CommandItem>
+              )}
+            {hasPermission(currentUser, 'manageUsers') && (
+              <CommandItem
+                onSelect={() => {
+                  setActiveTab('usuarios')
+                  setCommandOpen(false)
+                }}
+                value="usuarios"
+              >
                 <Users className="mr-2" /> Usuários
               </CommandItem>
             )}
-            {hasPermission(currentUser,'viewRelatorios') && (
-              <CommandItem onSelect={() => { setActiveTab('relatorios'); setCommandOpen(false) }} value="relatorios">
+            {hasPermission(currentUser, 'viewRelatorios') && (
+              <CommandItem
+                onSelect={() => {
+                  setActiveTab('relatorios')
+                  setCommandOpen(false)
+                }}
+                value="relatorios"
+              >
                 <TrendingUp className="mr-2" /> Relatórios
               </CommandItem>
             )}
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Ações Rápidas">
-            <CommandItem onSelect={() => { scheduleLoadData(true); setCommandOpen(false) }} value="recarregar">
+            <CommandItem
+              onSelect={() => {
+                scheduleLoadData(true)
+                setCommandOpen(false)
+              }}
+              value="recarregar"
+            >
               <Repeat className="mr-2" /> Recarregar Dados
             </CommandItem>
-            {hasPermission(currentUser,'createPropostas') && currentUser.tipo_usuario !== 'analista_movimentacao' && currentUser.tipo_usuario !== 'analista_cliente' && (
-              <CommandItem onSelect={() => { setActiveTab('propostas'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-proposal-btn]')?.click() }, 50) }} value="nova-proposta">
-                <PlusCircle className="mr-2" /> Nova Proposta
-              </CommandItem>
-            )}
-            {hasPermission(currentUser,'manageUsers') && (
-              <CommandItem onSelect={() => { setActiveTab('usuarios'); setCommandOpen(false); setTimeout(()=>{ document.querySelector('[data-new-user-btn]')?.click() }, 50) }} value="novo-usuario">
+            {hasPermission(currentUser, 'createPropostas') &&
+              currentUser.tipo_usuario !== 'analista_movimentacao' &&
+              currentUser.tipo_usuario !== 'analista_cliente' && (
+                <CommandItem
+                  onSelect={() => {
+                    setActiveTab('propostas')
+                    setCommandOpen(false)
+                    setTimeout(() => {
+                      document.querySelector('[data-new-proposal-btn]')?.click()
+                    }, 50)
+                  }}
+                  value="nova-proposta"
+                >
+                  <PlusCircle className="mr-2" /> Nova Proposta
+                </CommandItem>
+              )}
+            {hasPermission(currentUser, 'manageUsers') && (
+              <CommandItem
+                onSelect={() => {
+                  setActiveTab('usuarios')
+                  setCommandOpen(false)
+                  setTimeout(() => {
+                    document.querySelector('[data-new-user-btn]')?.click()
+                  }, 50)
+                }}
+                value="novo-usuario"
+              >
                 <PlusCircle className="mr-2" /> Novo Usuário
               </CommandItem>
             )}
-            <CommandItem onSelect={() => { handleLogout(); setCommandOpen(false) }} value="logout">
+            <CommandItem
+              onSelect={() => {
+                handleLogout()
+                setCommandOpen(false)
+              }}
+              value="logout"
+            >
               <LogOut className="mr-2" /> Sair
             </CommandItem>
           </CommandGroup>
