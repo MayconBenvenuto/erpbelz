@@ -431,7 +431,12 @@ function AppContent() {
   const handleCreateProposal = async (payload) => {
     setIsLoading(true)
     try {
-      const { afterSuccess, cnpjValidationData: _ignore, ...body } = payload || {}
+      const {
+        afterSuccess,
+        cnpjValidationData: _ignore,
+        _docs: pendingDocs = [],
+        ...body
+      } = payload || {}
       // Segurança mínima: sanitizar email no cliente
       if (body.consultor_email) body.consultor_email = String(body.consultor_email).trim()
       const headers = { 'Content-Type': 'application/json' }
@@ -452,6 +457,43 @@ function AppContent() {
             if (old.some((p) => p.id === result.id)) return old
             return [...old, result]
           })
+          // Persistência assíncrona dos metadados dos documentos anexados (se houverem)
+          if (Array.isArray(pendingDocs) && pendingDocs.length > 0) {
+            ;(async () => {
+              for (const doc of pendingDocs) {
+                try {
+                  const respMeta = await fetch('/api/proposals/files', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      proposta_id: result.id,
+                      path: doc.path,
+                      nome: doc.nome,
+                      mime: doc.mime,
+                      tamanho_bytes: doc.tamanho_bytes,
+                      bucket: doc.bucket || 'implantacao_upload',
+                    }),
+                  })
+                  if (!respMeta.ok) {
+                    // log silencioso; não bloquear fluxo principal
+                    console.warn('Falha registrar metadata doc proposta', await respMeta.text())
+                  }
+                } catch (e) {
+                  console.warn('Erro network registrar metadata doc', e)
+                }
+              }
+              // Opcional: poderia disparar evento custom para recarregar docs quando detalhe aberto
+              try {
+                window.dispatchEvent(
+                  new CustomEvent('proposta:docs-updated', { detail: { id: result.id } })
+                )
+              } catch {}
+            })()
+          }
         }
         refetchProposals()
       } else {
