@@ -10,9 +10,22 @@ Gerenciar propostas de planos de saúde com diferentes níveis de acesso para an
 
 ---
 
-## Atualizações recentes (02/09/2025)
+## Atualizações recentes (09/09/2025)
 
-Adições desde 29/08/2025:
+Adições desde 02/09/2025:
+
+- Padronização total de cores entre Propostas e Movimentações usando `STATUS_COLORS` e `SOLICITACAO_STATUS_COLORS` (não hardcodear HEX novos sem atualizar `lib/constants.js`).
+- Dashboard do Gestor reformulado em abas: Geral, Propostas, Movimentação, Equipe (gráficos via `components/ui/chart`).
+- Destaque de propostas sem responsável >24h (SLA triagem) no dashboard.
+- Introdução de tabelas de apoio: `propostas_auditoria`, `propostas_notas`, `propostas_tags` para auditoria, anotações colaborativas e tagging leve.
+- Tabela `sessoes` substituindo modelo antigo de presença; adicionada view derivada `vw_usuarios_online` (somente SELECT).
+- Novo modelo de metas mensal (`metas`: usuario_id, mes, ano, quantidade_implantacoes). Cálculo de progresso usa recomputo de propostas `implantado`; campos antigos `valor_meta/valor_alcancado` considerados legado.
+- Sequencial humano `codigo` em propostas (PRP0000) e solicitações (MVM0000); e‑mails referenciam somente `codigo`.
+- Edição inline de status por linha com spinner e bloqueio per-row.
+- Endpoint `/api/proposals` enriquece com `horas_em_analise`, `dias_em_analise` para evitar recomputo client-side.
+- Alertas de propostas paradas ≥24h permanecem (`/api/alerts/proposals/stale`).
+
+Histórico entre 29/08 e 02/09 mantido abaixo para referência.
 
 - Novo role `gerente`: pode criar, listar, visualizar detalhes e atualizar status/atribuições de propostas e movimentações, ver dashboards completos, mas NÃO gerencia usuários nem exclui propostas.
 - Expansão de roles de analistas específicos: `analista_implantacao` (foco propostas) e `analista_movimentacao` (foco movimentações). Ambos visualizam dashboards próprios; somente o respectivo tipo pode editar status na sua área (implantação vs movimentação) salvo gestores/gerentes.
@@ -37,7 +50,7 @@ Histórico anterior:
 - E-mails de notificação de mudança de status incluem apenas o Código da proposta (PRP...), nunca o UUID.
 - Mantido: API padronizada para PATCH; analista só altera status das próprias propostas; tooltip de Razão Social no CNPJ via `/api/validate-cnpj`; filtros persistentes por usuário.
 - Migration anterior: `scripts/migrations/2025-08-18-add-consultor-email.sql` adiciona `consultor_email` obrigatório às propostas.
-- Alerta automático de propostas em análise ≥24h (endpoint `/api/alerts/proposals/stale`) com configuração de horas (`STALE_PROPOSAL_ALERT_HOURS`) e e-mail gestor primário (`PRIMARY_GESTOR_EMAIL`).
+- Alerta automático de propostas em status 'análise' ≥24h (endpoint `/api/alerts/proposals/stale`) com configuração de horas (`STALE_PROPOSAL_ALERT_HOURS`) e e-mail gestor primário (`PRIMARY_GESTOR_EMAIL`).
 - Enriquecimento de `/api/proposals` com `horas_em_analise` e `dias_em_analise` (reduz recomputo no cliente).
 - Board de propostas: badges de idade (24h / 48h), destaque visual progressivo e toasts de SLA.
 - Dashboard gestor: remoção de funil e heatmap; adição de novos cards (Status ABS/% toggle, Top Operadoras com conversão, Aging Buckets, SLA Assunção, Evolução 7 Dias, Value Buckets, Forecast Meta, Ranking Analistas).
@@ -91,11 +104,11 @@ emergent-crm-adm/
 
 ```css
 /* Cores principais da Belz */
---primary: #130E54;        /* Azul escuro Belz */
---secondary: #021d79;      /* Azul médio */
---background: #f6f6f6;     /* Cinza claro */
---card: #ffffff;           /* Branco para cards */
---muted: #6b7280;          /* Cinza médio para texto secundário */
+--primary: #130e54; /* Azul escuro Belz */
+--secondary: #021d79; /* Azul médio */
+--background: #f6f6f6; /* Cinza claro */
+--card: #ffffff; /* Branco para cards */
+--muted: #6b7280; /* Cinza médio para texto secundário */
 ```
 
 ### 📝 Tipografia
@@ -131,20 +144,20 @@ const gerentePermissions = {
   propostas: {
     create: true,
     read: true,
-    update: true,      // campos operacionais (status, atendido_por, etc.)
-    delete: false,     // não exclui
-    status: true
+    update: true, // campos operacionais (status, atendido_por, etc.)
+    delete: false, // não exclui
+    status: true,
   },
   movimentacoes: {
     create: true,
     read: true,
     update: true,
     delete: false,
-    status: true
+    status: true,
   },
   dashboard: true,
   usuarios: false,
-  relatorios: true
+  relatorios: true,
 }
 ```
 
@@ -153,22 +166,22 @@ const gerentePermissions = {
 ```javascript
 const gestorPermissions = {
   propostas: {
-    create: true,   // Pode criar para agilizar fluxos
+    create: true, // Pode criar para agilizar fluxos
     read: true,
     update: true,
     delete: true,
-    status: true
+    status: true,
   },
   movimentacoes: {
     create: true,
     read: true,
     update: true,
     delete: true,
-    status: true
+    status: true,
   },
   dashboard: true,
   usuarios: true,
-  relatorios: true
+  relatorios: true,
 }
 ```
 
@@ -180,7 +193,7 @@ const analistaImplantacaoPermissions = {
   movimentacoes: { create: false, read: true, update: false, delete: false, status: false },
   dashboard: true,
   usuarios: false,
-  relatorios: false
+  relatorios: false,
 }
 ```
 
@@ -192,7 +205,7 @@ const analistaMovimentacaoPermissions = {
   movimentacoes: { create: true, read: true, update: false, delete: false, status: true },
   dashboard: true,
   usuarios: false,
-  relatorios: false
+  relatorios: false,
 }
 ```
 
@@ -204,7 +217,7 @@ const consultorPermissions = {
   movimentacoes: { create: true, read: true, update: false, delete: false, status: false },
   dashboard: false,
   usuarios: false,
-  relatorios: false
+  relatorios: false,
 }
 ```
 
@@ -220,7 +233,6 @@ Propostas e movimentações não atribuídas exibem "Solicitado por NOME_DO_SOLI
 4. Submissão bloqueada se CNPJ inválido ou não validado.
 5. Backend armazena dados saneados; enriquecimento de criador retornado nas listagens.
 
-
 ---
 
 ## 🛡️ Segurança e Autenticação
@@ -229,15 +241,15 @@ Propostas e movimentações não atribuídas exibem "Solicitado por NOME_DO_SOLI
 
 ```javascript
 // lib/security.js - Funções principais
-- hashPassword()           // Hash bcrypt com 12 rounds
-- verifyPassword()         // Verificação de senha
-- generateToken()          // JWT com 24h de expiração
-- verifyToken()            // Validação JWT
-- checkRateLimit()         // Limite de tentativas
-- sanitizeInput()          // Sanitização XSS
-- validateEmail()          // Validação de email
-- validateCNPJ()           // Validação de CNPJ
-- addSecurityHeaders()     // Headers de segurança
+;-hashPassword() - // Hash bcrypt com 12 rounds
+  verifyPassword() - // Verificação de senha
+  generateToken() - // JWT com 24h de expiração
+  verifyToken() - // Validação JWT
+  checkRateLimit() - // Limite de tentativas
+  sanitizeInput() - // Sanitização XSS
+  validateEmail() - // Validação de email
+  validateCNPJ() - // Validação de CNPJ
+  addSecurityHeaders() // Headers de segurança
 ```
 
 ### 🛡️ Headers de Segurança
@@ -293,8 +305,8 @@ CREATE TABLE propostas (
   valor NUMERIC(12,2) NOT NULL,
   "previsao_implantacao" DATE,
   status TEXT CHECK (status IN (
-    'em análise','pendencias seguradora','boleto liberado','implantando',
-    'pendente cliente','pleito seguradora','negado','implantado'
+    'recepcionado','análise','pendência','pleito seguradora',
+    'boleto liberado','implantado','proposta declinada'
   )) NOT NULL,
   "criado_por" UUID REFERENCES usuarios(id),
   "criado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -302,11 +314,13 @@ CREATE TABLE propostas (
 -- Para bases existentes, aplicar a migration: scripts/migrations/2025-08-18-add-consultor-email.sql
 ```
 
-Notas adicionais (Código PRP):
+Notas adicionais (Código PRP / Status):
 
 - Coluna `codigo` (ex.: PRP0000) adicionada via migration `scripts/migrations/2025-08-19-add-proposta-codigo.sql`.
 - Geração automática com sequência `prp_codigo_seq` e default: `('PRP' || lpad(nextval('prp_codigo_seq')::text, 4, '0'))`.
 - Restrições: `NOT NULL`, `UNIQUE`, `CHECK` para padrão `^PRP[0-9]{4,}$` e índice dedicado.
+
+- Migração de status legado: executar `scripts/migrate-proposal-status.js` ou `scripts/update-proposal-status.sql` para converter valores antigos (`em análise`, `pendencias seguradora`, `negado`) para o conjunto atualizado (`recepcionado`, `análise`, `pendência`, `proposta declinada`, etc.) antes de ativar validações rígidas em produção.
 
 ### Tabela sessoes
 
@@ -320,19 +334,23 @@ CREATE TABLE sessoes (
 );
 ```
 
-### Tabela metas e funções
+### Tabela metas (modelo mensal atualizado)
 
 ```sql
 CREATE TABLE metas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "usuario_id" UUID REFERENCES usuarios(id),
-  "valor_meta" NUMERIC(12,2) DEFAULT 150000,
-  "valor_alcancado" NUMERIC(12,2) DEFAULT 0,
-  "atualizado_em" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  usuario_id UUID NOT NULL REFERENCES usuarios(id),
+  mes INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  ano INT NOT NULL,
+  quantidade_implantacoes INT DEFAULT 0
 );
-
-CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUMERIC) ...;
 ```
+
+Notas:
+
+- Progresso exibido no frontend é calculado dinamicamente somando propostas com status `implantado` por usuário (fonte `/api/goals`).
+- Ajustes manuais: `PATCH /api/goals` (gestor) altera meta alvo (quando presente em schema legado) ou força recálculo com `POST /api/goals`.
+- Manter triggers / lógica de delta ao alterar status (implantado ↔ outros) em sincronia com migrations.
 
 ---
 
@@ -342,7 +360,7 @@ CREATE OR REPLACE FUNCTION atualizar_meta_usuario(p_usuario_id UUID, p_valor NUM
 
 #### **Autenticação**
 
-```javascript
+````javascript
 POST /api/auth/login
 Body: { email: string, password: string }
 Response: { user: object, sessionId: string, token: string }
@@ -354,7 +372,7 @@ GET /api/auth/me
 POST /api/sessions/ping
   Body: { sessionId: string }
   -> Atualiza `ultimo_ping` da sessão do usuário autenticado.
-```
+````
 
 #### Propostas
 
@@ -425,8 +443,8 @@ Response: { valid: boolean, data?: object, error?: string }
 #### **Sessões e Relatórios**
 
 ```javascript
-GET /api/sessions      // Listar sessões ativas
-GET /api/goals         // Metas: valor_alcancado calculado dinamicamente somando propostas com status 'implantado'
+GET / api / sessions // Listar sessões ativas
+GET / api / goals // Metas: valor_alcancado calculado dinamicamente somando propostas com status 'implantado'
 ```
 
 ---
@@ -435,27 +453,16 @@ GET /api/goals         // Metas: valor_alcancado calculado dinamicamente somando
 
 ### 📝 Gestão de Propostas
 
-#### **Status Disponíveis**
+#### **Status Disponíveis (fonte: STATUS_OPTIONS)**
 
-```javascript
-const statusOptions = [
-  'em análise',
-  'pendencias seguradora', 
-  'boleto liberado',
-  'implantando',
-  'pendente cliente',
-  'pleito seguradora',
-  'negado',
-  'implantado'
-];
-```
+Lista única mantida em `lib/constants.js` (não duplicar manualmente). Valores atuais: `recepcionado`, `análise`, `pendência`, `pleito seguradora`, `boleto liberado`, `implantado`, `proposta declinada`.
 
 #### **Operadoras Suportadas**
 
 ```javascript
 const operadoras = [
   'unimed recife',
-  'unimed seguros', 
+  'unimed seguros',
   'bradesco',
   'amil',
   'ampla',
@@ -463,8 +470,8 @@ const operadoras = [
   'hapvida',
   'medsenior',
   'sulamerica',
-  'select'
-];
+  'select',
+]
 ```
 
 ### 🔍 Validação de CNPJ (Cascata)
@@ -510,7 +517,7 @@ Cards/Gráficos Ativos (gestor):
 
 - Status (ABS/% toggle) – barras horizontais com contagem e proporção.
 - Top Operadoras (ABS/% + Conversão) – inclui taxa `implantado / total`.
-- Aging Buckets – distribuição de propostas por faixas de idade em análise.
+- Aging Buckets – distribuição de propostas por faixas de idade em status 'análise'.
 - SLA Assunção – média, p95, % ≤8h, % ≤24h até primeira ação.
 - Evolução 7 Dias – sparkline de novos registros / implantações.
 - Value Buckets – distribuição de faixas de `valor` (ticket mix).
@@ -564,35 +571,37 @@ Padrões:
 // Exemplo: useAutoRefresh
 const useAutoRefresh = (callback, interval = 30000) => {
   useEffect(() => {
-    const timer = setInterval(callback, interval);
-    return () => clearInterval(timer);
-  }, [callback, interval]);
-};
+    const timer = setInterval(callback, interval)
+    return () => clearInterval(timer)
+  }, [callback, interval])
+}
 ```
 
 #### **State Management**
 
 ```javascript
 // Estados principais do ERP
-const [currentUser, setCurrentUser] = useState(null);
-const [activeTab, setActiveTab] = useState('propostas');
-const [proposals, setProposals] = useState([]);
-const [users, setUsers] = useState([]);
-const [sessions, setSessions] = useState([]);
-const [userGoals, setUserGoals] = useState([]);
+const [currentUser, setCurrentUser] = useState(null)
+const [activeTab, setActiveTab] = useState('propostas')
+const [proposals, setProposals] = useState([])
+const [users, setUsers] = useState([])
+const [sessions, setSessions] = useState([])
+const [userGoals, setUserGoals] = useState([])
 ```
 
 #### **Conditional Rendering**
 
 ```javascript
 // Baseado em permissões
-{currentUser.tipo_usuario === 'gestor' && (
-  <Button onClick={handleDeleteProposal}>Excluir</Button>
-)}
+{
+  currentUser.tipo_usuario === 'gestor' && <Button onClick={handleDeleteProposal}>Excluir</Button>
+}
 
-{currentUser.tipo_usuario !== 'gestor' && (
-  <Button onClick={handleCreateProposal}>Nova Proposta</Button>
-)}
+{
+  currentUser.tipo_usuario !== 'gestor' && (
+    <Button onClick={handleCreateProposal}>Nova Proposta</Button>
+  )
+}
 ```
 
 ### 🎨 CSS Patterns
@@ -631,9 +640,9 @@ const [userGoals, setUserGoals] = useState([]);
 
 ```javascript
 // Sempre sanitizar inputs
-const sanitizedInput = sanitizeInput(userInput);
-const isValidEmail = validateEmail(email);
-const isValidCNPJ = validateCNPJFormat(cnpj);
+const sanitizedInput = sanitizeInput(userInput)
+const isValidEmail = validateEmail(email)
+const isValidCNPJ = validateCNPJFormat(cnpj)
 ```
 
 #### **API Error Handling**
@@ -642,24 +651,24 @@ const isValidCNPJ = validateCNPJFormat(cnpj);
 try {
   const response = await fetch('/api/endpoint', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(sanitizedData)
-  });
-  
+    body: JSON.stringify(sanitizedData),
+  })
+
   if (!response.ok) {
-    const error = await response.json();
-    toast.error(error.message || 'Erro na operação');
-    return;
+    const error = await response.json()
+    toast.error(error.message || 'Erro na operação')
+    return
   }
-  
-  const result = await response.json();
-  toast.success('Operação realizada com sucesso!');
+
+  const result = await response.json()
+  toast.success('Operação realizada com sucesso!')
 } catch (error) {
-  console.error('Erro:', sanitizeForLog(error));
-  toast.error('Erro de conexão com o servidor');
+  console.error('Erro:', sanitizeForLog(error))
+  toast.error('Erro de conexão com o servidor')
 }
 ```
 
@@ -758,13 +767,13 @@ npm install
 
 ```javascript
 // Logs seguros (sem dados sensíveis)
-console.log('Operação:', sanitizeForLog(operation));
-console.error('Erro:', sanitizeForLog(error));
+console.log('Operação:', sanitizeForLog(operation))
+console.error('Erro:', sanitizeForLog(error))
 
 // Toast notifications
-toast.success('✅ Operação realizada com sucesso!');
-toast.error('❌ Erro na operação');
-toast.info('ℹ️ Informação importante');
+toast.success('✅ Operação realizada com sucesso!')
+toast.error('❌ Erro na operação')
+toast.info('ℹ️ Informação importante')
 ```
 
 ---
@@ -865,7 +874,7 @@ git push origin main
 ### 🔔 Alerta de Propostas Paradas
 
 - Endpoint: `GET /api/alerts/proposals/stale`
-- Critério: status `em análise` e idade ≥ `STALE_PROPOSAL_ALERT_HOURS` (default 24)
+- Critério: status `análise` e idade ≥ `STALE_PROPOSAL_ALERT_HOURS` (default 24)
 - Destinatários: todos gestores + `PRIMARY_GESTOR_EMAIL`
 - Autorização: usuário gestor autenticado (sem cron)
 - Idempotente por execução (dedupe por janela temporal quando aplicável)
@@ -877,7 +886,7 @@ git push origin main
 Este ERP da Belz é um sistema robusto e seguro para gestão de propostas de planos de saúde. Ao desenvolver novas funcionalidades ou fazer manutenções, sempre priorize:
 
 1. **Segurança** - Autenticação, autorização e sanitização
-2. **Usabilidade** - Interface intuitiva e responsiva  
+2. **Usabilidade** - Interface intuitiva e responsiva
 3. **Performance** - Código otimizado e carregamento rápido
 4. **Manutenibilidade** - Código limpo e bem documentado
 
@@ -885,6 +894,6 @@ Este ERP da Belz é um sistema robusto e seguro para gestão de propostas de pla
 
 ---
 
-*Última atualização: 29 de agosto de 2025*
-*Versão: 1.3.0*
-*Autor: GitHub Copilot*
+_Última atualização: 09 de setembro de 2025_
+_Versão: 1.4.0_
+_Autor: Maycon Benvenuto_

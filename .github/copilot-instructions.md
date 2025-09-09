@@ -1,24 +1,27 @@
 # GitHub Copilot Instructions - ERP Belz
 
 ## Project Overview
+
 This is an ERP system for Belz company focused on health insurance proposal and movimentação management with role-based access control and modern security practices.
 
 Current architecture:
-- Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/* routes (no external proxy)
 
-Recent updates (2025-09-08):
-- Sequential proposal code (codigo) PRP0000 format (unique, indexed); lists ordered asc by codigo; emails reference only codigo.
-- Inline status editing with per-row loading/disable.
-- Meta progress now backed by table metas (mes, ano, quantidade_implantacoes) instead of accumulating valor.
+- Frontend + Backend: Next.js (App Router) at port 3000, serving both UI and /api/\* routes (no external proxy)
+
+Recent updates (2025-09-09):
+
+- Sequential proposal code (codigo) PRP0000 and solicitacao code MVM0000 (unique, indexed); lists ordered asc by codigo; emails reference only codigo.
+- Inline status editing with per-row loading/disable (no full table blocking).
+- Metas model: monthly rows (usuario_id, mes, ano, quantidade_implantacoes). Progress is recalculated from proposals with status 'implantado' (avoid stale accumulation).
 - Added audit (propostas_auditoria), notes (propostas_notas) and tags (propostas_tags) tables.
 - Added solicitacoes workflow table (tickets) with JSON campos (arquivos, dados, historico) and SLA fields.
-- Added sessoes table storing auth sessions tokens + expirado_em.
-- Added view vw_usuarios_online (derived presence status) used for reports/monitoring.
+- Added sessoes table storing auth sessions tokens + expirado_em plus derived view vw_usuarios_online.
 - Reports exclude gestor from monitoring; refresh button shows spinner/disable.
-- **Standardized UI colors**: Movimentação section now uses the same color system as Propostas section for consistency.
- - New Manager Dashboard with tabs (Geral, Propostas, Movimentação, Equipe), KPIs and charts; highlights proposals unassigned >24h.
+- **Standardized UI colors** across Propostas & Movimentação via STATUS_COLORS / SOLICITACAO_STATUS_COLORS only.
+- Manager Dashboard tabs: Geral, Propostas, Movimentação, Equipe with KPIs, charts (recharts) and highlight of proposals >24h without owner.
 
 ## Tech Stack
+
 - **Frontend/Backend**: Next.js 14.2.3 with App Router (/api routes)
 - **UI**: Shadcn/UI + TailwindCSS + Lucide Icons
 - **Database**: Supabase (PostgreSQL)
@@ -37,26 +40,28 @@ Nota sobre analista_cliente: este papel pode acessar a Carteira de Clientes (lis
 ## Key Security Patterns
 
 ### Always Implement
+
 ```javascript
 // Input sanitization
-const sanitizedInput = sanitizeInput(userInput);
+const sanitizedInput = sanitizeInput(userInput)
 
 // Permission checks
 if (currentUser.tipo_usuario !== 'gestor') {
-  return toast.error('Acesso negado');
+  return toast.error('Acesso negado')
 }
 
 // Error handling with toast
 try {
   // operation
-  toast.success('Operação realizada com sucesso!');
+  toast.success('Operação realizada com sucesso!')
 } catch (error) {
-  console.error('Erro:', sanitizeForLog(error));
-  toast.error('Erro na operação');
+  console.error('Erro:', sanitizeForLog(error))
+  toast.error('Erro na operação')
 }
 ```
 
 ### Security Functions (lib/security.js)
+
 - `hashPassword()` - bcrypt with 12 rounds
 - `verifyPassword()` - password verification
 - `generateToken()` - JWT with 24h expiration
@@ -69,61 +74,60 @@ try {
 ## UI Patterns
 
 ### Layout Structure
+
 ```javascript
 // Sidebar layout (current)
 <div className="min-h-screen bg-background flex">
-  <aside className="w-64 bg-card border-r shadow-lg flex flex-col">
-    {/* Sidebar content */}
-  </aside>
-  <div className="flex-1 flex flex-col">
-    {/* Main content */}
-  </div>
+  <aside className="w-64 bg-card border-r shadow-lg flex flex-col">{/* Sidebar content */}</aside>
+  <div className="flex-1 flex flex-col">{/* Main content */}</div>
 </div>
 ```
 
 ### Conditional Rendering by Role
+
 ```javascript
 // Show only for managers
-{currentUser.tipo_usuario === 'gestor' && (
-  <Button onClick={handleAction}>Manager Action</Button>
-)}
+{
+  currentUser.tipo_usuario === 'gestor' && <Button onClick={handleAction}>Manager Action</Button>
+}
 
 // Show only for analysts
-{currentUser.tipo_usuario !== 'gestor' && (
-  <Button onClick={handleCreate}>Create Proposal</Button>
-)}
+{
+  currentUser.tipo_usuario !== 'gestor' && <Button onClick={handleCreate}>Create Proposal</Button>
+}
 ```
 
 ### Toast Notifications
+
 ```javascript
-import { toast } from 'sonner';
+import { toast } from 'sonner'
 
 // Success
-toast.success('✅ Operação realizada com sucesso!');
+toast.success('✅ Operação realizada com sucesso!')
 
 // Error
-toast.error('❌ Erro na operação');
+toast.error('❌ Erro na operação')
 
 // Info
-toast.info('ℹ️ Informação importante');
+toast.info('ℹ️ Informação importante')
 ```
 
 ## Component Patterns
 
 ### Standard Card
+
 ```javascript
 <Card>
   <CardHeader>
     <CardTitle>Title</CardTitle>
     <CardDescription>Description</CardDescription>
   </CardHeader>
-  <CardContent>
-    {/* Content */}
-  </CardContent>
+  <CardContent>{/* Content */}</CardContent>
 </Card>
 ```
 
 ### Table with Actions
+
 ```javascript
 <Table>
   <TableHeader>
@@ -149,51 +153,53 @@ toast.info('ℹ️ Informação importante');
 
 ## API Patterns
 
-Important: All client calls go to /api/* served by Next.js (no proxy).
+Important: All client calls go to /api/\* served by Next.js (no proxy).
 
 Key endpoints:
+
 - GET /api/proposals → ordered by codigo asc when available; gestor sees all; analyst sees own only.
 - PATCH /api/proposals/:id → updates status; applies metas delta only on transitions (to/from “implantado”); sends email showing only the PRP codigo.
 
 ### Standard API Call
+
 ```javascript
 const handleApiCall = async () => {
-  setIsLoading(true);
-  
+  setIsLoading(true)
+
   try {
     const response = await fetch('/api/endpoint', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(sanitizeInput(data))
-    });
-    
+      body: JSON.stringify(sanitizeInput(data)),
+    })
+
     if (!response.ok) {
-      const error = await response.json();
-      toast.error(error.message || 'Erro na operação');
-      return;
+      const error = await response.json()
+      toast.error(error.message || 'Erro na operação')
+      return
     }
-    
-    const result = await response.json();
-    toast.success('Operação realizada com sucesso!');
-    
+
+    const result = await response.json()
+    toast.success('Operação realizada com sucesso!')
+
     // Update state
-    setData(result);
-    
+    setData(result)
   } catch (error) {
-    console.error('Erro:', sanitizeForLog(error));
-    toast.error('Erro de conexão com o servidor');
+    console.error('Erro:', sanitizeForLog(error))
+    toast.error('Erro de conexão com o servidor')
   } finally {
-    setIsLoading(false);
+    setIsLoading(false)
   }
-};
+}
 ```
 
 ## Database Schema
 
 ### Users Table (UUID)
+
 ```sql
 CREATE TABLE usuarios (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -206,69 +212,84 @@ CREATE TABLE usuarios (
 ```
 
 ### Proposals Table (propostas)
-Essential columns (full list in DOC_SUPABASE.md auto section):
-id (uuid, PK), codigo (text, sequential PRP format), cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por, arquivado (boolean default false), atendido_por, diversos campos cliente_* (dados cadastrais), timestamps (criado_em, updated_at, atendido_em) e observacoes.
+
+Essential columns (full list in DOC*SUPABASE.md auto section):
+id (uuid, PK), codigo (text, sequential PRP format), cnpj, consultor, consultor_email, operadora, quantidade_vidas, valor, previsao_implantacao, status, criado_por, arquivado (boolean default false), atendido_por, diversos campos cliente*\* (dados cadastrais), timestamps (criado_em, updated_at, atendido_em) e observacoes.
 
 ### Audit Table (propostas_auditoria)
+
 Rastreia mudanças campo a campo: proposta_id, campo, valor_antigo, valor_novo, alterado_por, alterado_em.
 
 ### Proposal Notes (propostas_notas)
+
 Notas livres por proposta: nota, autor_id, criado_em.
 
 ### Proposal Tags (propostas_tags)
+
 Par simples (proposta_id, tag) com aplicado_em.
 
 ### Metas Table (metas)
-Modelo mensal por usuário: usuario_id, mes, ano, quantidade_implantacoes (integer default 0).
-Usada para dashboard e cálculo de progresso; alteração de status para/from 'implantado' deve refletir metas (delta controlado no backend).
+
+Monthly model per user: usuario_id, mes (1-12), ano (YYYY), quantidade_implantacoes INT DEFAULT 0.
+Do NOT store recalculated progress in frontend state permanently; always refetch /api/goals.
+Backend: when status transitions to 'implantado' increment; leaving 'implantado' decrement (ensure idempotent logic / triggers). Fallback recompute endpoint recalculates from proposals if drift occurs.
 
 ### Sessions Table (sessoes)
+
 Tokens ativos: usuario_id, token, criado_em, ultimo_refresh, expirado_em. Use para invalidar / refresh logic. Nunca logar token completo em console.
 
 ### Solicitacoes Table (solicitacoes)
+
 Tickets operacionais: codigo, tipo, subtipo, razao_social, cnpj, apolice_da_belz (bool), acesso_empresa, operadora, observacoes, arquivos(jsonb), dados(jsonb), historico(jsonb), status, sla_previsto, prioridade, atendido_por(+nome), criado_por, criado_em, atualizado_em.
 Histórico e arquivos são arrays/objetos; sempre sanitize antes de armazenar.
 
 ### Usuarios Table (usuarios)
+
 id, nome, email (unique), senha (bcrypt), tipo_usuario ('gestor'|'analista'|possível 'consultor' legado), status_presenca, ultimo_refresh, criado_em, atualizado_em.
 
 ### Online Users View (vw_usuarios_online)
+
 View derivada para presença; NÃO escrever diretamente. Use apenas SELECT.
 
 ### RPCs Importantes
+
 atualizar_meta, atualizar_meta_usuario (existência verificada antes de chamar). Novas funções de introspecção (list_public_tables, list_public_table_columns, list_public_routines, list_public_views) são SECURITY DEFINER e não devem ser expostas ao cliente.
 
 ## Constants
 
 ### Status Options
-Use STATUS_OPTIONS from `lib/constants.js`. Keep docs aligned with source (do not duplicate lists here).
+
+Use STATUS_OPTIONS from `lib/constants.js` (current: recepcionado, análise, pendência, pleito seguradora, boleto liberado, implantado, proposta declinada). Never hardcode variants; add through constants + style mapping.
 
 ### Insurance Companies
+
 Use OPERADORAS from `lib/constants.js`. Do not hardcode in new components.
 
 ### Solicitação Status & Colors
+
 ```javascript
 const SOLICITACAO_STATUS = [
-  'aberta',          // criada
-  'em validação',    // documentos conferindo
-  'em execução',     // ação em andamento
-  'concluída',       // finalizada com sucesso
-  'cancelada'        // interrompida
-];
+  'aberta', // criada
+  'em validação', // documentos conferindo
+  'em execução', // ação em andamento
+  'concluída', // finalizada com sucesso
+  'cancelada', // interrompida
+]
 
 // Cores padronizadas para status de solicitações (mesmo padrão das propostas)
 const SOLICITACAO_STATUS_COLORS = {
-  'aberta': { bg: '#E3F2FD', text: '#1565C0', border: '#2196F3' },
+  aberta: { bg: '#E3F2FD', text: '#1565C0', border: '#2196F3' },
   'em validação': { bg: '#FFF8E1', text: '#F57C00', border: '#FF9800' },
   'em execução': { bg: '#E8EAF6', text: '#3F51B5', border: '#3F51B5' },
-  'concluída': { bg: '#E0F2F1', text: '#00695C', border: '#009688' },
-  'cancelada': { bg: '#FFEBEE', text: '#C62828', border: '#F44336' }
-};
+  concluída: { bg: '#E0F2F1', text: '#00695C', border: '#009688' },
+  cancelada: { bg: '#FFEBEE', text: '#C62828', border: '#F44336' },
+}
 ```
 
 ## Color System & Visual Consistency
 
 ### Standardized Status Colors
+
 Both Propostas and Movimentação sections use consistent color patterns for visual harmony:
 
 ```javascript
@@ -279,7 +300,7 @@ import { STATUS_COLORS, SOLICITACAO_STATUS_COLORS } from '@/lib/constants'
 const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', border: '#e2e2e2' }
 
 // Column header styling
-<div 
+<div
   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10"
   style={{
     backgroundColor: statusColors.bg,
@@ -290,8 +311,9 @@ const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', 
 ```
 
 ### Color Palette Guidelines
+
 - **Blue tones**: Initial/open states (recepcionado, aberta)
-- **Orange/amber tones**: In progress/validation states  
+- **Orange/amber tones**: In progress/validation states
 - **Purple tones**: Escalated/complex states
 - **Green tones**: Completed/success states
 - **Red tones**: Cancelled/declined states
@@ -299,6 +321,7 @@ const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', 
 ## Styling Guidelines
 
 ### Use TailwindCSS Classes
+
 ```javascript
 // Primary button
 <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -308,13 +331,14 @@ const statusColors = STATUS_COLORS[status] || { bg: '#f6f6f6', text: '#333333', 
 
 // Sidebar active state
 className={`px-4 py-3 rounded-lg transition-colors ${
-  activeTab === 'propostas' 
-    ? 'bg-primary text-primary-foreground' 
+  activeTab === 'propostas'
+    ? 'bg-primary text-primary-foreground'
     : 'hover:bg-muted text-muted-foreground hover:text-foreground'
 }`}
 ```
 
 ### Responsive Design
+
 ```javascript
 // Grid responsive
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -329,6 +353,7 @@ className={`px-4 py-3 rounded-lg transition-colors ${
 ## DO's and DON'Ts
 
 ### ✅ DO
+
 - Always sanitize user inputs
 - Check user permissions before actions
 - Use toast notifications for feedback
@@ -339,6 +364,7 @@ className={`px-4 py-3 rounded-lg transition-colors ${
 - Implement proper error handling
 
 ### ❌ DON'T
+
 - Hardcode credentials or secrets
 - Use inline styles (use TailwindCSS)
 - Allow actions without permission checks
@@ -351,6 +377,7 @@ className={`px-4 py-3 rounded-lg transition-colors ${
 ## File Structure
 
 ### Key Files
+
 - `app/page.js` - Main CRM interface
 - `app/api/[[...path]]/route.js` - Centralized API routes
 - `lib/security.js` - Security functions
@@ -358,6 +385,7 @@ className={`px-4 py-3 rounded-lg transition-colors ${
 - `components/ui/` - UI components
 
 ### Environment Variables
+
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
@@ -370,6 +398,7 @@ CORS_ORIGINS=http://localhost:3000
 Next.js auto-loads .env files. Ensure JWT_SECRET and Supabase keys are present.
 
 Email/TLS notes:
+
 - Configure SMTP_TLS_SERVERNAME for providers with wildcard certificates (e.g., skymail.net.br)
 - Do not disable certificate verification in production; use only for local diagnostics
 - Optional fallback: RESEND_API_KEY
@@ -377,10 +406,11 @@ Email/TLS notes:
 When generating code for this project, always prioritize security, follow the established patterns, and maintain consistency with the existing codebase.
 
 ## Manager Dashboard Guidelines
+
 - Prefer KPIs + actionable charts over static funnels.
 - Use `components/ui/chart` (ChartContainer, ChartTooltipContent, ChartLegendContent) with `recharts`.
 - Tabs: Geral, Propostas, Movimentação, Equipe. Mirror structure in `app/sections/Dashboard.jsx`.
 - Always use STATUS_COLORS and SOLICITACAO_STATUS_COLORS for statuses.
 - Surface risks/SLAs: proposals without owner >24h; tickets with SLA overdue.
 - Compute client-side using loaded /api data; avoid extra queries from the dashboard.
-\n+Schema source of truth: mantenha consultas alinhadas com DOC_SUPABASE.md (bloco AUTO_DB_SCHEMA) gerado pelo script scripts/supabase-introspect.mjs. Evite duplicar DDL manual; se a estrutura mudar, rode o script para atualizar documentação.
+  \n+Schema source of truth: mantenha consultas alinhadas com DOC_SUPABASE.md (bloco AUTO_DB_SCHEMA) gerado pelo script scripts/supabase-introspect.mjs. Evite duplicar DDL manual; se a estrutura mudar, rode o script para atualizar documentação.

@@ -26,11 +26,11 @@ CREATE INDEX idx_propostas_arquivado ON public.propostas(arquivado);
 
 ## 🖊️ Edição de Propostas (Atualizado)
 
-| Papel         | Pode criar | Pode editar campos gerais | Pode alterar status | Interface de edição |
-|---------------|-----------|----------------------------|---------------------|---------------------|
-| Analista      | ✅ (suas)  | ❌                          | ✅ (suas)           | Select inline (status) |
-| Gestor        | ❌         | ✅ (todos os campos permitidos) | ✅ (todas)         | Dialog popup + Select inline p/ status |
-| Consultor     | ❌         | ❌                          | ❌                 | Sem acesso à tela |
+| Papel     | Pode criar | Pode editar campos gerais       | Pode alterar status | Interface de edição                    |
+| --------- | ---------- | ------------------------------- | ------------------- | -------------------------------------- |
+| Analista  | ✅ (suas)  | ❌                              | ✅ (suas)           | Select inline (status)                 |
+| Gestor    | ❌         | ✅ (todos os campos permitidos) | ✅ (todas)          | Dialog popup + Select inline p/ status |
+| Consultor | ❌         | ❌                              | ❌                  | Sem acesso à tela                      |
 
 ### Campos editáveis pelo gestor no Dialog
 
@@ -73,10 +73,31 @@ Resposta (exemplo simplificado):
     "ticket_medio_geral": 18500.75,
     "vidas_totais": 2120
   },
-  "rankingAnalistas": [ { "usuario_id": "...", "nome": "João", "total_propostas": 40, "implantadas": 12, "taxa_implantacao": 30, "valor_total": 320000, "ticket_medio": 21000, "vidas_total": 540 } ],
-  "rankingConsultores": [ { "consultor": "Carlos", "total_propostas": 25, "implantadas": 8, "taxa_implantacao": 32, "valor_total": 190000, "ticket_medio": 23750, "vidas_total": 350 } ],
-  "funilStatus": [ { "status": "em análise", "total": 50, "valor_total": 500000 } ],
-  "vidasPorOperadora": [ { "operadora": "unimed recife", "vidas_total": 620, "propostas": 18 } ]
+  "rankingAnalistas": [
+    {
+      "usuario_id": "...",
+      "nome": "João",
+      "total_propostas": 40,
+      "implantadas": 12,
+      "taxa_implantacao": 30,
+      "valor_total": 320000,
+      "ticket_medio": 21000,
+      "vidas_total": 540
+    }
+  ],
+  "rankingConsultores": [
+    {
+      "consultor": "Carlos",
+      "total_propostas": 25,
+      "implantadas": 8,
+      "taxa_implantacao": 32,
+      "valor_total": 190000,
+      "ticket_medio": 23750,
+      "vidas_total": 350
+    }
+  ],
+  "funilStatus": [{ "status": "em análise", "total": 50, "valor_total": 500000 }],
+  "vidasPorOperadora": [{ "operadora": "unimed recife", "vidas_total": 620, "propostas": 18 }]
 }
 ```
 
@@ -86,7 +107,7 @@ Resposta (exemplo simplificado):
 async function loadPerformance(start, end, token) {
   const qs = new URLSearchParams({ start, end }).toString()
   const res = await fetch(`/api/reports/performance?${qs}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) throw new Error('Erro ao carregar métricas')
   return res.json()
@@ -150,11 +171,14 @@ Removida referência inexistente `setArquivos([])` que causava `ReferenceError` 
 - Limitar sempre o histórico retornado ou paginar caso cresça demasiadamente.
 - Usar `CustomEvent` para outras interações reativas (ex: atualização de SLA em massa) ao invés de polling adicional.
 
-## 🔄 Metas (Goals)
+## 🔄 Metas (Goals – modelo mensal atualizado)
 
-- Continuação: `GET /api/goals` retorna metas com fallback ao somatório de propostas implantadas.
-- Atualização de meta individual: `PATCH /api/goals` (gestor-only) com `{ usuario_id, valor_meta }`.
-- Recalcular (mass update): `POST /api/goals` (gestor-only) – recalcula `valor_alcancado` baseado nas propostas implantadas.
+Modelo atual usa tabela `metas` (usuario_id, mes, ano, quantidade_implantacoes). Progresso real exibido sempre é recalculado a partir das propostas com status `implantado` (não confiar em acumuladores legados de valor).
+
+- `GET /api/goals`: retorna metas alvo + valor_alcancado derivado (somatório atual) garantindo consistência.
+- `PATCH /api/goals` (gestor): ajusta meta alvo (compatível com colunas legadas se ainda existirem).
+- `POST /api/goals` (gestor): força recálculo e sincroniza armazenamento persistido com estado derivado.
+- Alterações de status (→ implantado / ← implantado) aplicam delta incremental na contagem de implantações mensais; recomputo periódico garante idempotência.
 
 ## ✉️ Notificações de Status (Inalterado)
 
@@ -198,4 +222,5 @@ Removida referência inexistente `setArquivos([])` que causava `ReferenceError` 
 - Versão sugerida pós-addendum: 1.3.0 (não alterar arquivo original, apenas referência aqui)
 
 ---
+
 **Uso**: Leia este addendum após o documento principal para garantir aderência aos fluxos atuais.
