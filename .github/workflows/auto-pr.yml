@@ -2,10 +2,11 @@ name: Auto PR (testes -> dev -> main)
 
 on:
   push:
-    branches: [ testes ]
+    branches:
+      - testes
 
 concurrency:
-  group: auto-pr-${{ github.ref }}
+  group: "auto-pr-${{ github.ref }}"
   cancel-in-progress: true
 
 permissions:
@@ -42,7 +43,7 @@ jobs:
       - name: Checkout código (branch testes)
         uses: actions/checkout@v4
         with:
-            ref: testes
+          ref: testes
 
       - name: Setup Node
         uses: actions/setup-node@v4

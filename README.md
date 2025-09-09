@@ -5,6 +5,22 @@
 - **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
 - **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
 
+### 🌐 Documentação Pública da API
+
+Disponível sem autenticação em:
+
+```text
+/api-docs
+```
+
+Spec JSON bruto:
+
+```text
+/openapi.json
+```
+
+Edite/expanda em `app/openapi.json/route.js`.
+
 // Pipelines CI (GitHub Actions) usam Yarn. Para gerar cobertura local:
 
 ```powershell
