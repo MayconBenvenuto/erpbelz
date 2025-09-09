@@ -7,7 +7,7 @@
 - **Rota**: `PATCH /api/proposals/{proposal_id}`
 - **Permissão**: Gestores (qualquer proposta) e Analistas (apenas propostas criadas por eles)
 - **Funcionalidade**: Atualização parcial do recurso (status da proposta)
-- **Atualização automática de metas**: Quando o status muda para "implantado", atualiza automaticamente as metas do usuário (RPC `atualizar_meta_usuario`)
+- **Atualização automática de metas**: Quando o status muda para "implantado", incrementa contagem mensal (`metas.quantidade_implantacoes`) ou aplica delta inverso ao sair de "implantado". Recomputo idempotente: `/api/goals`.
 
 ### 2. Frontend - Interface de Alteração
 
@@ -16,16 +16,19 @@
 - **Interação**: Mudança imediata ao selecionar novo status
 - **Feedback**: Toast de sucesso/erro após alteração
 
-### 3. Status Disponíveis
+### 3. Status Disponíveis (fonte: STATUS_OPTIONS em `lib/constants.js`)
 
-- em análise
-- pendencias seguradora
-- boleto liberado
-- implantando
-- pendente cliente
+Status padronizados atuais (não duplicar manualmente em código):
+
+- recepcionado
+- análise
+- pendência
 - pleito seguradora
-- negado
+- boleto liberado
 - implantado
+- proposta declinada
+
+Migração: valores legados como `em análise`, `pendencias seguradora`, `negado` foram normalizados por scripts de migração. Execute `scripts/migrate-proposal-status.js` antes de dependências novas.
 
 ## 🧪 Testes Realizados
 
@@ -50,22 +53,17 @@
 
 ### Backend
 
-- `app/api/proposals/[id]/route.js`:
-       - Endpoint PATCH para atualizar status
-       - Lógica de atualização de metas quando status = "implantado"
+- `app/api/proposals/[id]/route.js`: - Endpoint PATCH para atualizar status - Lógica de atualização de metas quando status = "implantado"
 
 ### Frontend
 
-- `app/page.js`:
-       - Função `handleUpdateProposalStatus()`
-       - Nova coluna na tabela com dropdown de status
-       - Componente Select para alteração imediata
+- `app/page.js`: - Função `handleUpdateProposalStatus()` - Nova coluna na tabela com dropdown de status - Componente Select para alteração imediata
 
 ## 📊 Estrutura da Tabela
 
-| CNPJ | Consultor | Operadora | Vidas | Valor | Status | **Alterar Status** | Ações |
-|------|-----------|-----------|-------|-------|--------|-------------------|-------|
-| Badge atual | | | | | Badge colorido | **Dropdown Select** | Botão Excluir (Gestor) |
+| CNPJ        | Consultor | Operadora | Vidas | Valor | Status         | **Alterar Status**  | Ações                  |
+| ----------- | --------- | --------- | ----- | ----- | -------------- | ------------------- | ---------------------- |
+| Badge atual |           |           |       |       | Badge colorido | **Dropdown Select** | Botão Excluir (Gestor) |
 
 ## 🎯 Permissões
 
@@ -88,7 +86,7 @@
 ```text
 Usuário seleciona novo status
        ↓
-Frontend chama PATCH /api/proposals/:id  
+Frontend chama PATCH /api/proposals/:id
        ↓
 Backend atualiza status na base
        ↓
@@ -102,5 +100,6 @@ Tabela atualizada com novo status
 ```
 
 ---
+
 **Status**: ✅ Implementado e testado
 **Data**: 18 de agosto de 2025
