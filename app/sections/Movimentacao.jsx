@@ -3,16 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import {
-  Clock,
-  Activity,
-  CheckCircle2,
-  XCircle,
-  Pencil,
-  Save,
-  FileDown,
-  Loader2,
-} from 'lucide-react'
+import { Pencil, Save, FileDown, Loader2 } from 'lucide-react'
+import { statusIcon } from './solicitacoes/helpers'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { SOLICITACAO_STATUS, SOLICITACAO_STATUS_COLORS } from '@/lib/constants'
 import {
@@ -45,22 +37,7 @@ const fmt = (d) => {
   }
 }
 
-const statusIcon = (s) => {
-  switch (s) {
-    case 'aberta':
-      return <Activity className="h-4 w-4 text-blue-600" />
-    case 'em validação':
-      return <Clock className="h-4 w-4 text-amber-600" />
-    case 'em execução':
-      return <Activity className="h-4 w-4 text-purple-600" />
-    case 'concluída':
-      return <CheckCircle2 className="h-4 w-4 text-green-600" />
-    case 'cancelada':
-      return <XCircle className="h-4 w-4 text-red-600" />
-    default:
-      return <Activity className="h-4 w-4" />
-  }
-}
+// statusIcon agora importado de helpers para reduzir conflitos de merge
 
 export default function MovimentacaoSection({ currentUser, token: parentToken }) {
   const [openSolicitacao, setOpenSolicitacao] = useState(false)

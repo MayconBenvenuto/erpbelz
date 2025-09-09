@@ -31,27 +31,12 @@ import {
 import TopUserActions from '@/components/TopUserActions'
 import MobileSidebar from '@/app/sections/MobileSidebar'
 import { OPERADORAS as operadoras, STATUS_OPTIONS as statusOptions } from '@/lib/constants'
+// Import necessário para operações otimistas de propostas (antes faltava causando possíveis erros)
+import { queryClient, queryKeys } from '@/lib/query-client'
 import { useProposals } from '@/hooks/use-api'
 import { hasPermission } from '@/lib/rbac'
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandSeparator,
-} from '@/components/ui/command'
-import {
-  FileText,
-  BarChart3,
-  Users,
-  TrendingUp,
-  Repeat,
-  LogOut,
-  PlusCircle,
-  Search,
-} from 'lucide-react'
+import { Search } from 'lucide-react'
+import CommandPalette from './components/CommandPalette'
 
 function AppContent() {
   const [currentUser, setCurrentUser] = useState(null)
@@ -1266,144 +1251,15 @@ function AppContent() {
           </Tabs>
         </main>
       </div>
-      {/* Command Palette */}
-      <CommandDialog
+      {/* Command Palette extraída para reduzir conflitos em merges */}
+      <CommandPalette
         open={commandOpen}
         onOpenChange={setCommandOpen}
-        description="Digite para filtrar ações ou navegue com setas."
-      >
-        <CommandInput
-          placeholder="Buscar ações, abas, PRP..."
-          autoFocus
-          onValueChange={(val) => {
-            const v = String(val || '')
-              .trim()
-              .toUpperCase()
-            // padrão simples PRP + dígitos
-            if (/^PRP\d{3,}$/.test(v)) {
-              setActiveTab('propostas')
-              setCommandOpen(false)
-              // opcional: emitir evento para destacar proposta
-              setTimeout(() => {
-                window.dispatchEvent(
-                  new CustomEvent('proposals:focus-code', { detail: { code: v } })
-                )
-              }, 50)
-            }
-          }}
-        />
-        <CommandList>
-          <CommandEmpty>Nenhum resultado.</CommandEmpty>
-          <CommandGroup heading="Navegação">
-            <CommandItem
-              onSelect={() => {
-                setActiveTab('dashboard')
-                setCommandOpen(false)
-              }}
-              value="dashboard"
-            >
-              <BarChart3 className="mr-2" /> Dashboard
-            </CommandItem>
-            {hasPermission(currentUser, 'viewPropostas') &&
-              currentUser.tipo_usuario !== 'analista_cliente' && (
-                <CommandItem
-                  onSelect={() => {
-                    setActiveTab('propostas')
-                    setCommandOpen(false)
-                  }}
-                  value="propostas"
-                >
-                  <FileText className="mr-2" /> Propostas
-                </CommandItem>
-              )}
-            {hasPermission(currentUser, 'viewMovimentacao') &&
-              currentUser.tipo_usuario !== 'analista_cliente' && (
-                <CommandItem
-                  onSelect={() => {
-                    setActiveTab('movimentacao')
-                    setCommandOpen(false)
-                  }}
-                  value="movimentacao"
-                >
-                  <Repeat className="mr-2" /> Movimentação
-                </CommandItem>
-              )}
-            {hasPermission(currentUser, 'manageUsers') && (
-              <CommandItem
-                onSelect={() => {
-                  setActiveTab('usuarios')
-                  setCommandOpen(false)
-                }}
-                value="usuarios"
-              >
-                <Users className="mr-2" /> Usuários
-              </CommandItem>
-            )}
-            {hasPermission(currentUser, 'viewRelatorios') && (
-              <CommandItem
-                onSelect={() => {
-                  setActiveTab('relatorios')
-                  setCommandOpen(false)
-                }}
-                value="relatorios"
-              >
-                <TrendingUp className="mr-2" /> Relatórios
-              </CommandItem>
-            )}
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup heading="Ações Rápidas">
-            <CommandItem
-              onSelect={() => {
-                scheduleLoadData(true)
-                setCommandOpen(false)
-              }}
-              value="recarregar"
-            >
-              <Repeat className="mr-2" /> Recarregar Dados
-            </CommandItem>
-            {hasPermission(currentUser, 'createPropostas') &&
-              currentUser.tipo_usuario !== 'analista_movimentacao' &&
-              currentUser.tipo_usuario !== 'analista_cliente' && (
-                <CommandItem
-                  onSelect={() => {
-                    setActiveTab('propostas')
-                    setCommandOpen(false)
-                    setTimeout(() => {
-                      document.querySelector('[data-new-proposal-btn]')?.click()
-                    }, 50)
-                  }}
-                  value="nova-proposta"
-                >
-                  <PlusCircle className="mr-2" /> Nova Proposta
-                </CommandItem>
-              )}
-            {hasPermission(currentUser, 'manageUsers') && (
-              <CommandItem
-                onSelect={() => {
-                  setActiveTab('usuarios')
-                  setCommandOpen(false)
-                  setTimeout(() => {
-                    document.querySelector('[data-new-user-btn]')?.click()
-                  }, 50)
-                }}
-                value="novo-usuario"
-              >
-                <PlusCircle className="mr-2" /> Novo Usuário
-              </CommandItem>
-            )}
-            <CommandItem
-              onSelect={() => {
-                handleLogout()
-                setCommandOpen(false)
-              }}
-              value="logout"
-            >
-              <LogOut className="mr-2" /> Sair
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
+        currentUser={currentUser}
+        setActiveTab={setActiveTab}
+        scheduleLoadData={scheduleLoadData}
+        handleLogout={handleLogout}
+      />
     </div>
   )
 }
