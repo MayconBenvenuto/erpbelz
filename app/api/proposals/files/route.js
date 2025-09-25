@@ -27,7 +27,32 @@ export async function GET(request) {
     .eq('proposta_id', propostaId)
     .order('criado_em', { ascending: true })
   if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
-  return handleCORS(NextResponse.json({ data }), origin)
+  // Enriquecer com URL pública (ou assinada como fallback) para facilitar consumo no frontend
+  try {
+    const enriched = await Promise.all(
+      (data || []).map(async (f) => {
+        try {
+          let url = null
+          // Primeiro tenta URL pública (caso o bucket seja público)
+          const { data: pub } = supabase.storage.from(f.bucket).getPublicUrl(f.path)
+          url = pub?.publicUrl || null
+          // Se não houver pública, tenta gerar uma URL assinada temporária
+          if (!url) {
+            const { data: signed } = await supabase.storage
+              .from(f.bucket)
+              .createSignedUrl(f.path, 600) // 10 minutos
+            url = signed?.signedUrl || null
+          }
+          return { ...f, url }
+        } catch {
+          return { ...f, url: null }
+        }
+      })
+    )
+    return handleCORS(NextResponse.json({ data: enriched }), origin)
+  } catch (e) {
+    return handleCORS(NextResponse.json({ data }), origin)
+  }
 }
 
 // POST registra metadados após upload bem sucedido
