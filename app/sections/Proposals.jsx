@@ -610,12 +610,20 @@ function ProposalsInner({
               <CardDescription>
                 {filteredProposals.length} de {proposals.length} proposta(s) filtradas
               </CardDescription>
-              {slaSummary && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  SLA médio para assumir: {slaSummary.sla_medio_horas.toFixed(2)}h • Aguardando
-                  analista: {slaSummary.aguardando_analista}
-                </p>
-              )}
+              {slaSummary &&
+                (() => {
+                  const sla = Number(slaSummary.sla_medio_horas)
+                  const slaFmt = Number.isFinite(sla) ? sla.toFixed(2) : '—'
+                  const aguardando =
+                    typeof slaSummary.aguardando_analista === 'number'
+                      ? slaSummary.aguardando_analista
+                      : '—'
+                  return (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      SLA médio para assumir: {slaFmt}h • Aguardando analista: {aguardando}
+                    </p>
+                  )
+                })()}
             </div>
             <div className="flex gap-2">
               <Button
@@ -1209,10 +1217,10 @@ function ProposalsInner({
                   <span
                     className="font-mono text-xs px-1 py-0.5 rounded ml-2"
                     style={{
-                      backgroundColor: (STATUS_COLORS[detail.status] || { bg: '#f6f6f6' }).bg,
+                      backgroundColor: (STATUS_COLORS[detail?.status] || { bg: '#f6f6f6' }).bg,
                       fontWeight: 'bold',
-                      color: (STATUS_COLORS[detail.status] || { text: '#333333' }).text,
-                      border: `1px solid ${(STATUS_COLORS[detail.status] || { border: '#e2e2e2' }).border}`,
+                      color: (STATUS_COLORS[detail?.status] || { text: '#333333' }).text,
+                      border: `1px solid ${(STATUS_COLORS[detail?.status] || { border: '#e2e2e2' }).border}`,
                     }}
                   >
                     {detail.codigo}
