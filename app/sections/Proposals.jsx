@@ -1648,10 +1648,18 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                   {f.nome_original || f.path}
                 </span>
                 {(() => {
-                  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_REF || ''
-                  const url = projectRef
-                    ? `https://${projectRef}.supabase.co/storage/v1/object/public/${f.bucket}/${f.path}`
-                    : `/${f.bucket}/${f.path}`
+                  // Preferir URL fornecida pela API (pública ou assinada)
+                  let url = f.url || null
+                  if (!url) {
+                    // Fallback: montar a partir da NEXT_PUBLIC_SUPABASE_URL quando disponível
+                    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+                    if (base) {
+                      url = `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
+                    } else {
+                      // Último fallback: relativo (pode falhar em prod se sem proxy)
+                      url = `/${f.bucket}/${f.path}`
+                    }
+                  }
                   return (
                     <a
                       href={url}
