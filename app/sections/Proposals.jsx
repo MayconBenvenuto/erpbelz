@@ -1592,7 +1592,7 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const load = React.useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
