@@ -4,9 +4,16 @@ on:
   push:
     branches:
       - testes
+  workflow_dispatch:
+    inputs:
+      force_merge_dev_main:
+        description: "Forçar tentativa de merge dev->main (ignora label needs-full-qa se true)"
+        required: false
+        default: "false"
 
 concurrency:
   group: "auto-pr-${{ github.ref }}"
+  # Mantemos cancel-in-progress para evitar múltiplos pushes em testes competindo.
   cancel-in-progress: true
 
 permissions:
@@ -26,12 +33,24 @@ jobs:
             const { owner, repo } = context.repo;
             const head = 'testes';
             const base = 'dev';
-            // Listar PRs abertos com head testes e base dev
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', base
-            });
-            let existing = prs.find(p => p.head.ref === head && p.base.ref === base);
+
+            async function getExistingPR(attempts = 5) {
+              for (let i=1;i<=attempts;i++) {
+                try {
+                  const { data } = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base, per_page: 5 });
+                  return data[0];
+                } catch (e) {
+                  const retriable = !e.status || e.status >= 500;
+                  core.warning(`Falha listando PR (tentativa ${i}): ${e.message}`);
+                  if (!retriable || i === attempts) throw e;
+                  await new Promise(r=>setTimeout(r, 1000 * i));
+                }
+              }
+            }
+
+            let existing = await getExistingPR();
             if (!existing) {
+              core.notice('Nenhum PR existente testes->dev. Criando...');
               const created = await github.rest.pulls.create({ owner, repo, head, base, title: `Sync ${head} -> ${base}`, body: 'PR automático gerado pelo workflow ao receber push em testes.' });
               existing = created.data;
               core.notice(`PR criado #${existing.number}`);
@@ -127,7 +146,7 @@ jobs:
           GH_NO_UPDATE_NOTIFIER: 1
           GH_PROMPT_DISABLED: 1
 
-      - name: Merge automático PR testes->dev (fast-forward/squash)
+      - name: Merge automático PR testes->dev (fast-forward/squash resiliente)
         id: merge_testes_dev
         if: success()
         uses: actions/github-script@v7
@@ -136,37 +155,57 @@ jobs:
             const { owner, repo } = context.repo;
             const base = 'dev';
             const head = 'testes';
-            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base });
-            const pr = prs.find(p => p.head.ref === head && p.base.ref === base);
-            if (!pr) { core.notice('Nenhum PR testes->dev aberto para merge.'); return; }
-            // Aguarda campo mergeable ser calculado (pode vir null inicialmente)
-            async function waitMergeable(pull_number, attempts = 8, delayMs = 4000) {
-              for (let i = 0; i < attempts; i++) {
+
+            async function findPR() {
+              for (let attempt=1; attempt<=5; attempt++) {
+                try {
+                  const { data } = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base, per_page: 5 });
+                  return data[0];
+                } catch (e) {
+                  const retriable = !e.status || e.status >= 500;
+                  core.warning(`Erro listando PR testes->dev tentativa ${attempt}: ${e.message}`);
+                  if (!retriable || attempt===5) throw e;
+                  await new Promise(r=>setTimeout(r, 1200 * attempt));
+                }
+              }
+            }
+
+            const pr = await findPR();
+            if (!pr) { core.notice('Nenhum PR testes->dev aberto para merge.'); core.setOutput('merged','false'); return; }
+
+            async function waitMergeable(pull_number, attempts = 10, delayMs = 3000) {
+              for (let i=0;i<attempts;i++) {
                 const { data } = await github.rest.pulls.get({ owner, repo, pull_number });
-                if (data.mergeable !== null) return data;
-                await new Promise(r => setTimeout(r, delayMs));
+                if (data.mergeable !== null) {
+                  core.notice(`mergeable_state tentativa ${i+1}: ${data.mergeable_state}`);
+                  return data;
+                }
+                core.info(`mergeable null (tentativa ${i+1}) aguardando ${delayMs}ms`);
+                await new Promise(r=>setTimeout(r, delayMs));
               }
               throw new Error('Timeout aguardando estado mergeable != null');
             }
 
             let details = await waitMergeable(pr.number);
-            core.notice(`mergeable_state inicial: ${details.mergeable_state}`);
 
-            // Se branch está atrás da base, tenta atualizar
             if (details.mergeable_state === 'behind') {
+              core.notice('PR atrás de dev — tentando updateBranch...');
               try {
                 await github.rest.pulls.updateBranch({ owner, repo, pull_number: pr.number });
-                core.notice('Branch do PR atualizada com dev. Revalidando mergeability...');
                 details = await waitMergeable(pr.number);
-                core.notice(`Novo mergeable_state: ${details.mergeable_state}`);
               } catch (e) {
-                core.warning('Falha ao atualizar branch (talvez proteção bloqueando): ' + e.message);
+                core.warning(`Falha updateBranch: ${e.message}`);
               }
             }
 
-            const blockedStates = ['dirty','blocked','draft','unknown'];
-            if (blockedStates.includes(details.mergeable_state)) {
-              core.notice(`PR não mesclável automaticamente agora (estado ${details.mergeable_state}). Merge manual ou ajuste necessário.`);
+            const blocked = ['dirty','blocked','draft','unknown'];
+            if (blocked.includes(details.mergeable_state)) {
+              core.notice(`PR não mesclável agora (estado ${details.mergeable_state}).`);
+              core.setOutput('merged','false');
+              return;
+            }
+            if (details.mergeable_state === 'behind') {
+              core.notice('Ainda behind após updateBranch — evitando merge automático.');
               core.setOutput('merged','false');
               return;
             }
@@ -176,7 +215,7 @@ jobs:
               core.notice(`PR #${pr.number} mesclado (squash).`);
               core.setOutput('merged','true');
             } catch (e) {
-              core.setFailed(`Falha ao mesclar PR testes->dev após validações: ${e.message}`);
+              core.setFailed(`Falha ao mesclar PR testes->dev: ${e.message}`);
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -215,14 +254,30 @@ jobs:
             const { owner, repo } = context.repo;
             const base = 'main';
             const head = 'dev';
-            // Localiza PR aberto dev->main
-            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base });
-            const pr = prs.find(p => p.head.ref === head && p.base.ref === base);
+            const force = (core.getInput('force_merge_dev_main') || 'false').toLowerCase() === 'true';
+
+            async function findPR() {
+              for (let attempt=1; attempt<=5; attempt++) {
+                try {
+                  const { data } = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}`, base, per_page: 5 });
+                  return data[0];
+                } catch (e) {
+                  const retriable = !e.status || e.status >= 500;
+                  core.warning(`Erro listando PR dev->main tentativa ${attempt}: ${e.message}`);
+                  if (!retriable || attempt===5) throw e;
+                  await new Promise(r=>setTimeout(r, 1200 * attempt));
+                }
+              }
+            }
+
+            const pr = await findPR();
             if (!pr) { core.notice('Nenhum PR dev->main aberto para merge automático.'); return; }
-            // Verifica labels bloqueadoras
-            const labels = (pr.labels || []).map(l => l.name);
-            if (labels.includes('needs-full-qa')) { core.notice('Label needs-full-qa presente. Aguardando aprovação.'); return; }
-            // Verifica status combinado (caso existam checks)
+
+            const labels = (pr.labels || []).map(l=>l.name);
+            if (labels.includes('needs-full-qa') && !force) {
+              core.notice('Label needs-full-qa presente. Aguardando aprovação (ou usar workflow_dispatch force_merge_dev_main=true).');
+              return;
+            }
             try {
               const combined = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: pr.head.sha });
               if (combined.state && combined.state !== 'success') {
@@ -230,32 +285,39 @@ jobs:
                 return;
               }
             } catch (e) {
-              core.warning('Não foi possível obter status combinado: ' + e.message + ' (prosseguindo se demais condições ok)');
+              core.warning(`Falha obtendo combined status: ${e.message}`);
             }
-            // Função waitMergeable reutilizável
-            async function waitMergeable(pull_number, attempts = 8, delayMs = 4000) {
-              for (let i = 0; i < attempts; i++) {
+
+            async function waitMergeable(pull_number, attempts = 10, delayMs = 3000) {
+              for (let i=0;i<attempts;i++) {
                 const { data } = await github.rest.pulls.get({ owner, repo, pull_number });
-                if (data.mergeable !== null) return data;
-                await new Promise(r => setTimeout(r, delayMs));
+                if (data.mergeable !== null) {
+                  core.notice(`mergeable_state dev->main tentativa ${i+1}: ${data.mergeable_state}`);
+                  return data;
+                }
+                core.info(`mergeable null (dev->main) tentativa ${i+1}; aguardando ${delayMs}ms`);
+                await new Promise(r=>setTimeout(r, delayMs));
               }
-              throw new Error('Timeout aguardando estado mergeable != null');
+              throw new Error('Timeout aguardando estado mergeable != null (dev->main)');
             }
+
             let details = await waitMergeable(pr.number);
-            core.notice(`mergeable_state dev->main inicial: ${details.mergeable_state}`);
             if (details.mergeable_state === 'behind') {
               try {
                 await github.rest.pulls.updateBranch({ owner, repo, pull_number: pr.number });
-                core.notice('Branch dev atualizada com main (updateBranch). Revalidando...');
                 details = await waitMergeable(pr.number);
-              } catch (e) { core.warning('Falha ao atualizar branch dev->main: ' + e.message); }
+              } catch (e) {
+                core.warning(`Falha updateBranch dev->main: ${e.message}`);
+              }
             }
             const blocked = ['dirty','blocked','draft','unknown'];
-            if (blocked.includes(details.mergeable_state)) { core.notice(`PR dev->main não mesclável agora (estado ${details.mergeable_state}).`); return; }
+            if (blocked.includes(details.mergeable_state)) { core.notice(`PR dev->main não mesclável (estado ${details.mergeable_state}).`); return; }
+            if (details.mergeable_state === 'behind') { core.notice('Ainda behind dev->main após updateBranch. Abortando.'); return; }
+
             try {
               await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: 'squash' });
               core.notice(`PR dev->main #${pr.number} mesclado (squash) automaticamente.`);
-            } catch (e) { core.setFailed('Falha ao mesclar dev->main: ' + e.message); }
+            } catch (e) { core.setFailed(`Falha ao mesclar dev->main: ${e.message}`); }
 
       - name: Resultado final
         if: always()
