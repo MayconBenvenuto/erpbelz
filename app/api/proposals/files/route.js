@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus } from '@/lib/api-helpers'
 
 export const runtime = 'nodejs'
 
@@ -26,7 +26,11 @@ export async function GET(request) {
     .select('*')
     .eq('proposta_id', propostaId)
     .order('criado_em', { ascending: true })
-  if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
+  if (error)
+    return handleCORS(
+      NextResponse.json({ error: error.message }, { status: mapSupabaseErrorToStatus(error) }),
+      origin
+    )
   // Enriquecer com URL pública (ou assinada como fallback) para facilitar consumo no frontend
   try {
     const enriched = await Promise.all(
@@ -86,7 +90,10 @@ export async function POST(request) {
       .select()
       .single()
     if (error)
-      return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
+      return handleCORS(
+        NextResponse.json({ error: error.message }, { status: mapSupabaseErrorToStatus(error) }),
+        origin
+      )
     return handleCORS(NextResponse.json(data), origin)
   } catch (e) {
     return handleCORS(NextResponse.json({ error: 'Erro ao registrar' }, { status: 500 }), origin)

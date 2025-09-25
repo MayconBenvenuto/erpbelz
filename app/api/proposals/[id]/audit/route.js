@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus } from '@/lib/api-helpers'
 import { STATUS_OPTIONS } from '@/lib/constants'
 
 export async function GET(request, { params }) {
@@ -22,11 +22,23 @@ export async function GET(request, { params }) {
     .eq('proposta_id', id)
     .order('criado_em', { ascending: false })
 
-  if (error) return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
+  if (error)
+    return handleCORS(
+      NextResponse.json({ error: error.message }, { status: mapSupabaseErrorToStatus(error) }),
+      origin
+    )
 
   // Whitelist de campos auditáveis
-  const ALLOWED = new Set(['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email'])
-  const sanitized = (data || []).map(row => {
+  const ALLOWED = new Set([
+    'status',
+    'quantidade_vidas',
+    'valor',
+    'previsao_implantacao',
+    'operadora',
+    'consultor',
+    'consultor_email',
+  ])
+  const sanitized = (data || []).map((row) => {
     const filtered = {}
     const changes = row.changes || {}
     for (const k of Object.keys(changes)) {
@@ -35,12 +47,21 @@ export async function GET(request, { params }) {
         if (k === 'status') {
           const b = changes[k]?.before
           const a = changes[k]?.after
-          if ((b && !STATUS_OPTIONS.includes(String(b))) || (a && !STATUS_OPTIONS.includes(String(a)))) continue
+          if (
+            (b && !STATUS_OPTIONS.includes(String(b))) ||
+            (a && !STATUS_OPTIONS.includes(String(a)))
+          )
+            continue
         }
         filtered[k] = changes[k]
       }
     }
-    return { id: row.id, alterado_por: row.alterado_por, criado_em: row.criado_em, changes: filtered }
+    return {
+      id: row.id,
+      alterado_por: row.alterado_por,
+      criado_em: row.criado_em,
+      changes: filtered,
+    }
   })
   return handleCORS(NextResponse.json(sanitized), origin)
 }
