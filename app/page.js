@@ -793,6 +793,35 @@ function AppContent() {
     if (currentUser) loadData()
   }, [currentUser, loadData])
 
+  // Verificar status da senha após carregar usuário
+  useEffect(() => {
+    if (currentUser) {
+      const verifyPasswordStatus = async () => {
+        try {
+          const token = sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
+          if (token) {
+            const meResponse = await fetch('/api/auth/me', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (meResponse.ok) {
+              const { user } = await meResponse.json()
+              // Atualizar o estado do usuário se necessário
+              if (user.must_change_password !== currentUser.must_change_password) {
+                setCurrentUser((prev) => ({
+                  ...prev,
+                  must_change_password: user.must_change_password,
+                }))
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Erro ao verificar status da senha:', error)
+        }
+      }
+      verifyPasswordStatus()
+    }
+  }, [currentUser])
+
   // Renovar token se usuário autenticado via cookie e token ausente
   useEffect(() => {
     if (currentUser && !token) {
