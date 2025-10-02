@@ -59,11 +59,17 @@ export async function POST(request) {
     const path = `proposta_${safeCodigo}/${categoria}/${Date.now()}_${original.replace(/[^a-zA-Z0-9_.-]/g,'_')}`
     const { error: upErr } = await supabase.storage.from('implantacao_upload').upload(path, buffer, { upsert: false, contentType: mime || undefined })
     if (upErr) {
-      return handleCORS(NextResponse.json({ error: 'Falha no upload', detalhe: upErr.message }), { status: 500 })
+      return handleCORS(
+        NextResponse.json({ error: 'Falha no upload', detalhe: upErr.message }, { status: 500 }),
+        origin
+      )
     }
     const { data: pub } = await supabase.storage.from('implantacao_upload').getPublicUrl(path)
     return handleCORS(NextResponse.json({ path, publicUrl: pub?.publicUrl || null }), origin)
   } catch (e) {
-    return handleCORS(NextResponse.json({ error: 'Erro no upload', detalhe: e?.message }), { status: 500 })
+    return handleCORS(
+      NextResponse.json({ error: 'Erro no upload', detalhe: e?.message }, { status: 500 }),
+      origin
+    )
   }
 }

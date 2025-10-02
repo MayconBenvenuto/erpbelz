@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { supabase, handleCORS } from '@/lib/api-helpers'
 import { generateToken, verifyPassword, validateEmail, sanitizeForLog, checkRateLimit } from '@/lib/security'
 

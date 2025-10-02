@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus, supabaseConfigStatus } from '@/lib/api-helpers'
 import { STATUS_OPTIONS } from '@/lib/constants'
+
+export const runtime = 'nodejs'
 
 export async function GET(request, { params }) {
   const origin = request.headers.get('origin')
@@ -8,10 +10,22 @@ export async function GET(request, { params }) {
   if (auth.error) {
     return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   }
+  const cfg = supabaseConfigStatus()
+  if (!cfg.hasUrl || !cfg.hasAnonKey) {
+    return handleCORS(NextResponse.json({ error: 'Supabase não configurado para runtime', config: cfg }, { status: 503 }), origin)
+  }
   // gestores podem ver qualquer histórico; analistas apenas dos seus
   const { id } = params
   // Busca proposta p/ checar autoria quando não gestor
-  const { data: prop } = await supabase.from('propostas').select('criado_por').eq('id', id).single()
+  const { data: prop, error: propErr } = await supabase
+    .from('propostas')
+    .select('criado_por')
+    .eq('id', id)
+    .single()
+  if (propErr) {
+    const status = mapSupabaseErrorToStatus(propErr)
+    return handleCORS(NextResponse.json({ error: propErr.message }, { status }), origin)
+  }
   if (auth.user.tipo_usuario !== 'gestor' && prop?.criado_por !== auth.user.id) {
     return handleCORS(NextResponse.json({ error: 'Sem permissão' }, { status: 403 }), origin)
   }

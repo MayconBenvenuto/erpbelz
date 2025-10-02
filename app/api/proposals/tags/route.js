@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus } from '@/lib/api-helpers'
+import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus, supabaseConfigStatus } from '@/lib/api-helpers'
 import { sanitizeInput } from '@/lib/security'
 
 export const runtime = 'nodejs'
@@ -14,6 +14,16 @@ export async function GET(request) {
   const auth = await requireAuth(request)
   if (auth.error)
     return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
+  const cfg = supabaseConfigStatus()
+  if (!cfg.hasUrl || !(cfg.hasAnonKey || cfg.hasServiceRoleKey)) {
+    return handleCORS(
+      NextResponse.json(
+        { error: 'Supabase não configurado para runtime', config: cfg },
+        { status: 503 }
+      ),
+      origin
+    )
+  }
   const { searchParams } = new URL(request.url)
   const proposta_id = searchParams.get('proposta_id')
   if (!proposta_id)
@@ -23,9 +33,9 @@ export async function GET(request) {
     )
   const { data, error } = await supabase
     .from('propostas_tags')
-    .select('proposta_id, tag, criado_em')
+    .select('proposta_id, tag, aplicado_em')
     .eq('proposta_id', proposta_id)
-    .order('criado_em', { ascending: false })
+    .order('aplicado_em', { ascending: false })
   if (error)
     return handleCORS(
       NextResponse.json({ error: error.message }, { status: mapSupabaseErrorToStatus(error) }),

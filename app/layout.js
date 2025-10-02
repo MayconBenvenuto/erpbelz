@@ -1,7 +1,7 @@
 import './globals.css'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import React from 'react'
-import KeepAlivePing from '../components/keep-alive-ping'
+import KeepAlivePing from '@/components/keep-alive-ping'
 
 export const metadata = {
   title: 'Sistema de Gestão - Belz',
@@ -27,10 +27,10 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/logo-belz.jpg" sizes="32x32" />
         <link rel="apple-touch-icon" href="/logo-belz.jpg" />
       </head>
-    <body className="min-h-screen bg-background text-foreground antialiased scroll-smooth">
-  {children}
-  <KeepAlivePing />
-  <SpeedInsights />
+      <body className="min-h-screen bg-background text-foreground antialiased scroll-smooth">
+        {children}
+        <KeepAlivePing />
+        <SpeedInsights />
       </body>
     </html>
   )

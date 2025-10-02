@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { NovaPropostaDialog } from '@/components/propostas/NovaPropostaDialog'
-import { PlusCircle, X, ArrowUpDown, Clock } from 'lucide-react'
+import { PlusCircle, X, ArrowUpDown, Clock, Eye, Download, FileText } from 'lucide-react'
 // Virtualização: carregamento dinâmico para evitar erro de build caso a lib mude formato de export
 // e para não quebrar em ambientes onde "react-window" não esteja disponível (fallback graceful)
 // Virtualização simples baseada em altura fixa de item (itemSize)
@@ -248,6 +248,7 @@ function ProposalsInner({
 
   // Merge live updates em proposals para exibição responsiva sem refetch completo
   const proposalsMerged = useMemo(() => {
+    if (!Array.isArray(proposals)) return []
     const map = new Map(proposals.map((p) => [p.id, p]))
     Object.entries(liveUpdates).forEach(([id, patch]) => {
       if (map.has(id)) {
@@ -715,7 +716,7 @@ function ProposalsInner({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    {users.map((u) => (
+                    {(Array.isArray(users) ? users : []).map((u) => (
                       <SelectItem key={u.id} value={String(u.id)}>
                         {u.nome}
                       </SelectItem>
@@ -1185,7 +1186,7 @@ function ProposalsInner({
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((u) => (
+                        {(Array.isArray(users) ? users : []).map((u) => (
                           <SelectItem key={u.id} value={String(u.id)}>
                             {u.nome}
                           </SelectItem>
@@ -1541,13 +1542,29 @@ function exportCsv(rows) {
 function AuditDrawer({ id, onClose }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const res = await fetch(`/api/proposals/${id}/audit`, { credentials: 'include' })
-        const data = await res.json().catch(() => [])
-        if (mounted) setItems(Array.isArray(data) ? data : [])
+        const bearer =
+          typeof window !== 'undefined'
+            ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+            : ''
+        const res = await fetch(`/api/proposals/${id}/audit`, {
+          credentials: 'include',
+          headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          if (mounted) {
+            setError(body?.error || `Falha ao carregar histórico (HTTP ${res.status})`)
+            setItems([])
+          }
+        } else {
+          const data = await res.json().catch(() => [])
+          if (mounted) setItems(Array.isArray(data) ? data : [])
+        }
       } finally {
         if (mounted) setLoading(false)
       }
@@ -1572,20 +1589,24 @@ function AuditDrawer({ id, onClose }) {
           </Button>
         </div>
         <div className="p-4 space-y-3 text-sm">
-          {loading
-            ? 'Carregando…'
-            : items.length === 0
-              ? 'Sem registros'
-              : items.map((it) => (
-                  <div key={it.id} className="p-3 rounded border">
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(it.criado_em).toLocaleString('pt-BR')}
-                    </div>
-                    <pre className="text-xs whitespace-pre-wrap mt-1">
-                      {JSON.stringify(it.changes, null, 2)}
-                    </pre>
-                  </div>
-                ))}
+          {loading ? (
+            'Carregando…'
+          ) : error ? (
+            <div className="text-xs text-destructive">{String(error)}</div>
+          ) : items.length === 0 ? (
+            'Sem registros'
+          ) : (
+            items.map((it) => (
+              <div key={it.id} className="p-3 rounded border">
+                <div className="text-xs text-muted-foreground">
+                  {new Date(it.criado_em).toLocaleString('pt-BR')}
+                </div>
+                <pre className="text-xs whitespace-pre-wrap mt-1">
+                  {JSON.stringify(it.changes, null, 2)}
+                </pre>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -1604,15 +1625,31 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
     setLoading(true)
     setError(null)
     try {
+      const bearer =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+          : ''
       const r = await fetch(`/api/proposals/files?proposta_id=${proposalId}`, {
         credentials: 'include',
+        headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
       })
       if (!r.ok) {
-        setError('Falha ao carregar')
+        const j = await r.json().catch(() => ({}))
+        setError(j?.error || `Falha ao carregar (HTTP ${r.status})`)
         return
       }
       const j = await r.json().catch(() => ({}))
-      setFiles(Array.isArray(j.data) ? j.data : [])
+      if (j?.meta?.missingTable) {
+        // Migration de metadados ainda não aplicada -> instrução ao usuário admin e fallback a zero arquivos
+        setError(null)
+        setFiles([])
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[FILES] Tabela propostas_arquivos ausente; aplicar migration 20250909_add_propostas_arquivos.sql'
+        )
+      } else {
+        setFiles(Array.isArray(j.data) ? j.data : [])
+      }
     } catch {
       setError('Erro de rede')
     } finally {
@@ -1636,45 +1673,127 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
       <h4 className="font-semibold text-sm">Documentos</h4>
       {loading && <p className="text-xs text-muted-foreground">Carregando...</p>}
       {!loading && error && <p className="text-xs text-destructive">{error}</p>}
-      {!loading &&
-        !error &&
-        (files.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Nenhum documento registrado</p>
-        ) : (
-          <ul className="space-y-1 max-h-40 overflow-auto pr-1 text-xs">
-            {files.map((f) => (
-              <li key={f.id} className="flex items-center gap-2 p-2 border rounded bg-muted/20">
-                <span className="flex-1 truncate" title={f.nome_original || f.path}>
-                  {f.nome_original || f.path}
-                </span>
+      {!loading && !error && files.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Nenhum documento registrado
+          <br />
+          <span className="block opacity-70">
+            (Se você é admin e espera anexos: confirme que a migration de arquivos foi aplicada.)
+          </span>
+        </p>
+      )}
+      {!loading && !error && files.length > 0 && (
+        <ul className="space-y-1 max-h-40 overflow-auto pr-1 text-xs">
+          {files.map((f) => (
+            <li key={f.id} className="flex items-center gap-2 p-2 border rounded bg-muted/20">
+              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="flex-1 truncate" title={f.nome_original || f.path}>
+                {f.nome_original || f.path}
+              </span>
+              <div className="flex items-center gap-1">
                 {(() => {
-                  // Preferir URL fornecida pela API (pública ou assinada)
-                  let url = f.url || null
-                  if (!url) {
-                    // Fallback: montar a partir da NEXT_PUBLIC_SUPABASE_URL quando disponível
+                  const computeProxy = () => {
+                    if (f.download_url || f.proxy_url) return f.proxy_url || f.download_url
+                    if (!f.bucket || !f.path) return null
+                    return `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
+                  }
+                  const proxyUrl = computeProxy()
+                  const viewUrl = (() => {
+                    if (f.url) return f.url
+                    if (proxyUrl) return proxyUrl
                     const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-                    if (base) {
-                      url = `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
-                    } else {
-                      // Último fallback: relativo (pode falhar em prod se sem proxy)
-                      url = `/${f.bucket}/${f.path}`
+                    if (base && f.bucket && f.path) {
+                      return `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
+                    }
+                    return null
+                  })()
+                  const downloadEndpoint = (() => {
+                    if (f.download_url) return f.download_url
+                    if (proxyUrl) {
+                      return `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}download=1`
+                    }
+                    return viewUrl
+                  })()
+
+                  const handleDownload = async (e) => {
+                    e.preventDefault()
+                    try {
+                      if (!downloadEndpoint) {
+                        toast?.error?.('Link de download indisponível')
+                        return
+                      }
+                      const bearer =
+                        typeof window !== 'undefined'
+                          ? sessionStorage.getItem('erp_token') ||
+                            sessionStorage.getItem('crm_token') ||
+                            ''
+                          : ''
+                      const response = await fetch(downloadEndpoint, {
+                        credentials: 'include',
+                        headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
+                      })
+
+                      if (!response.ok) {
+                        let message = `Erro ao baixar arquivo (HTTP ${response.status})`
+                        try {
+                          const payload = await response.clone().json()
+                          if (payload?.error) message = payload.error
+                        } catch {}
+                        toast?.error?.(message)
+                        // eslint-disable-next-line no-console
+                        console.error('[Proposals][download] resposta inesperada', {
+                          status: response.status,
+                          statusText: response.statusText,
+                        })
+                        return
+                      }
+
+                      const blob = await response.blob()
+                      const downloadUrl = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = downloadUrl
+                      a.download = f.nome_original || f.path.split('/').pop() || 'documento'
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
+                      window.URL.revokeObjectURL(downloadUrl)
+                      toast?.success?.('Download iniciado')
+                    } catch (error) {
+                      // eslint-disable-next-line no-console
+                      console.error('[Proposals][download] erro inesperado', {
+                        name: error?.name,
+                        message: error?.message,
+                      })
+                      toast?.error?.('Erro ao baixar arquivo')
                     }
                   }
+
                   return (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary underline"
-                    >
-                      abrir
-                    </a>
+                    <>
+                      <a
+                        href={viewUrl || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-white hover:underline"
+                        title="Abrir em nova aba"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </a>
+                      <button
+                        onClick={handleDownload}
+                        className="text-white hover:text-primary/80"
+                        title="Baixar arquivo"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </>
                   )
                 })()}
-              </li>
-            ))}
-          </ul>
-        ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

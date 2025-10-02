@@ -4,6 +4,7 @@
 
 - **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
 - **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
+- **[Troubleshooting - Instalação](TROUBLESHOOTING_INSTALACAO.md)** - Soluções para problemas comuns de instalação
 
 ### 🌐 Documentação Pública da API
 
@@ -143,6 +144,12 @@ EMAIL_FROM=comunicacao@belzseguros.com.br
 EMAIL_FROM_NAME=ERP Belz
 # TLS/SNI – defina quando o certificado do provedor for curinga (ex.: *.skymail.net.br)
 SMTP_TLS_SERVERNAME=skymail.net.br
+# Forçar que a conexão seja promovida para STARTTLS (falha se não suportar)
+SMTP_REQUIRE_TLS=true
+# Usar conexão segura direta (tipicamente porta 465). Define secure=true
+# SMTP_FORCE_SECURE=true
+# Ativar logs de debug de conexão (não expõe senha, mas usar só em staging)
+# SMTP_CONNECTION_DEBUG=true
 # NUNCA desabilite verificação de certificado em produção; use apenas para diagnóstico local
 # SMTP_TLS_REJECT_UNAUTHORIZED=false
 

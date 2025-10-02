@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 import { supabase, handleCORS, requireAuth, cacheJson } from '@/lib/api-helpers'
+import { performance } from 'node:perf_hooks'
 
 // Probabilidades para forecast ponderado por estágio
 const STATUS_PROB = {
@@ -49,17 +50,19 @@ export async function GET(request) {
     return handleCORS(NextResponse.json({ message: 'Acesso negado' }, { status: 403 }), origin)
   }
 
+  const queryStarted = performance.now()
   const { searchParams } = new URL(request.url)
   const spStart = searchParams.get('start')
   const spEnd = searchParams.get('end')
   const { start, end } = (isValidDateString(spStart) && isValidDateString(spEnd)) ? { start: spStart, end: spEnd } : monthRange()
+  const endInclusiveISO = new Date(new Date(end).getTime() + 24 * 60 * 60 * 1000).toISOString()
 
   // Busca propostas do período (criadas no range)
   const { data: props, error } = await supabase
     .from('propostas')
     .select('id, criado_em, status, valor, quantidade_vidas, operadora, consultor, consultor_email, criado_por, codigo')
     .gte('criado_em', start)
-    .lt('criado_em', new Date(new Date(end).getTime() + 24 * 60 * 60 * 1000).toISOString())
+    .lt('criado_em', endInclusiveISO)
 
   if (error) {
     return handleCORS(NextResponse.json({ message: 'Erro ao carregar métricas', detail: error.message }, { status: 400 }), origin)
@@ -69,13 +72,29 @@ export async function GET(request) {
 
   // Mapa de usuários (todos menos gestores para rankingUsuarios)
   const userIds = Array.from(new Set(proposals.map(p => p.criado_por).filter(Boolean)))
-  let usersById = {}
-  let users = []
-  if (userIds.length) {
-    const { data: udata } = await supabase.from('usuarios').select('id, nome, email, tipo_usuario').in('id', userIds)
-    users = udata || []
-    usersById = Object.fromEntries(users.map(u => [u.id, u]))
+  const usersPromise = userIds.length
+    ? supabase.from('usuarios').select('id, nome, email, tipo_usuario').in('id', userIds)
+    : Promise.resolve({ data: [], error: null })
+  const auditPromise = proposals.length
+    ? supabase
+        .from('propostas_auditoria')
+        .select('proposta_id, changes, criado_em')
+        .in('proposta_id', proposals.map(p => p.id))
+        .gte('criado_em', start)
+        .order('criado_em', { ascending: true })
+    : Promise.resolve({ data: [], error: null })
+
+  const [{ data: udata, error: usersError }, { data: auditsRaw, error: auditsError }] = await Promise.all([usersPromise, auditPromise])
+
+  if (usersError) {
+    return handleCORS(NextResponse.json({ message: 'Erro ao carregar usuários', detail: usersError.message }, { status: 400 }), origin)
   }
+  if (auditsError) {
+    return handleCORS(NextResponse.json({ message: 'Erro ao carregar auditoria', detail: auditsError.message }, { status: 400 }), origin)
+  }
+
+  const users = udata || []
+  const usersById = Object.fromEntries((udata || []).map(u => [u.id, u]))
 
   // Funções auxiliares
   const sum = (arr, sel) => arr.reduce((acc, it) => acc + (Number(sel(it)) || 0), 0)
@@ -83,14 +102,8 @@ export async function GET(request) {
 
   // --- Histórico de status (para métricas temporais) ---
   let statusHistory = []
-  if (proposals.length) {
-    const ids = proposals.map(p => p.id)
-    const { data: audits } = await supabase
-      .from('propostas_auditoria')
-      .select('proposta_id, changes, criado_em')
-      .in('proposta_id', ids)
-      .order('criado_em', { ascending: true })
-    statusHistory = (audits || []).filter(a => a?.changes?.status && a.changes.status.after)
+  if (Array.isArray(auditsRaw) && auditsRaw.length) {
+    statusHistory = auditsRaw.filter(a => a?.changes?.status && a.changes.status.after)
   }
 
   // Reconstrói timeline de status por proposta
@@ -339,6 +352,8 @@ export async function GET(request) {
   }
   const vidasPorOperadora = Object.values(byOperadora).sort((a, b) => b.vidas_total - a.vidas_total)
 
+  const tookMs = Math.round(Math.max(performance.now() - queryStarted, 0))
+
   const result = {
     periodo: { start, end },
     kpis,
@@ -352,9 +367,22 @@ export async function GET(request) {
     rankingConsultores,
     rankingConsultoresEmail,
     vidasPorOperadora,
-    meta_info: { sla_dias: SLA_IMPLANTACAO_DIAS, estagnacao_dias: ESTAGNAÇÃO_DIAS, prob_status: STATUS_PROB }
+    meta_info: { sla_dias: SLA_IMPLANTACAO_DIAS, estagnacao_dias: ESTAGNAÇÃO_DIAS, prob_status: STATUS_PROB },
+    meta: { took_ms: tookMs, total_propostas: totalPropostas }
+  }
+
+  if (tookMs) {
+    try {
+      // eslint-disable-next-line no-console
+      console.info('[API][reports:performance]', {
+        user: auth.user?.id || 'anon',
+        periodo: { start, end },
+        total_propostas: totalPropostas,
+        took_ms: tookMs,
+      })
+    } catch {}
   }
 
   // Dashboard é consultado com frequência; aplicar cache privado com ETag
-  return cacheJson(request, origin, result, { maxAge: 60, swr: 180, status: 200 })
+  return cacheJson(request, origin, result, { maxAge: 300, swr: 900, status: 200, headers: tookMs ? { 'X-Query-Duration-MS': tookMs } : undefined })
 }

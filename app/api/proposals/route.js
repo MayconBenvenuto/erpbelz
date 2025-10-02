@@ -7,11 +7,15 @@ import { hasPermission } from '@/lib/rbac'
 import { sendEmail } from '@/lib/email'
 import { renderBrandedEmail } from '@/lib/email-template'
 import { formatCurrency, formatCNPJ } from '@/lib/utils'
+import { performance } from 'node:perf_hooks'
 
 export async function OPTIONS(request) {
 	const origin = request.headers.get('origin')
 	return handleCORS(new NextResponse(null, { status: 200 }), origin)
 }
+
+const DEFAULT_LIST_COLUMNS = 'id,codigo,cnpj,cliente_nome,cliente_email,consultor,consultor_email,operadora,quantidade_vidas,valor,previsao_implantacao,status,criado_por,atendido_por,criado_em,updated_at,atendido_em'
+const DEFAULT_DETAIL_COLUMNS = '*'
 
 export async function GET(request) {
 	const origin = request.headers.get('origin')
@@ -24,8 +28,9 @@ export async function GET(request) {
 		return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
 	}
 
-	const buildBase = (columns = '*') => {
-		let q = supabase.from('propostas').select(columns)
+	const buildBase = (columns = '*', { includeCount = false } = {}) => {
+		const selectOptions = includeCount ? { count: 'estimated' } : { }
+		let q = supabase.from('propostas').select(columns, selectOptions)
 		if (auth.user.tipo_usuario === 'consultor') {
 			// Consultor: vê apenas propostas que criou ou cujo email de consultor é o seu
 			q = q.or(`criado_por.eq.${auth.user.id},consultor_email.eq.${auth.user.email}`)
@@ -47,9 +52,7 @@ export async function GET(request) {
 		const { searchParams } = new URL(request.url)
 		const code = (searchParams.get('code') || '').trim()
 		const fields = (searchParams.get('fields') || '').trim()
-		const columns = fields === 'list'
-			? 'id,codigo,cnpj,cliente_nome,cliente_email,consultor,consultor_email,operadora,quantidade_vidas,valor,previsao_implantacao,status,criado_por,atendido_por,criado_em,updated_at,atendido_em'
-			: '*'
+		const columns = fields === 'list' ? DEFAULT_LIST_COLUMNS : DEFAULT_DETAIL_COLUMNS
 		if (code) {
 			let q = buildBase(columns).ilike('codigo', code)
 			const { data: one, error: err } = await q.limit(1)
@@ -60,30 +63,33 @@ export async function GET(request) {
 	} catch (_) {}
 
 	// Paginação e seleção de colunas
-	let data, error, count
+	let data, error, count, durationMs = null, hasExplicitPagination = false
+	let page = 1
+	let pageSize = 50
 	try {
 		const { searchParams } = new URL(request.url)
-		const page = Number(searchParams.get('page') || '')
-		const pageSize = Number(searchParams.get('pageSize') || '')
+		const rawPage = searchParams.get('page')
+		const rawPageSize = searchParams.get('pageSize')
 		const fields = (searchParams.get('fields') || '').trim()
-		const columns = fields === 'list'
-			? 'id,codigo,cnpj,cliente_nome,cliente_email,consultor,consultor_email,operadora,quantidade_vidas,valor,previsao_implantacao,status,criado_por,atendido_por,criado_em,updated_at,atendido_em'
-			: '*'
-		let q = buildBase(columns)
+		const columns = fields === 'list' ? DEFAULT_LIST_COLUMNS : DEFAULT_DETAIL_COLUMNS
+		hasExplicitPagination = searchParams.has('page') || searchParams.has('pageSize')
+		page = Math.max(1, Number.parseInt(rawPage ?? '1', 10) || 1)
+		pageSize = (() => {
+			const parsed = Number.parseInt(rawPageSize ?? '50', 10)
+			if (!Number.isFinite(parsed) || parsed <= 0) return 50
+			return Math.min(parsed, 200)
+		})()
+		const from = (page - 1) * pageSize
+		const to = from + pageSize - 1
+		let q = buildBase(columns, { includeCount: true })
 		q = q.order('codigo', { ascending: true }).order('criado_em', { ascending: true })
-		if (Number.isInteger(page) && page > 0 && Number.isInteger(pageSize) && pageSize > 0) {
-			const from = (page - 1) * pageSize
-			const to = from + pageSize - 1
-			const r = await q.range(from, to)
-			data = r.data; error = r.error
-			// count em chamada separada para não transferir linhas
-			try {
-				const rc = await buildBase('id').select('id', { count: 'exact', head: true })
-				count = rc.count || 0
-			} catch { count = 0 }
-		} else {
-			const r = await q
-			data = r.data; error = r.error
+		const started = performance.now()
+		const r = await q.range(from, to)
+		data = r.data; error = r.error; count = r.count ?? null
+		durationMs = Number.isFinite(started) ? Math.round(performance.now() - started) : null
+		if (!hasExplicitPagination) {
+			// Compatibilidade: retornar array puro quando consumidor não informou paginação
+			count = null
 		}
 	} catch (e) {
 		return handleCORS(NextResponse.json({ error: 'Erro ao consultar' }, { status: 500 }), origin)
@@ -106,15 +112,25 @@ export async function GET(request) {
 	})
 
 	// Compat: sem paginação => array; com paginação => objeto com meta
+	const durationHeader = durationMs != null ? { 'X-Query-Duration-MS': durationMs } : undefined
+	if (durationMs != null) {
+		try {
+			// eslint-disable-next-line no-console
+			console.info('[API][propostas:list]', {
+				user: auth.user?.id || 'anon',
+				rows: Array.isArray(enriched) ? enriched.length : 0,
+				page: hasExplicitPagination ? page : 'default',
+				pageSize: hasExplicitPagination ? pageSize : 'default',
+				took_ms: durationMs,
+			})
+		} catch {}
+	}
 	try {
-		const { searchParams } = new URL(request.url)
-		const page = Number(searchParams.get('page') || '')
-		const pageSize = Number(searchParams.get('pageSize') || '')
-		if (Number.isInteger(page) && page > 0 && Number.isInteger(pageSize) && pageSize > 0) {
-			return cacheJson(request, origin, { data: enriched, page, pageSize, total: count ?? enriched.length }, { maxAge: 60, swr: 300 })
+		if (hasExplicitPagination) {
+			return cacheJson(request, origin, { data: enriched, page, pageSize, total: count ?? enriched.length, took_ms: durationMs ?? undefined }, { maxAge: 60, swr: 300, headers: durationHeader })
 		}
 	} catch {}
-	return cacheJson(request, origin, enriched, { maxAge: 60, swr: 300 })
+	return cacheJson(request, origin, enriched, { maxAge: 60, swr: 300, headers: durationHeader })
 }
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/

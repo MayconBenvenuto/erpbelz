@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts'
 import OperadoraBadge from '@/components/ui/operadora-badge'
+import { useReportsPerformance } from '@/hooks/use-api'
 
 export default function ReportsSection({
   users,
@@ -29,7 +30,26 @@ export default function ReportsSection({
   token,
 }) {
   const [refreshing, setRefreshing] = useState(false)
-  const [perf, setPerf] = useState(null)
+  const [start, setStart] = useState(() =>
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+  )
+  const [end, setEnd] = useState(() =>
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10)
+  )
+  const [reportsEnabled, setReportsEnabled] = useState(false)
+  const {
+    data: perf,
+    isFetching: isPerfFetching,
+    isError: perfIsError,
+    error: perfError,
+    refetch: refetchPerformance,
+  } = useReportsPerformance({
+    start,
+    end,
+    token,
+    enabled: reportsEnabled && currentUser?.tipo_usuario === 'gestor',
+  })
+  const isPerfLoading = reportsEnabled && isPerfFetching
   // Estados para alertas de propostas estagnadas
   const [alertsInfo, setAlertsInfo] = useState(null)
   const [loadingAlerts, setLoadingAlerts] = useState(false)
@@ -48,13 +68,6 @@ export default function ReportsSection({
     if (!lastActivity) return false
     return now - new Date(lastActivity).getTime() < 5 * 60 * 1000
   }, [])
-  const [loadingPerf, setLoadingPerf] = useState(false)
-  const [start, setStart] = useState(() =>
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
-  )
-  const [end, setEnd] = useState(() =>
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10)
-  )
   // Filtrar gestores do monitoramento
   const analystUsers = useMemo(
     () => (Array.isArray(users) ? users.filter((u) => u.tipo_usuario !== 'gestor') : []),
@@ -132,33 +145,7 @@ export default function ReportsSection({
     return () => clearInterval(id)
   }, [currentUser?.tipo_usuario, loadOnlineUsers])
 
-  const loadPerformance = async () => {
-    if (currentUser?.tipo_usuario !== 'gestor') return
-    setLoadingPerf(true)
-    try {
-      const res = await fetch(`/api/reports/performance?start=${start}&end=${end}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      if (!res.ok) return
-      const data = await res.json()
-      setPerf(data)
-    } catch (_) {
-      // silencioso no relatório
-    } finally {
-      setLoadingPerf(false)
-    }
-  }
-
-  useEffect(() => {
-    loadPerformance()
-    if (currentUser?.tipo_usuario === 'gestor') {
-      loadAlertsInfo()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Carrega informações dos alertas
-  const loadAlertsInfo = async () => {
+  const loadAlertsInfo = useCallback(async () => {
     if (currentUser?.tipo_usuario !== 'gestor') return
     setLoadingAlerts(true)
     try {
@@ -174,7 +161,50 @@ export default function ReportsSection({
     } finally {
       setLoadingAlerts(false)
     }
-  }
+  }, [currentUser?.tipo_usuario, token])
+
+  const handleUpdatePerformance = useCallback(async () => {
+    if (currentUser?.tipo_usuario !== 'gestor') return
+    if (!reportsEnabled) {
+      setReportsEnabled(true)
+    }
+    try {
+      await refetchPerformance()
+    } finally {
+      loadAlertsInfo()
+    }
+  }, [currentUser?.tipo_usuario, loadAlertsInfo, refetchPerformance, reportsEnabled])
+
+  useEffect(() => {
+    if (currentUser?.tipo_usuario !== 'gestor' || reportsEnabled) return
+    if (typeof window === 'undefined') {
+      setReportsEnabled(true)
+      return
+    }
+    const enable = () => setReportsEnabled(true)
+    let idleId = null
+    let timeoutId = null
+    if ('requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(enable, { timeout: 1500 })
+    } else {
+      timeoutId = window.setTimeout(enable, 800)
+    }
+    return () => {
+      if (idleId && window.cancelIdleCallback) window.cancelIdleCallback(idleId)
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [currentUser?.tipo_usuario, reportsEnabled])
+
+  useEffect(() => {
+    if (currentUser?.tipo_usuario !== 'gestor' || !reportsEnabled) return
+    loadAlertsInfo()
+  }, [currentUser?.tipo_usuario, loadAlertsInfo, reportsEnabled])
+
+  useEffect(() => {
+    if (perfIsError && perfError) {
+      toast.error(`❌ Erro ao carregar relatórios: ${perfError.message || 'Falha inesperada'}`)
+    }
+  }, [perfError, perfIsError])
 
   // Executa verificação manual de alertas
   const triggerStaleCheck = async () => {
@@ -212,8 +242,8 @@ export default function ReportsSection({
               <label className="text-sm block mb-1">Fim</label>
               <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
             </div>
-            <Button onClick={loadPerformance} disabled={loadingPerf} className="ml-auto">
-              {loadingPerf ? 'Atualizando...' : 'Atualizar'}
+            <Button onClick={handleUpdatePerformance} disabled={isPerfLoading} className="ml-auto">
+              {isPerfLoading ? 'Atualizando...' : perf ? 'Atualizar' : 'Carregar'}
             </Button>
           </div>
 

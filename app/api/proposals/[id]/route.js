@@ -8,6 +8,16 @@ import { formatCurrency, formatCNPJ } from '@/lib/utils'
 import { STATUS_OPTIONS, OPERADORAS } from '@/lib/constants'
 import { z } from 'zod'
 
+// Importar broadcast para notificação SSE em tempo real
+let broadcast = null
+try {
+  const eventsModule = await import('../events/route.js')
+  broadcast = eventsModule.broadcast
+} catch {
+  // Fallback silencioso se módulo não disponível
+  broadcast = () => {}
+}
+
 // Validações endurecidas
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
 const validateFutureOrToday = (d) => {
@@ -53,11 +63,27 @@ export async function GET(request, { params }) {
     return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   }
   const { id } = params
-  const { data: proposal, error } = await supabase
-    .from('propostas')
-  .select('id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, previsao_implantacao, cliente_nome, cliente_email, criado_em, observacoes_cliente')
-    .eq('id', id)
-    .single()
+  const columns = 'id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, previsao_implantacao, cliente_nome, cliente_email, criado_em, observacoes_cliente'
+  // 1) Tenta por UUID (com um retry curto para mitigar latência de replicação)
+  async function fetchById() {
+    return await supabase.from('propostas').select(columns).eq('id', id).single()
+  }
+  let { data: proposal, error } = await fetchById()
+  if ((error || !proposal)) {
+    try {
+      await new Promise((r) => setTimeout(r, 120))
+      const retry = await fetchById()
+      proposal = retry.data; error = retry.error
+    } catch {}
+  }
+  // 2) Fallback: se não achou, tenta por código (PRP0001)
+  if ((error || !proposal) && typeof id === 'string') {
+    const code = id.trim()
+    if (/^PRP\d+$/i.test(code)) {
+      const alt = await supabase.from('propostas').select(columns).eq('codigo', code).single()
+      proposal = alt.data; error = alt.error
+    }
+  }
   if (error || !proposal) {
     return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
   }
@@ -173,6 +199,23 @@ export async function PATCH(request, { params }) {
         changes: { claim: { before: null, after: { atendido_por: auth.user.id, atendido_em: claimed.atendido_em } } }
       })
     } catch (_) {}
+    
+    // Broadcast SSE para feedback visual imediato de claim
+    try {
+      if (broadcast) {
+        broadcast('proposta_update', {
+          id: claimed.id,
+          codigo: claimed.codigo,
+          status: claimed.status,
+          atendido_por: claimed.atendido_por,
+          atendido_em: claimed.atendido_em,
+          updated_at: new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      try { console.warn('[SSE] broadcast claim failed', sanitizeForLog({ message: err?.message })) } catch {}
+    }
+    
     return handleCORS(NextResponse.json(claimed), origin)
   }
 
@@ -364,6 +407,22 @@ export async function PATCH(request, { params }) {
     }
   } catch (e) {
     try { console.warn('[AUDIT] failed to write audit log', sanitizeForLog({ message: e?.message })) } catch {}
+  }
+
+  // Broadcast SSE para atualização em tempo real (feedback visual imediato)
+  try {
+    if (broadcast) {
+      broadcast('proposta_update', {
+        id: updated.id,
+        codigo: updated.codigo,
+        status: updated.status,
+        atendido_por: updated.atendido_por,
+        atendido_em: updated.atendido_em,
+        updated_at: new Date().toISOString()
+      })
+    }
+  } catch (err) {
+    try { console.warn('[SSE] broadcast failed', sanitizeForLog({ message: err?.message })) } catch {}
   }
 
   // Notificação por e-mail (mesma lógica do PUT)

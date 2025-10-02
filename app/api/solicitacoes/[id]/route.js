@@ -37,23 +37,30 @@ export async function GET(req, { params }) {
       return NextResponse.json({ message: 'Sem permissão para ver detalhes' }, { status: 403 })
     }
 
-  // garantir URLs de download (gera assinada se necessário) com validação de path
-  const safePath = (p) => typeof p === 'string' && !p.startsWith('/') && !p.includes('..') && p.length < 200
+  // garantir URLs de download (tenta pública; como fallback usa proxy para assinada) com validação de path
+  const safePath = (p) => typeof p === 'string' && !p.startsWith('/') && !p.includes('..') && p.length < 300
   const arquivos = Array.isArray(data.arquivos) ? data.arquivos : []
-    const enriched = []
-    for (const arq of arquivos) {
-      if (arq?.url) { enriched.push(arq); continue }
-  const path = arq?.path
-      if (!path) { enriched.push(arq); continue }
-  if (!safePath(path)) { enriched.push({ ...arq, url: null, invalid: true }); continue }
-      try {
-        const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 600)
-        enriched.push({ ...arq, url: signed?.signedUrl || arq.url || null, signed: true })
-      } catch {
-        enriched.push(arq)
-      }
+  const enriched = []
+  for (const arq of arquivos) {
+    if (arq?.url) { enriched.push(arq); continue }
+    const path = arq?.path
+    if (!path) { enriched.push(arq); continue }
+    if (!safePath(path)) { enriched.push({ ...arq, url: null, invalid: true }); continue }
+    // bucket pode estar salvo no item; senão, default
+    const bucket = arq?.bucket || STORAGE_BUCKET
+    let url = null
+    try {
+      // Primeiro tenta pública (caso bucket público)
+      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path)
+      url = pub?.publicUrl || null
+    } catch {}
+    if (!url) {
+      // Usa proxy que redireciona para pública ou gera assinada (servidor)
+      url = `/api/solicitacoes/files/proxy?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(path)}`
     }
-    data.arquivos = enriched
+    enriched.push({ ...arq, url, signed: !url.includes('/storage/v1/object/public/') })
+  }
+  data.arquivos = enriched
 
     // Buscar dados do consultor criador (nome/email) para exibir nos detalhes
     if (data.criado_por) {
