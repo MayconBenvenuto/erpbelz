@@ -1692,33 +1692,59 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
               </span>
               <div className="flex items-center gap-1">
                 {(() => {
-                  // Preferir URL fornecida pela API (pública ou assinada)
-                  let url = f.url || null
-                  if (!url) {
-                    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-                    if (base) {
-                      url = `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
-                    } else {
-                      url = `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
-                    }
+                  const computeProxy = () => {
+                    if (f.download_url || f.proxy_url) return f.proxy_url || f.download_url
+                    if (!f.bucket || !f.path) return null
+                    return `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
                   }
+                  const proxyUrl = computeProxy()
+                  const viewUrl = (() => {
+                    if (f.url) return f.url
+                    if (proxyUrl) return proxyUrl
+                    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+                    if (base && f.bucket && f.path) {
+                      return `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
+                    }
+                    return null
+                  })()
+                  const downloadEndpoint = (() => {
+                    if (f.download_url) return f.download_url
+                    if (proxyUrl) {
+                      return `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}download=1`
+                    }
+                    return viewUrl
+                  })()
 
                   const handleDownload = async (e) => {
                     e.preventDefault()
                     try {
+                      if (!downloadEndpoint) {
+                        toast?.error?.('Link de download indisponível')
+                        return
+                      }
                       const bearer =
                         typeof window !== 'undefined'
                           ? sessionStorage.getItem('erp_token') ||
                             sessionStorage.getItem('crm_token') ||
                             ''
                           : ''
-                      const response = await fetch(url, {
+                      const response = await fetch(downloadEndpoint, {
                         credentials: 'include',
                         headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
                       })
 
                       if (!response.ok) {
-                        toast?.error?.('Erro ao baixar arquivo')
+                        let message = `Erro ao baixar arquivo (HTTP ${response.status})`
+                        try {
+                          const payload = await response.clone().json()
+                          if (payload?.error) message = payload.error
+                        } catch {}
+                        toast?.error?.(message)
+                        // eslint-disable-next-line no-console
+                        console.error('[Proposals][download] resposta inesperada', {
+                          status: response.status,
+                          statusText: response.statusText,
+                        })
                         return
                       }
 
@@ -1733,7 +1759,11 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                       window.URL.revokeObjectURL(downloadUrl)
                       toast?.success?.('Download iniciado')
                     } catch (error) {
-                      console.error('Erro ao baixar:', error)
+                      // eslint-disable-next-line no-console
+                      console.error('[Proposals][download] erro inesperado', {
+                        name: error?.name,
+                        message: error?.message,
+                      })
                       toast?.error?.('Erro ao baixar arquivo')
                     }
                   }
@@ -1741,7 +1771,7 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                   return (
                     <>
                       <a
-                        href={url}
+                        href={viewUrl || '#'}
                         target="_blank"
                         rel="noreferrer"
                         className="text-white hover:underline"

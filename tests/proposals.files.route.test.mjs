@@ -88,5 +88,7 @@ describe('proposals files route', () => {
     expect(Array.isArray(body.data)).toBe(true)
     expect(body.data[0]).toMatchObject({ id: 'f1', nome_original: 'doc.pdf' })
     expect(body.data[0].url).toBeDefined()
+    expect(body.data[0].proxy_url).toBeDefined()
+    expect(body.data[0].download_url).toMatch(/download=1/)
   })
 })

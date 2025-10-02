@@ -6,7 +6,7 @@ O token estava sendo salvo no `sessionStorage` pelo `AuthProvider`, mas o códig
 
 ## Correções Aplicadas
 
-### 1. ✅ Arquivo: `app/(app)/usuarios/page.jsx`
+### 1. ✅ Arquivo: `app/(protected)/usuarios/page.jsx`
 
 Todas as funções agora buscam o token corretamente:
 
@@ -15,7 +15,8 @@ Todas as funções agora buscam o token corretamente:
 const token = localStorage.getItem('token')
 
 // Depois (CORRETO)
-const authToken = token || sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
+const authToken =
+  token || sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
 
 if (!authToken) {
   toast.error('Sessão expirada. Por favor, faça login novamente.')
@@ -24,8 +25,9 @@ if (!authToken) {
 ```
 
 **Funções corrigidas:**
+
 - `handleCreateUser` ✅
-- `handleUpdateUserGoal` ✅  
+- `handleUpdateUserGoal` ✅
 - `handleDeleteUser` ✅
 
 ### 2. ✅ Arquivo: `app/api/auth/login/route.js`
@@ -98,6 +100,7 @@ Após login e verificação do token:
 4. Salvar
 
 **Resultado esperado:**
+
 - ✅ Toast verde: "Usuário criado com sucesso!"
 - ✅ Usuário aparece na lista
 - ✅ Sem erro 401 no Network tab
@@ -107,17 +110,20 @@ Após login e verificação do token:
 ### Debug Adicional
 
 1. **Console do navegador (F12)**:
+
    ```javascript
    // Ver se tem token
    console.log('Token ERP:', sessionStorage.getItem('erp_token'))
    console.log('Token CRM:', sessionStorage.getItem('crm_token'))
-   
+
    // Testar API manualmente
    fetch('/api/users', {
      headers: {
-       'Authorization': 'Bearer ' + sessionStorage.getItem('erp_token')
-     }
-   }).then(r => r.json()).then(console.log)
+       Authorization: 'Bearer ' + sessionStorage.getItem('erp_token'),
+     },
+   })
+     .then((r) => r.json())
+     .then(console.log)
    ```
 
 2. **Network Tab**:
@@ -141,6 +147,7 @@ JWT_SECRET=belz-crm-super-secret-key-2025-production-do-not-share
 ```
 
 Reiniciar o servidor:
+
 ```bash
 # Parar: Ctrl + C
 # Iniciar novamente:
@@ -149,11 +156,11 @@ npm run dev
 
 ## Resumo das Mudanças
 
-| Arquivo | Mudança | Status |
-|---------|---------|--------|
-| `app/(app)/usuarios/page.jsx` | Buscar token do sessionStorage | ✅ |
-| `app/api/auth/login/route.js` | Adicionar import crypto | ✅ |
-| AuthProvider | Já estava correto (usa sessionStorage) | ✅ |
+| Arquivo                             | Mudança                                | Status |
+| ----------------------------------- | -------------------------------------- | ------ |
+| `app/(protected)/usuarios/page.jsx` | Buscar token do sessionStorage         | ✅     |
+| `app/api/auth/login/route.js`       | Adicionar import crypto                | ✅     |
+| AuthProvider                        | Já estava correto (usa sessionStorage) | ✅     |
 
 ## Próximos Testes
 

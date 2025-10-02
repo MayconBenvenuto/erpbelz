@@ -143,9 +143,23 @@ export async function GET(request) {
               .createSignedUrl(f.path, 600) // 10 minutos
             url = signed?.signedUrl || null
           }
-          return { ...f, url }
+          const bucket = f.bucket || 'implantacao_upload'
+          const path = f.path || ''
+          const proxyUrl =
+            bucket && path
+              ? `/api/proposals/files/proxy?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(path)}`
+              : null
+          const downloadUrl = proxyUrl ? `${proxyUrl}&download=1` : null
+          return { ...f, url, proxy_url: proxyUrl, download_url: downloadUrl }
         } catch {
-          return { ...f, url: null }
+          const bucket = f.bucket || 'implantacao_upload'
+          const path = f.path || ''
+          const proxyUrl =
+            bucket && path
+              ? `/api/proposals/files/proxy?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(path)}`
+              : null
+          const downloadUrl = proxyUrl ? `${proxyUrl}&download=1` : null
+          return { ...f, url: null, proxy_url: proxyUrl, download_url: downloadUrl }
         }
       })
     )

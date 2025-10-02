@@ -12,15 +12,17 @@ O hook `useQuery` do React Query retorna `refetch`, não `mutate`. A função `m
 
 ## Solução Aplicada
 
-### Arquivo: `app/(app)/usuarios/page.jsx`
+### Arquivo: `app/(protected)/usuarios/page.jsx`
 
 #### Antes (ERRADO):
+
 ```javascript
 const { data: users = [], mutate: mutateUsers } = useUsers()
 await mutateUsers()
 ```
 
 #### Depois (CORRETO):
+
 ```javascript
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query-client'
@@ -36,6 +38,7 @@ queryClient.invalidateQueries({ queryKey: queryKeys.users })
 ## Mudanças Implementadas
 
 ### 1. ✅ handleCreateUser
+
 ```javascript
 // Revalidar lista de usuários
 await refetchUsers()
@@ -43,6 +46,7 @@ queryClient.invalidateQueries({ queryKey: queryKeys.users })
 ```
 
 ### 2. ✅ handleUpdateUserGoal
+
 ```javascript
 // Revalidar metas
 await refetchGoals()
@@ -50,6 +54,7 @@ queryClient.invalidateQueries({ queryKey: queryKeys.userGoals })
 ```
 
 ### 3. ✅ handleDeleteUser
+
 ```javascript
 // Revalidar lista de usuários
 await refetchUsers()
@@ -59,20 +64,25 @@ queryClient.invalidateQueries({ queryKey: queryKeys.users })
 ## Como React Query Funciona
 
 ### useQuery (para buscas/GET)
+
 Retorna:
+
 - `data` - dados da query
 - `isLoading` - estado de carregamento
 - `refetch()` - função para refazer a busca
 - `error` - erro se houver
 
 ### useMutation (para POST/PUT/DELETE)
+
 Retorna:
+
 - `mutate()` - função para executar a mutação
 - `mutateAsync()` - versão async
 - `isLoading` - estado
 - `error` - erro se houver
 
 ### queryClient.invalidateQueries()
+
 Marca queries como "stale" (desatualizadas), forçando um refetch na próxima vez que forem usadas.
 
 ## Benefícios da Correção
@@ -89,6 +99,7 @@ Marca queries como "stale" (desatualizadas), forçando um refetch na próxima ve
 ### 2. Ir em Usuários → Criar Usuário
 
 Preencher:
+
 - Nome: `Teste Final`
 - Email: `teste.final@belz.com.br`
 - Senha: `senha123456`
@@ -97,6 +108,7 @@ Preencher:
 ### 3. Salvar
 
 **Resultado esperado:**
+
 - ✅ Toast verde: "Usuário criado com sucesso!"
 - ✅ Usuário aparece na lista imediatamente
 - ✅ Sem erro no console
@@ -111,7 +123,7 @@ Todas as funções CRUD agora seguem o mesmo padrão:
 
 ## Arquivos Modificados
 
-- `app/(app)/usuarios/page.jsx` - Correção completa das 3 funções
+- `app/(protected)/usuarios/page.jsx` - Correção completa das 3 funções
 
 ## Documentação
 

@@ -5,9 +5,11 @@
 ## 📋 Problemas Identificados
 
 ### 1. Modal de criação permite submissão duplicada
+
 **Descrição:** Ao criar uma proposta, o modal permanecia aberto e o botão "Salvar" continuava habilitado, permitindo que o usuário submetesse a mesma proposta múltiplas vezes, causando duplicidade no banco de dados.
 
 ### 2. Arquivos anexados não eram salvos/visíveis
+
 **Descrição:** Após anexar arquivos à proposta e enviá-la, os documentos eram uploadados para o Storage mas seus metadados não eram registrados na tabela `propostas_arquivos`, impedindo que analistas visualizassem e baixassem os arquivos.
 
 ---
@@ -19,26 +21,29 @@
 #### Mudanças:
 
 **a) Adicionado estado `isSubmitting`:**
+
 ```javascript
 const [isSubmitting, setIsSubmitting] = useState(false)
 ```
 
 **b) Prevenção de submissões duplicadas:**
+
 ```javascript
 const handleSubmit = async (e) => {
   e.preventDefault()
-  
+
   // Previne submissões duplicadas
   if (isSubmitting) {
     return
   }
-  
+
   setIsSubmitting(true)
   // ... resto da lógica
 }
 ```
 
 **c) Reset de `isSubmitting` em todos os pontos de saída:**
+
 - Validações que falham (email, CNPJ, valor, etc.)
 - Cancelamento de upload
 - Erro no upload de documentos
@@ -46,10 +51,11 @@ const handleSubmit = async (e) => {
 - Sucesso completo (após salvar metadados)
 
 **d) Botões desabilitados durante submissão:**
+
 ```javascript
-<Button 
-  type="button" 
-  variant="outline" 
+<Button
+  type="button"
+  variant="outline"
   onClick={() => onOpenChange(false)}
   disabled={uploadingDocs || isSubmitting}
 >
@@ -72,6 +78,7 @@ const handleSubmit = async (e) => {
 ```
 
 **e) Feedback visual claro:**
+
 - Spinner animado durante submissão
 - Texto do botão muda: "Salvar" → "Salvando..." → "Enviando (X/Y)..."
 - Botão desabilitado durante todo o processo
@@ -83,15 +90,16 @@ const handleSubmit = async (e) => {
 #### Mudanças no NovaPropostaDialog.jsx:
 
 **a) Fluxo atualizado após criação da proposta:**
+
 ```javascript
 try {
   // 1. Cria a proposta
   const result = await onCreateProposal({ ...payload, _docs: docsMeta })
   const createdProposal = result?.data || result
-  
+
   // 2. Se houver documentos, salva metadados no banco
   if (docsMeta.length > 0 && createdProposal?.id) {
-    const docsToSave = docsMeta.map(doc => ({
+    const docsToSave = docsMeta.map((doc) => ({
       proposta_id: createdProposal.id,
       bucket: doc.bucket,
       path: doc.path,
@@ -101,7 +109,7 @@ try {
       url: doc.url,
       categoria: doc.categoria,
     }))
-    
+
     const saveResp = await fetch('/api/proposals/files', {
       method: 'POST',
       headers: {
@@ -110,7 +118,7 @@ try {
       },
       body: JSON.stringify({ files: docsToSave }),
     })
-    
+
     if (saveResp.ok) {
       // Dispara evento para atualizar lista de arquivos
       window.dispatchEvent(
@@ -118,9 +126,11 @@ try {
       )
     }
   }
-  
+
   // 3. Resetar formulário e fechar modal
-  setForm({ /* campos limpos */ })
+  setForm({
+    /* campos limpos */
+  })
   setIsSubmitting(false)
   onOpenChange(false)
 } catch (error) {
@@ -160,6 +170,7 @@ try {
 ```
 
 **Características:**
+
 - Suporta batch insert de múltiplos arquivos
 - Compatibilidade com formato legado
 - Retorna sucesso parcial (alguns arquivos salvos, outros com erro)
@@ -169,18 +180,21 @@ try {
 #### Mudanças no hooks/use-api.js:
 
 **useCreateProposal agora retorna a proposta criada:**
+
 ```javascript
 export function useCreateProposal() {
   return useMutation({
     mutationFn: async (proposalData) => {
-      const response = await fetch('/api/proposals', { /* ... */ })
+      const response = await fetch('/api/proposals', {
+        /* ... */
+      })
       return response.json()
     },
     onSuccess: (newProposal) => {
       // Atualiza cache
       // ...
       toast.success('✅ Proposta criada com sucesso!')
-      
+
       // IMPORTANTE: Retorna a proposta para uso no callback
       return newProposal
     },
@@ -192,9 +206,10 @@ export function useCreateProposal() {
 }
 ```
 
-#### Mudanças no app/(app)/propostas/page.jsx:
+#### Mudanças no app/(protected)/propostas/page.jsx:
 
 **handleCreateProposal retorna o resultado:**
+
 ```javascript
 const handleCreateProposal = async (data) => {
   try {
@@ -214,30 +229,30 @@ const handleCreateProposal = async (data) => {
 **Já estava funcionando corretamente:**
 
 O endpoint GET já estava retornando arquivos com URLs enriquecidas:
+
 ```javascript
 // Enriquecimento com URLs
 const enriched = await Promise.all(
   rows.map(async (f) => {
     let url = null
-    
+
     // Tenta URL pública primeiro
     const { data: pub } = supabase.storage.from(f.bucket).getPublicUrl(f.path)
     url = pub?.publicUrl || null
-    
+
     // Fallback para URL assinada (10 minutos)
     if (!url) {
-      const { data: signed } = await supabase.storage
-        .from(f.bucket)
-        .createSignedUrl(f.path, 600)
+      const { data: signed } = await supabase.storage.from(f.bucket).createSignedUrl(f.path, 600)
       url = signed?.signedUrl || null
     }
-    
+
     return { ...f, url }
   })
 )
 ```
 
 **Melhorias na exibição (ProposalFilesList):**
+
 - Botão "abrir" com link direto para download
 - Fallback para proxy se URL não estiver disponível
 - Listagem organizada com scroll
@@ -302,18 +317,21 @@ const enriched = await Promise.all(
 ## 📊 Benefícios
 
 ### Prevenção de Duplicatas:
+
 - ✅ Botão desabilitado durante submissão
 - ✅ Guard clause previne múltiplas chamadas
 - ✅ Feedback visual claro do estado
 - ✅ Reset apenas após sucesso completo
 
 ### Persistência de Arquivos:
+
 - ✅ Metadados salvos na tabela propostas_arquivos
 - ✅ Suporte a múltiplos arquivos em batch
 - ✅ URLs pré-assinadas para acesso direto
 - ✅ Organização por categoria
 
 ### Experiência do Usuário:
+
 - ✅ Feedback visual durante todo o processo
 - ✅ Mensagens de erro específicas
 - ✅ Possibilidade de cancelar upload
@@ -325,11 +343,13 @@ const enriched = await Promise.all(
 ## 🧪 Testes Recomendados
 
 ### 1. Teste de Duplicação:
+
 - [ ] Criar proposta e clicar "Salvar" rapidamente múltiplas vezes
 - [ ] Verificar que apenas 1 proposta foi criada
 - [ ] Verificar que botão fica desabilitado
 
 ### 2. Teste de Arquivos:
+
 - [ ] Anexar 3 documentos (empresa, titular, outros)
 - [ ] Criar proposta
 - [ ] Verificar que os 3 documentos aparecem na lista
@@ -337,6 +357,7 @@ const enriched = await Promise.all(
 - [ ] Verificar registro na tabela propostas_arquivos
 
 ### 3. Teste de Cancelamento:
+
 - [ ] Anexar 5 arquivos grandes
 - [ ] Clicar "Salvar"
 - [ ] Clicar "Cancelar" durante upload
@@ -344,6 +365,7 @@ const enriched = await Promise.all(
 - [ ] Verificar que modal volta ao estado inicial
 
 ### 4. Teste de Erros:
+
 - [ ] Simular erro de rede durante criação
 - [ ] Verificar que botão volta a ficar habilitado
 - [ ] Verificar mensagem de erro
@@ -359,13 +381,13 @@ components/propostas/NovaPropostaDialog.jsx
   ✅ Guards de duplicação
   ✅ Salvamento de metadados
   ✅ Feedback visual
-  
+
 hooks/use-api.js
   ✅ useCreateProposal retorna proposta
-  
-app/(app)/propostas/page.jsx
+
+app/(protected)/propostas/page.jsx
   ✅ handleCreateProposal retorna resultado
-  
+
 app/api/proposals/files/route.js
   ✅ POST aceita múltiplos arquivos
   ✅ Suporte a categoria e URL
