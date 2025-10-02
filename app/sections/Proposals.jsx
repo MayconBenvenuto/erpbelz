@@ -807,7 +807,7 @@ function ProposalsInner({
                         <VirtualList
                           height={780}
                           itemCount={groupedByStatus[status].length}
-                          itemSize={212}
+                          itemSize={240}
                           width={270}
                           className="pr-2"
                         >
@@ -835,8 +835,12 @@ function ProposalsInner({
                               border: '#e2e2e2',
                             }
                             return (
-                              <div key={p.id} style={style} className="w-full h-full">
-                                <div className="h-full p-2">
+                              <div
+                                key={p.id}
+                                style={style}
+                                className="w-full h-full relative z-0 group/card hover:z-10 overflow-visible"
+                              >
+                                <div className="h-full p-2 overflow-visible">
                                   <div
                                     style={{
                                       backgroundColor: statusColors.bg,
@@ -997,7 +1001,10 @@ function ProposalsInner({
                                               {busy ? '...' : 'Alterar Status'}
                                             </button>
                                           </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="start" className="w-44">
+                                          <DropdownMenuContent
+                                            align="start"
+                                            className="w-44 z-[100]"
+                                          >
                                             <DropdownMenuLabel className="text-[11px]">
                                               Alterar status
                                             </DropdownMenuLabel>
