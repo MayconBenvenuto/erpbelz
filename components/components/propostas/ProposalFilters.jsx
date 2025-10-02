@@ -6,7 +6,13 @@
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowUpDown, X } from 'lucide-react'
@@ -111,7 +117,7 @@ export function ProposalFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                {users.map((u) => (
+                {(Array.isArray(users) ? users : []).map((u) => (
                   <SelectItem key={u.id} value={String(u.id)}>
                     {u.nome}
                   </SelectItem>

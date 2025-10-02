@@ -109,6 +109,7 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
   }, [loadSolicitacoes])
 
   const groupedByStatus = useMemo(() => {
+    if (!Array.isArray(solicitacoes)) return {}
     const g = {}
     for (const s of SOLICITACAO_STATUS) g[s] = []
     for (const sol of solicitacoes) g[sol.status || 'aberta']?.push(sol)
@@ -117,6 +118,8 @@ export default function MovimentacaoSection({ currentUser, token: parentToken })
 
   const hoje = useMemo(() => new Date(), [])
   const stats = useMemo(() => {
+    if (!Array.isArray(solicitacoes))
+      return { total: 0, atrasadas: 0, concluidas: 0, dias_restantes_medio: 0 }
     const total = solicitacoes.length
     const atrasadas = solicitacoes.filter(
       (s) =>

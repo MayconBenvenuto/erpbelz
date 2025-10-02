@@ -248,6 +248,7 @@ function ProposalsInner({
 
   // Merge live updates em proposals para exibição responsiva sem refetch completo
   const proposalsMerged = useMemo(() => {
+    if (!Array.isArray(proposals)) return []
     const map = new Map(proposals.map((p) => [p.id, p]))
     Object.entries(liveUpdates).forEach(([id, patch]) => {
       if (map.has(id)) {
@@ -715,7 +716,7 @@ function ProposalsInner({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    {users.map((u) => (
+                    {(Array.isArray(users) ? users : []).map((u) => (
                       <SelectItem key={u.id} value={String(u.id)}>
                         {u.nome}
                       </SelectItem>
@@ -1185,7 +1186,7 @@ function ProposalsInner({
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((u) => (
+                        {(Array.isArray(users) ? users : []).map((u) => (
                           <SelectItem key={u.id} value={String(u.id)}>
                             {u.nome}
                           </SelectItem>
@@ -1546,7 +1547,10 @@ function AuditDrawer({ id, onClose }) {
     let mounted = true
     ;(async () => {
       try {
-        const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
+        const bearer =
+          typeof window !== 'undefined'
+            ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+            : ''
         const res = await fetch(`/api/proposals/${id}/audit`, {
           credentials: 'include',
           headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
@@ -1621,7 +1625,10 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
     setLoading(true)
     setError(null)
     try {
-      const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
+      const bearer =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+          : ''
       const r = await fetch(`/api/proposals/files?proposta_id=${proposalId}`, {
         credentials: 'include',
         headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
@@ -1637,7 +1644,9 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
         setError(null)
         setFiles([])
         // eslint-disable-next-line no-console
-        console.warn('[FILES] Tabela propostas_arquivos ausente; aplicar migration 20250909_add_propostas_arquivos.sql')
+        console.warn(
+          '[FILES] Tabela propostas_arquivos ausente; aplicar migration 20250909_add_propostas_arquivos.sql'
+        )
       } else {
         setFiles(Array.isArray(j.data) ? j.data : [])
       }
@@ -1693,21 +1702,26 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                       url = `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
                     }
                   }
-                  
+
                   const handleDownload = async (e) => {
                     e.preventDefault()
                     try {
-                      const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
+                      const bearer =
+                        typeof window !== 'undefined'
+                          ? sessionStorage.getItem('erp_token') ||
+                            sessionStorage.getItem('crm_token') ||
+                            ''
+                          : ''
                       const response = await fetch(url, {
                         credentials: 'include',
                         headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
                       })
-                      
+
                       if (!response.ok) {
                         toast?.error?.('Erro ao baixar arquivo')
                         return
                       }
-                      
+
                       const blob = await response.blob()
                       const downloadUrl = window.URL.createObjectURL(blob)
                       const a = document.createElement('a')
@@ -1723,7 +1737,7 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                       toast?.error?.('Erro ao baixar arquivo')
                     }
                   }
-                  
+
                   return (
                     <>
                       <a

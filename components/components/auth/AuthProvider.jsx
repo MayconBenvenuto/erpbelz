@@ -1,7 +1,8 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { hasPermission } from '@/lib/rbac'
+import { registerLogoutCallback } from '@/lib/auth-interceptor'
 
 const AuthContext = createContext(null)
 
@@ -10,6 +11,7 @@ export function AuthProvider({ children }) {
   const [sessionId, setSessionId] = useState(null)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
+  const logoutRef = useRef(null)
 
   const saveSession = (user, sid, tok) => {
     try {
@@ -21,7 +23,16 @@ export function AuthProvider({ children }) {
   }
   const clearSession = () => {
     try {
-      ;['erp_user','erp_session','erp_token','erp_last_activity','crm_user','crm_session','crm_token','crm_last_activity'].forEach(k=>sessionStorage.removeItem(k))
+      ;[
+        'erp_user',
+        'erp_session',
+        'erp_token',
+        'erp_last_activity',
+        'crm_user',
+        'crm_session',
+        'crm_token',
+        'crm_last_activity',
+      ].forEach((k) => sessionStorage.removeItem(k))
     } catch {}
   }
   const loadSession = () => {
@@ -41,13 +52,16 @@ export function AuthProvider({ children }) {
 
   // bootstrap
   useEffect(() => {
+    // Registra callback de logout para o interceptador 401 usando ref
+    registerLogoutCallback(() => logoutRef.current?.())
+
     const have = loadSession()
     if (!have) {
       ;(async () => {
         try {
           const res = await fetch('/api/auth/me', { credentials: 'include' })
           if (res.ok) {
-            const data = await res.json().catch(()=>({}))
+            const data = await res.json().catch(() => ({}))
             if (data?.user) {
               setCurrentUser(data.user)
               if (data.sessionId) setSessionId(data.sessionId)
@@ -60,6 +74,7 @@ export function AuthProvider({ children }) {
     } else {
       setLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // renovar token se necessário
@@ -69,8 +84,11 @@ export function AuthProvider({ children }) {
         try {
           const res = await fetch('/api/auth/renew', { credentials: 'include' })
           if (res.ok) {
-            const d = await res.json().catch(()=>({}))
-            if (d.token) { setToken(d.token); saveSession(currentUser, sessionId, d.token) }
+            const d = await res.json().catch(() => ({}))
+            if (d.token) {
+              setToken(d.token)
+              saveSession(currentUser, sessionId, d.token)
+            }
           }
         } catch {}
       })()
@@ -84,17 +102,17 @@ export function AuthProvider({ children }) {
       credentials: 'include',
       body: JSON.stringify({ email, password }),
     })
-    const data = await res.json().catch(()=>({}))
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       toast.error(data.error || 'Erro no login')
-      return { ok:false, error: data.error }
+      return { ok: false, error: data.error }
     }
     setCurrentUser(data.user)
     setSessionId(data.sessionId)
     setToken(data.token)
     saveSession(data.user, data.sessionId, data.token)
     toast.success('Login realizado com sucesso!')
-    return { ok:true }
+    return { ok: true }
   }
 
   const logout = async () => {
@@ -107,15 +125,19 @@ export function AuthProvider({ children }) {
     setToken(null)
   }
 
+  // Mantém referência atualizada do logout
+  logoutRef.current = logout
+
   const refreshCurrentUser = async () => {
     try {
-      const tok = token || sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
+      const tok =
+        token || sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
       const res = await fetch('/api/auth/me', {
         headers: tok ? { Authorization: `Bearer ${tok}` } : {},
-        credentials: 'include'
+        credentials: 'include',
       })
       if (res.ok) {
-        const data = await res.json().catch(()=>({}))
+        const data = await res.json().catch(() => ({}))
         if (data?.user) {
           setCurrentUser(data.user)
           saveSession(data.user, sessionId, token)
@@ -141,4 +163,6 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export function useAuth() { return useContext(AuthContext) }
+export function useAuth() {
+  return useContext(AuthContext)
+}
