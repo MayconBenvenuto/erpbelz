@@ -948,6 +948,35 @@ function ProposalsInner({
                                         )}
                                       </div>
                                     )}
+                                    {/* Informações do responsável - sempre visíveis dentro do card */}
+                                    {(() => {
+                                      let handlerId = p.atendido_por
+                                      if (!handlerId && p.status === 'implantado') {
+                                        const creatorIsAnalyst = users.some(
+                                          (u) =>
+                                            u.id === p.criado_por &&
+                                            [
+                                              'analista_implantacao',
+                                              'analista_movimentacao',
+                                            ].includes(u.tipo_usuario)
+                                        )
+                                        if (creatorIsAnalyst) handlerId = p.criado_por
+                                      }
+                                      const nome = handlerId
+                                        ? users.find((u) => u.id === handlerId)?.nome || '—'
+                                        : '—'
+                                      return (
+                                        <div className="text-[10px] text-muted-foreground">
+                                          Atendido por: {nome}
+                                        </div>
+                                      )
+                                    })()}
+                                    {currentUser.tipo_usuario === 'gestor' && (
+                                      <div className="text-[10px] text-muted-foreground">
+                                        Analista:{' '}
+                                        {users.find((u) => u.id === p.criado_por)?.nome || '-'}
+                                      </div>
+                                    )}
                                     {/* Ações */}
                                     <div className="flex gap-1 flex-wrap items-center pt-1">
                                       <button
@@ -1036,35 +1065,7 @@ function ProposalsInner({
                                             Assumir
                                           </button>
                                         )}
-                                      {(() => {
-                                        let handlerId = p.atendido_por
-                                        if (!handlerId && p.status === 'implantado') {
-                                          const creatorIsAnalyst = users.some(
-                                            (u) =>
-                                              u.id === p.criado_por &&
-                                              [
-                                                'analista_implantacao',
-                                                'analista_movimentacao',
-                                              ].includes(u.tipo_usuario)
-                                          )
-                                          if (creatorIsAnalyst) handlerId = p.criado_por
-                                        }
-                                        const nome = handlerId
-                                          ? users.find((u) => u.id === handlerId)?.nome || '—'
-                                          : '—'
-                                        return (
-                                          <span className="text-[10px] text-white-foreground">
-                                            {`Atendido por: ${nome}`}
-                                          </span>
-                                        )
-                                      })()}
                                     </div>
-                                    {currentUser.tipo_usuario === 'gestor' && (
-                                      <div className="text-[10px] text-white-foreground">
-                                        Analista:{' '}
-                                        {users.find((u) => u.id === p.criado_por)?.nome || '-'}
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               </div>
