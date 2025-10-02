@@ -248,6 +248,7 @@ function ProposalsInner({
 
   // Merge live updates em proposals para exibição responsiva sem refetch completo
   const proposalsMerged = useMemo(() => {
+    if (!Array.isArray(proposals)) return []
     const map = new Map(proposals.map((p) => [p.id, p]))
     Object.entries(liveUpdates).forEach(([id, patch]) => {
       if (map.has(id)) {
@@ -715,7 +716,7 @@ function ProposalsInner({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    {users.map((u) => (
+                    {(Array.isArray(users) ? users : []).map((u) => (
                       <SelectItem key={u.id} value={String(u.id)}>
                         {u.nome}
                       </SelectItem>
@@ -1185,7 +1186,7 @@ function ProposalsInner({
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((u) => (
+                        {(Array.isArray(users) ? users : []).map((u) => (
                           <SelectItem key={u.id} value={String(u.id)}>
                             {u.nome}
                           </SelectItem>
@@ -1546,7 +1547,10 @@ function AuditDrawer({ id, onClose }) {
     let mounted = true
     ;(async () => {
       try {
-        const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
+        const bearer =
+          typeof window !== 'undefined'
+            ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+            : ''
         const res = await fetch(`/api/proposals/${id}/audit`, {
           credentials: 'include',
           headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
@@ -1621,7 +1625,10 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
     setLoading(true)
     setError(null)
     try {
-      const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
+      const bearer =
+        typeof window !== 'undefined'
+          ? sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || ''
+          : ''
       const r = await fetch(`/api/proposals/files?proposta_id=${proposalId}`, {
         credentials: 'include',
         headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
@@ -1637,7 +1644,9 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
         setError(null)
         setFiles([])
         // eslint-disable-next-line no-console
-        console.warn('[FILES] Tabela propostas_arquivos ausente; aplicar migration 20250909_add_propostas_arquivos.sql')
+        console.warn(
+          '[FILES] Tabela propostas_arquivos ausente; aplicar migration 20250909_add_propostas_arquivos.sql'
+        )
       } else {
         setFiles(Array.isArray(j.data) ? j.data : [])
       }
@@ -1683,31 +1692,62 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
               </span>
               <div className="flex items-center gap-1">
                 {(() => {
-                  // Preferir URL fornecida pela API (pública ou assinada)
-                  let url = f.url || null
-                  if (!url) {
-                    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-                    if (base) {
-                      url = `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
-                    } else {
-                      url = `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
-                    }
+                  const computeProxy = () => {
+                    if (f.download_url || f.proxy_url) return f.proxy_url || f.download_url
+                    if (!f.bucket || !f.path) return null
+                    return `/api/proposals/files/proxy?bucket=${encodeURIComponent(f.bucket)}&path=${encodeURIComponent(f.path)}`
                   }
-                  
+                  const proxyUrl = computeProxy()
+                  const viewUrl = (() => {
+                    if (f.url) return f.url
+                    if (proxyUrl) return proxyUrl
+                    const base = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+                    if (base && f.bucket && f.path) {
+                      return `${base.replace(/\/$/, '')}/storage/v1/object/public/${f.bucket}/${f.path}`
+                    }
+                    return null
+                  })()
+                  const downloadEndpoint = (() => {
+                    if (f.download_url) return f.download_url
+                    if (proxyUrl) {
+                      return `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}download=1`
+                    }
+                    return viewUrl
+                  })()
+
                   const handleDownload = async (e) => {
                     e.preventDefault()
                     try {
-                      const bearer = (typeof window !== 'undefined') ? (sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token') || '') : ''
-                      const response = await fetch(url, {
+                      if (!downloadEndpoint) {
+                        toast?.error?.('Link de download indisponível')
+                        return
+                      }
+                      const bearer =
+                        typeof window !== 'undefined'
+                          ? sessionStorage.getItem('erp_token') ||
+                            sessionStorage.getItem('crm_token') ||
+                            ''
+                          : ''
+                      const response = await fetch(downloadEndpoint, {
                         credentials: 'include',
                         headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
                       })
-                      
+
                       if (!response.ok) {
-                        toast?.error?.('Erro ao baixar arquivo')
+                        let message = `Erro ao baixar arquivo (HTTP ${response.status})`
+                        try {
+                          const payload = await response.clone().json()
+                          if (payload?.error) message = payload.error
+                        } catch {}
+                        toast?.error?.(message)
+                        // eslint-disable-next-line no-console
+                        console.error('[Proposals][download] resposta inesperada', {
+                          status: response.status,
+                          statusText: response.statusText,
+                        })
                         return
                       }
-                      
+
                       const blob = await response.blob()
                       const downloadUrl = window.URL.createObjectURL(blob)
                       const a = document.createElement('a')
@@ -1719,15 +1759,19 @@ function ProposalFilesList({ proposalId, currentUser: _currentUser }) {
                       window.URL.revokeObjectURL(downloadUrl)
                       toast?.success?.('Download iniciado')
                     } catch (error) {
-                      console.error('Erro ao baixar:', error)
+                      // eslint-disable-next-line no-console
+                      console.error('[Proposals][download] erro inesperado', {
+                        name: error?.name,
+                        message: error?.message,
+                      })
                       toast?.error?.('Erro ao baixar arquivo')
                     }
                   }
-                  
+
                   return (
                     <>
                       <a
-                        href={url}
+                        href={viewUrl || '#'}
                         target="_blank"
                         rel="noreferrer"
                         className="text-white hover:underline"

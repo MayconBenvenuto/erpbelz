@@ -1,5 +1,12 @@
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus, supabaseConfigStatus } from '@/lib/api-helpers'
+import {
+  supabase,
+  handleCORS,
+  requireAuth,
+  mapSupabaseErrorToStatus,
+  supabaseConfigStatus,
+} from '@/lib/api-helpers'
 
 export const runtime = 'nodejs'
 
@@ -55,10 +62,7 @@ export async function GET(request) {
     // Caso a migration ainda não tenha sido aplicada no ambiente atual, evita quebrar a UI.
     if (/propostas_arquivos/i.test(msg) && /not exist|could not find|schema cache/i.test(msg)) {
       // Retorna lista vazia + indicador de fallback
-      return handleCORS(
-        NextResponse.json({ data: [], meta: { missingTable: true } }),
-        origin
-      )
+      return handleCORS(NextResponse.json({ data: [], meta: { missingTable: true } }), origin)
     }
     return handleCORS(
       NextResponse.json({ error: error.message }, { status: mapSupabaseErrorToStatus(error) }),
@@ -89,7 +93,7 @@ export async function GET(request) {
             // Heurística: se size inexistente, trata como pasta
             if (typeof f.size === 'number') {
               collected.push({
-                id: crypto.randomUUID(),
+                id: randomUUID(),
                 proposta_id: propostaId,
                 bucket,
                 path: `${base}/${f.name}`,
@@ -103,7 +107,10 @@ export async function GET(request) {
           }
         }
         // arquivos diretos em prefix
-        pushFiles(level1?.filter((x) => typeof x?.size === 'number'), prefix)
+        pushFiles(
+          level1?.filter((x) => typeof x?.size === 'number'),
+          prefix
+        )
         // subpastas
         const folders = (level1 || []).filter((x) => typeof x?.size !== 'number')
         for (const folder of folders) {
@@ -136,9 +143,23 @@ export async function GET(request) {
               .createSignedUrl(f.path, 600) // 10 minutos
             url = signed?.signedUrl || null
           }
-          return { ...f, url }
+          const bucket = f.bucket || 'implantacao_upload'
+          const path = f.path || ''
+          const proxyUrl =
+            bucket && path
+              ? `/api/proposals/files/proxy?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(path)}`
+              : null
+          const downloadUrl = proxyUrl ? `${proxyUrl}&download=1` : null
+          return { ...f, url, proxy_url: proxyUrl, download_url: downloadUrl }
         } catch {
-          return { ...f, url: null }
+          const bucket = f.bucket || 'implantacao_upload'
+          const path = f.path || ''
+          const proxyUrl =
+            bucket && path
+              ? `/api/proposals/files/proxy?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(path)}`
+              : null
+          const downloadUrl = proxyUrl ? `${proxyUrl}&download=1` : null
+          return { ...f, url: null, proxy_url: proxyUrl, download_url: downloadUrl }
         }
       })
     )
@@ -156,41 +177,41 @@ export async function POST(request) {
   const auth = await requireAuth(request)
   if (auth.error)
     return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
-  
+
   const body = await request.json().catch(() => ({}))
-  
+
   // Suporte a formato novo (múltiplos arquivos) e legado (arquivo único)
   const files = body.files || (body.proposta_id ? [body] : [])
-  
+
   if (!files.length) {
     return handleCORS(
       NextResponse.json({ error: 'Nenhum arquivo para registrar' }, { status: 400 }),
       origin
     )
   }
-  
+
   try {
     const results = []
     const errors = []
-    
+
     for (const file of files) {
-      const { 
-        proposta_id, 
-        path, 
-        nome_original, 
+      const {
+        proposta_id,
+        path,
+        nome_original,
         nome, // compatibilidade legada
-        mime, 
-        tamanho_bytes, 
+        mime,
+        tamanho_bytes,
         bucket = 'implantacao_upload',
         url,
-        categoria
+        categoria,
       } = file
-      
+
       if (!proposta_id || !path) {
         errors.push({ file, error: 'proposta_id e path são obrigatórios' })
         continue
       }
-      
+
       const insert = {
         proposta_id,
         path,
@@ -202,43 +223,46 @@ export async function POST(request) {
         categoria: categoria || null,
         uploaded_by: auth.user.id,
       }
-      
+
       const { data, error } = await supabase
         .from('propostas_arquivos')
         .insert(insert)
         .select()
         .single()
-      
+
       if (error) {
         errors.push({ file, error: error.message })
       } else {
         results.push(data)
       }
     }
-    
+
     // Se houver pelo menos um sucesso, retorna ok
     if (results.length > 0) {
       return handleCORS(
-        NextResponse.json({ 
+        NextResponse.json({
           success: true,
           data: results,
-          errors: errors.length > 0 ? errors : undefined
-        }), 
+          errors: errors.length > 0 ? errors : undefined,
+        }),
         origin
       )
     }
-    
+
     // Se todos falharam
     return handleCORS(
-      NextResponse.json({ 
-        error: 'Falha ao registrar arquivos',
-        errors 
-      }, { status: 400 }), 
+      NextResponse.json(
+        {
+          error: 'Falha ao registrar arquivos',
+          errors,
+        },
+        { status: 400 }
+      ),
       origin
     )
   } catch (e) {
     return handleCORS(
-      NextResponse.json({ error: 'Erro ao registrar arquivos' }, { status: 500 }), 
+      NextResponse.json({ error: 'Erro ao registrar arquivos' }, { status: 500 }),
       origin
     )
   }

@@ -4,7 +4,7 @@
 // assim que detectar um usuário autenticado via AuthProvider (cookie + /api/auth/me).
 // Também utiliza authLogin do contexto para manter sessão consistente (sessionStorage + cookies).
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -15,7 +15,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const search = useSearchParams()
   const redirect = search.get('redirect') || '/dashboard'
@@ -95,7 +95,9 @@ export default function LoginPage() {
       setForgotStep('code')
     } catch {
       toast.error('Erro de rede')
-    } finally { setFpLoading(false) }
+    } finally {
+      setFpLoading(false)
+    }
   }
   const verifyCode = async (e) => {
     e.preventDefault()
@@ -107,27 +109,49 @@ export default function LoginPage() {
         body: JSON.stringify({ email: fpEmail, code: fpCode }),
       })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok || !d.success) { toast.error(d.error || 'Código inválido'); return }
+      if (!res.ok || !d.success) {
+        toast.error(d.error || 'Código inválido')
+        return
+      }
       setFpResetToken(d.resetToken)
       setForgotStep('reset')
       toast.success('Código verificado')
-    } catch { toast.error('Erro de rede') } finally { setFpLoading(false) }
+    } catch {
+      toast.error('Erro de rede')
+    } finally {
+      setFpLoading(false)
+    }
   }
   const submitReset = async (e) => {
     e.preventDefault()
-    if (fpNewPass !== fpNewPass2) { toast.error('Senhas não coincidem'); return }
+    if (fpNewPass !== fpNewPass2) {
+      toast.error('Senhas não coincidem')
+      return
+    }
     setFpLoading(true)
     try {
       const res = await fetch('/api/auth/forgot-password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: fpEmail, code: fpCode, resetToken: fpResetToken, novaSenha: fpNewPass }),
+        body: JSON.stringify({
+          email: fpEmail,
+          code: fpCode,
+          resetToken: fpResetToken,
+          novaSenha: fpNewPass,
+        }),
       })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok || !d.success) { toast.error(d.error || 'Falha ao redefinir'); return }
+      if (!res.ok || !d.success) {
+        toast.error(d.error || 'Falha ao redefinir')
+        return
+      }
       toast.success('Senha redefinida. Faça login.')
       setForgotStep('done')
-    } catch { toast.error('Erro de rede') } finally { setFpLoading(false) }
+    } catch {
+      toast.error('Erro de rede')
+    } finally {
+      setFpLoading(false)
+    }
   }
 
   return (
@@ -136,9 +160,18 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <Image src="/logo-belz.jpg" alt="Logo Belz" width={120} height={60} className="mx-auto rounded-lg" priority />
+            <Image
+              src="/logo-belz.jpg"
+              alt="Logo Belz"
+              width={120}
+              height={60}
+              className="mx-auto rounded-lg"
+              priority
+            />
           </div>
-          <CardTitle className="text-2xl text-primary font-montserrat">Sistema de Gestão - Belz</CardTitle>
+          <CardTitle className="text-2xl text-primary font-montserrat">
+            Sistema de Gestão - Belz
+          </CardTitle>
           <CardDescription>Acesse sua conta</CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,15 +179,38 @@ export default function LoginPage() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} required />
+                <Input
+                  id="email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  required
+                />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</Button>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </Button>
               <div className="text-center">
-                <button type="button" onClick={()=>{ setForgotStep('email'); setFpEmail(form.email) }} className="text-xs text-primary hover:underline">Esqueci a senha</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotStep('email')
+                    setFpEmail(form.email)
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Esqueci a senha
+                </button>
               </div>
             </form>
           )}
@@ -162,24 +218,64 @@ export default function LoginPage() {
             <form onSubmit={requestCode} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fp-email">Email cadastrado</Label>
-                <Input id="fp-email" type="email" value={fpEmail} onChange={e=>setFpEmail(e.target.value)} required />
+                <Input
+                  id="fp-email"
+                  type="email"
+                  value={fpEmail}
+                  onChange={(e) => setFpEmail(e.target.value)}
+                  required
+                />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={()=>setForgotStep('login')} disabled={fpLoading}>Voltar</Button>
-                <Button type="submit" className="flex-1" disabled={fpLoading}>{fpLoading ? 'Enviando...' : 'Enviar código'}</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setForgotStep('login')}
+                  disabled={fpLoading}
+                >
+                  Voltar
+                </Button>
+                <Button type="submit" className="flex-1" disabled={fpLoading}>
+                  {fpLoading ? 'Enviando...' : 'Enviar código'}
+                </Button>
               </div>
             </form>
           )}
           {forgotStep === 'code' && !currentUser && (
             <form onSubmit={verifyCode} className="space-y-4">
-              <p className="text-sm text-muted-foreground">Código de 6 dígitos enviado (se email existir).</p>
+              <p className="text-sm text-muted-foreground">
+                Código de 6 dígitos enviado (se email existir).
+              </p>
               <div className="space-y-2">
                 <Label htmlFor="fp-code">Código</Label>
-                <Input id="fp-code" inputMode="numeric" maxLength={6} pattern="[0-9]{6}" value={fpCode} onChange={e=>setFpCode(e.target.value.replace(/[^0-9]/g,''))} required />
+                <Input
+                  id="fp-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                  value={fpCode}
+                  onChange={(e) => setFpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  required
+                />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={()=>setForgotStep('email')} disabled={fpLoading}>Voltar</Button>
-                <Button type="submit" className="flex-1" disabled={fpLoading || fpCode.length !== 6}>{fpLoading ? 'Verificando...' : 'Verificar'}</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setForgotStep('email')}
+                  disabled={fpLoading}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={fpLoading || fpCode.length !== 6}
+                >
+                  {fpLoading ? 'Verificando...' : 'Verificar'}
+                </Button>
               </div>
             </form>
           )}
@@ -187,30 +283,64 @@ export default function LoginPage() {
             <form onSubmit={submitReset} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fp-pass1">Nova senha</Label>
-                <Input id="fp-pass1" type="password" value={fpNewPass} onChange={e=>setFpNewPass(e.target.value)} required />
+                <Input
+                  id="fp-pass1"
+                  type="password"
+                  value={fpNewPass}
+                  onChange={(e) => setFpNewPass(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fp-pass2">Confirmar senha</Label>
-                <Input id="fp-pass2" type="password" value={fpNewPass2} onChange={e=>setFpNewPass2(e.target.value)} required />
+                <Input
+                  id="fp-pass2"
+                  type="password"
+                  value={fpNewPass2}
+                  onChange={(e) => setFpNewPass2(e.target.value)}
+                  required
+                />
               </div>
               <ul className="text-xs text-muted-foreground space-y-0.5">
                 <li>Mínimo 8 caracteres</li>
                 <li>Ao menos 1 maiúscula, 1 minúscula e 1 dígito</li>
               </ul>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={()=>setForgotStep('code')} disabled={fpLoading}>Voltar</Button>
-                <Button type="submit" className="flex-1" disabled={fpLoading}>{fpLoading ? 'Salvando...' : 'Redefinir'}</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setForgotStep('code')}
+                  disabled={fpLoading}
+                >
+                  Voltar
+                </Button>
+                <Button type="submit" className="flex-1" disabled={fpLoading}>
+                  {fpLoading ? 'Salvando...' : 'Redefinir'}
+                </Button>
               </div>
             </form>
           )}
           {forgotStep === 'done' && !currentUser && (
             <div className="space-y-4 text-center">
               <p className="text-sm">Senha redefinida com sucesso.</p>
-              <Button className="w-full" onClick={()=>setForgotStep('login')}>Voltar para login</Button>
+              <Button className="w-full" onClick={() => setForgotStep('login')}>
+                Voltar para login
+              </Button>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}
+    >
+      <LoginPageInner />
+    </Suspense>
   )
 }

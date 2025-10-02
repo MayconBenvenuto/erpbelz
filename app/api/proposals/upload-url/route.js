@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { verifyToken, sanitizeForLog } from '@/lib/security'
 import { supabase } from '@/lib/api-helpers'
@@ -52,7 +53,7 @@ export async function POST(req) {
 
     const safeName = filename.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 150)
     const ext = (safeName.split('.').pop() || '').toLowerCase() || mime.split('/').pop() || 'bin'
-    const path = `${user.userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`
+    const path = `${user.userId}/${Date.now()}-${randomUUID()}.${ext}`
 
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path, 60)
     if (error) {

@@ -124,12 +124,18 @@ function ProposalUploadDocs({ attached, onChange }) {
         setPreview({ url, mime: f.mime, nome: f.nome, _file: f.file, loading: true })
         try {
           const data = await f.file.arrayBuffer()
-          const XLSX = await import('xlsx')
-          const wb = XLSX.read(data, { type: 'array' })
-          const sheetName = wb.SheetNames[0]
-          const sheet = wb.Sheets[sheetName]
-          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
-          const previewRows = rows.slice(0, 15).map((r) => (Array.isArray(r) ? r.slice(0, 12) : []))
+          const ExcelJS = await import('exceljs')
+          const wb = new ExcelJS.Workbook()
+          await wb.xlsx.load(data)
+          const sheet = wb.worksheets[0]
+          const sheetName = sheet?.name || 'Sheet1'
+          const rows = []
+          sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+            if (rowNumber <= 15) {
+              rows.push(row.values.slice(1, 13)) // valores começam no índice 1; limita a 12 colunas
+            }
+          })
+          const previewRows = rows.map((r) => (Array.isArray(r) ? r : []))
           setPreview({
             url,
             mime: f.mime,
@@ -373,6 +379,7 @@ export function NovaPropostaDialog({
   const [cnpjCache, setCnpjCache] = useState({}) // digits -> { loading, error, nome }
   const [uploadingDocs, setUploadingDocs] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const abortRef = useRef({ aborted: false })
   // Reset ao fechar
   useEffect(() => {
@@ -449,24 +456,36 @@ export function NovaPropostaDialog({
   )
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Previne submissões duplicadas
+    if (isSubmitting) {
+      return
+    }
+
+    setIsSubmitting(true)
+
     const email = isConsultor ? form.cliente_email.trim() : form.consultor_email.trim()
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       toast.error(isConsultor ? 'Email de cliente inválido' : 'Email de consultor inválido')
+      setIsSubmitting(false)
       return
     }
     if (isConsultor && !form.cliente_nome.trim()) {
       toast.error('Valide o CNPJ para carregar o Nome do Cliente')
+      setIsSubmitting(false)
       return
     }
     const valorNumber = parseMoney(form.valor)
     if (!valorNumber || valorNumber <= 0) {
       toast.error('Informe valor > 0')
+      setIsSubmitting(false)
       return
     }
     const cnpjDigits = form.cnpj.replace(/\D/g, '')
     if (cnpjDigits.length !== 14) {
       toast.error('CNPJ deve ter 14 dígitos')
+      setIsSubmitting(false)
       return
     }
     // valida CNPJ final novamente
@@ -479,10 +498,12 @@ export function NovaPropostaDialog({
       const j = await r.json()
       if (!j?.valid) {
         toast.error(j?.error || 'CNPJ inválido')
+        setIsSubmitting(false)
         return
       }
     } catch {
       toast.error('Erro ao validar CNPJ')
+      setIsSubmitting(false)
       return
     }
     const forcedStatus = isConsultor ? 'recepcionado' : form.status
@@ -505,6 +526,7 @@ export function NovaPropostaDialog({
           if (abortRef.current.aborted) {
             toast.error('Upload cancelado')
             setUploadingDocs(false)
+            setIsSubmitting(false)
             return
           }
           const d = pendingDocs[i]
@@ -553,6 +575,7 @@ export function NovaPropostaDialog({
         console.error('upload adiado error', err)
         toast.error('Falha ao enviar documentos')
         setUploadingDocs(false)
+        setIsSubmitting(false)
         return
       }
       setUploadingDocs(false)
@@ -573,26 +596,85 @@ export function NovaPropostaDialog({
       if (!payload.cliente_nome) delete payload.cliente_nome
       if (!payload.cliente_email) delete payload.cliente_email
     }
-    await onCreateProposal({
-      ...payload,
-      _docs: docsMeta,
-      afterSuccess: () => {
-        setForm({
-          cnpj: '',
-          operadora: '',
-          quantidade_vidas: '',
-          valor: '',
-          previsao_implantacao: '',
-          status: 'recepcionado',
-          consultor: '',
-          consultor_email: '',
-          cliente_nome: '',
-          cliente_email: '',
-          _docs: [],
-        })
-        onOpenChange(false)
-      },
-    })
+
+    try {
+      // Chama onCreateProposal que agora deve retornar a proposta criada
+      const result = await onCreateProposal({
+        ...payload,
+        _docs: docsMeta,
+      })
+
+      // Aguarda a proposta ser criada
+      const createdProposal = result?.data || result
+
+      // Se houver documentos e a proposta foi criada, salvar metadados no banco
+      if (docsMeta.length > 0 && createdProposal?.id) {
+        try {
+          const authToken = (() => {
+            try {
+              return sessionStorage.getItem('erp_token') || sessionStorage.getItem('crm_token')
+            } catch {
+              return null
+            }
+          })()
+
+          const docsToSave = docsMeta.map((doc) => ({
+            proposta_id: createdProposal.id,
+            bucket: doc.bucket,
+            path: doc.path,
+            nome_original: doc.nome,
+            mime: doc.mime,
+            tamanho_bytes: doc.tamanho_bytes,
+            url: doc.url,
+            categoria: doc.categoria,
+          }))
+
+          const saveResp = await fetch('/api/proposals/files', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+            },
+            body: JSON.stringify({ files: docsToSave }),
+          })
+
+          if (!saveResp.ok) {
+            console.error('Falha ao salvar metadados dos arquivos')
+            toast.warning('Proposta criada, mas houve problema ao registrar alguns documentos')
+          } else {
+            // Dispara evento para atualizar lista de arquivos
+            window.dispatchEvent(
+              new CustomEvent('proposta:docs-updated', { detail: { id: createdProposal.id } })
+            )
+          }
+        } catch (err) {
+          console.error('Erro ao salvar metadados:', err)
+          toast.warning('Proposta criada, mas houve problema ao registrar documentos')
+        }
+      }
+
+      // Resetar formulário após sucesso completo
+      setForm({
+        cnpj: '',
+        operadora: '',
+        quantidade_vidas: '',
+        valor: '',
+        previsao_implantacao: '',
+        status: 'recepcionado',
+        consultor: '',
+        consultor_email: '',
+        cliente_nome: '',
+        cliente_email: '',
+        _docs: [],
+      })
+
+      setIsSubmitting(false)
+      onOpenChange(false)
+    } catch (error) {
+      console.error('Erro ao criar proposta:', error)
+      setIsSubmitting(false)
+      // Erro já é tratado pelo hook/mutation
+    }
   }
   const cnpjDigits = form.cnpj.replace(/\D/g, '')
   const cnpjInfo = cnpjDigits.length === 14 ? cnpjCache[cnpjDigits] : null
@@ -807,19 +889,27 @@ export function NovaPropostaDialog({
           )}
         </form>
         <div className="border-t px-6 py-3 flex justify-end gap-2 bg-background sticky bottom-0">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={uploadingDocs || isSubmitting}
+          >
             Cancelar
           </Button>
           <Button
-            disabled={uploadingDocs}
+            disabled={uploadingDocs || isSubmitting}
             onClick={(e) => {
               const formEl = e.currentTarget.closest('[role=dialog]')?.querySelector('form')
               formEl?.requestSubmit()
             }}
           >
+            {isSubmitting && !uploadingDocs && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {uploadingDocs
               ? `Enviando (${uploadProgress.done}/${uploadProgress.total})...`
-              : 'Salvar'}
+              : isSubmitting
+                ? 'Salvando...'
+                : 'Salvar'}
           </Button>
         </div>
       </DialogContent>
