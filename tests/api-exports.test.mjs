@@ -5,7 +5,8 @@ vi.mock('@supabase/supabase-js', () => {
   return {
     createClient: vi.fn(() => ({
       auth: {},
-      from: () => ({ select: () => ({ data: [], error: null }) })
+      from: () => ({ select: () => ({ data: [], error: null }) }),
+      storage: { from: () => ({ list: () => ({ data: [], error: null }) }) }
     }))
   }
 })
@@ -40,6 +41,18 @@ describe('API routes exports', () => {
     expect(typeof item.PATCH).toBe('function')
   })
 
+  it('proposals metadata routes should export handlers', async () => {
+    const notes = await import('@/app/api/proposals/notes/route.js')
+    const tags = await import('@/app/api/proposals/tags/route.js')
+    const files = await import('@/app/api/proposals/files/route.js')
+    expect(typeof notes.GET).toBe('function')
+    expect(typeof notes.POST).toBe('function')
+    expect(typeof tags.GET).toBe('function')
+    expect(typeof tags.POST).toBe('function')
+    expect(typeof files.GET).toBe('function')
+    expect(typeof files.POST).toBe('function')
+  })
+
   it('users/goals/sessions/validate-cnpj should export handlers', async () => {
     const users = await import('@/app/api/users/route.js')
     const goals = await import('@/app/api/goals/route.js')
@@ -50,25 +63,25 @@ describe('API routes exports', () => {
     expect(typeof goals.GET).toBe('function')
     expect(typeof sessions.GET).toBe('function')
     expect(typeof validate.POST).toBe('function')
+    vi.resetModules()
   })
 
   it('users POST should allow creating gestor (schema)', async () => {
-    const { vi } = await import('vitest')
     // Garante isolamento: limpa cache de módulos antes de mockar e importar
     vi.resetModules()
 
     // Injeta mocks necessários ANTES da importação da rota
-    vi.mock('@/lib/api-helpers', () => {
-      return {
-        supabase: {
-          from: () => ({
-            insert: () => ({ select: () => ({ single: () => ({ data: { id: 'u2', nome: 'Novo Gestor', email: 'novo@belz.com.br', tipo_usuario: 'gestor', must_change_password: true }, error: null }) }) })
-          })
-        },
-        handleCORS: (r) => r,
-        requireAuth: vi.fn(async () => ({ user: { id: 'u1', email: 'gestor@belz.com.br', tipo_usuario: 'gestor' } })),
-      }
-    })
+    vi.doMock('@/lib/api-helpers', () => ({
+      __esModule: true,
+      supabase: {
+        from: () => ({
+          insert: () => ({ select: () => ({ single: () => ({ data: { id: 'u2', nome: 'Novo Gestor', email: 'novo@belz.com.br', tipo_usuario: 'gestor', must_change_password: true }, error: null }) }) })
+        })
+      },
+      handleCORS: (r) => r,
+      requireAuth: vi.fn(async () => ({ user: { id: 'u1', email: 'gestor@belz.com.br', tipo_usuario: 'gestor' } })),
+      cacheJson: (_req, _origin, payload) => new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
 
     const route = await import('@/app/api/users/route.js')
     expect(typeof route.POST).toBe('function')
@@ -81,6 +94,40 @@ describe('API routes exports', () => {
     expect(res.status).toBeLessThan(400)
     const json = await res.json()
     expect(json.tipo_usuario).toBe('gestor')
+    vi.unmock('@/lib/api-helpers')
+    vi.resetModules()
+  })
+})
+
+describe('supabase helpers', () => {
+  it('supabaseConfigStatus should reflect environment flags', async () => {
+    vi.resetModules()
+    vi.unmock('@/lib/api-helpers')
+    vi.unstubAllEnvs()
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-key')
+
+    // Reaplica mock do supabase após reset
+    vi.doMock('@supabase/supabase-js', () => ({
+      createClient: vi.fn(() => ({
+        auth: {},
+        from: () => ({ select: () => ({ data: [], error: null }) })
+      }))
+    }))
+
+  const helpers = await vi.importActual('@/lib/api-helpers')
+    const status = helpers.supabaseConfigStatus()
+
+    expect(status).toMatchObject({
+      hasUrl: true,
+      hasAnonKey: true,
+      hasServiceRoleKey: true,
+      urlHost: 'example.supabase.co',
+      isExampleUrl: true
+    })
+
+    vi.unstubAllEnvs()
   })
 })
 
