@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { supabase, handleCORS, requireAuth, mapSupabaseErrorToStatus, supabaseConfigStatus } from '@/lib/api-helpers'
+import {
+  supabase,
+  handleCORS,
+  requireAuth,
+  mapSupabaseErrorToStatus,
+  supabaseConfigStatus,
+} from '@/lib/api-helpers'
 import { STATUS_OPTIONS } from '@/lib/constants'
 
 export const runtime = 'nodejs'
@@ -12,7 +18,13 @@ export async function GET(request, { params }) {
   }
   const cfg = supabaseConfigStatus()
   if (!cfg.hasUrl || !cfg.hasAnonKey) {
-    return handleCORS(NextResponse.json({ error: 'Supabase não configurado para runtime', config: cfg }, { status: 503 }), origin)
+    return handleCORS(
+      NextResponse.json(
+        { error: 'Supabase não configurado para runtime', config: cfg },
+        { status: 503 }
+      ),
+      origin
+    )
   }
   // gestores podem ver qualquer histórico; analistas apenas dos seus
   const { id } = params
@@ -47,10 +59,12 @@ export async function GET(request, { params }) {
     'status',
     'quantidade_vidas',
     'valor',
-    'previsao_implantacao',
     'operadora',
     'consultor',
     'consultor_email',
+    'observacoes',
+    'observacoes_cliente',
+    'cliente_telefone',
   ])
   const sanitized = (data || []).map((row) => {
     const filtered = {}

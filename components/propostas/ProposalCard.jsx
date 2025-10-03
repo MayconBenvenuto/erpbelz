@@ -11,9 +11,9 @@ import {
   Building2,
   Users,
   DollarSign,
-  Calendar,
   User,
   Mail,
+  Phone,
   Clock,
   FileText,
   AlertCircle,
@@ -34,20 +34,6 @@ function formatMoneyBR(value) {
     style: 'currency',
     currency: 'BRL',
   }).format(capped)
-}
-
-/**
- * Formata data para exibição
- */
-function formatDate(date) {
-  if (!date) return '-'
-  const d = new Date(date)
-  if (isNaN(d.getTime())) return '-'
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(d)
 }
 
 /**
@@ -106,6 +92,12 @@ export function ProposalCard({
           {proposal.cliente_nome && (
             <div className="text-sm text-muted-foreground truncate">{proposal.cliente_nome}</div>
           )}
+          {proposal.cliente_telefone && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+              <Phone className="w-3 h-3" />
+              <span>{proposal.cliente_telefone}</span>
+            </div>
+          )}
         </div>
 
         {/* Operadora */}
@@ -128,11 +120,11 @@ export function ProposalCard({
           </div>
         </div>
 
-        {/* Previsão de Implantação */}
-        {proposal.previsao_implantacao && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="w-4 h-4" />
-            <span>Previsão: {formatDate(proposal.previsao_implantacao)}</span>
+        {/* Observações */}
+        {proposal.observacoes && (
+          <div className="text-sm text-muted-foreground bg-muted/30 p-2 rounded border-l-2 border-primary/30">
+            <p className="text-xs font-medium text-foreground mb-1">Observações:</p>
+            <p className="line-clamp-2">{proposal.observacoes}</p>
           </div>
         )}
 

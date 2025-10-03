@@ -18,37 +18,33 @@ try {
   broadcast = () => {}
 }
 
-// Validações endurecidas
-const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/
-const validateFutureOrToday = (d) => {
-  if (!isoDateRegex.test(d)) return false
-  const dt = new Date(d + 'T00:00:00Z')
-  if (isNaN(dt.getTime())) return false
-  const today = new Date()
-  const todayUTC = new Date(today.toISOString().slice(0,10) + 'T00:00:00Z')
-  return dt >= todayUTC
-}
+// Validações endurecidas (removidas validações de data depreciadas)
 
 // Analista: pode alterar status (opcional) ou realizar claim (claim:true) para assumir
-const analistaPatchSchema = z.object({
-  status: z.enum([...STATUS_OPTIONS]).optional(),
-  claim: z.boolean().optional(),
-}).refine((data) => typeof data.status !== 'undefined' || data.claim === true, {
-  message: 'Nada para atualizar',
-  path: ['status']
-})
+const analistaPatchSchema = z
+  .object({
+    status: z.enum([...STATUS_OPTIONS]).optional(),
+    claim: z.boolean().optional(),
+  })
+  .refine((data) => typeof data.status !== 'undefined' || data.claim === true, {
+    message: 'Nada para atualizar',
+    path: ['status'],
+  })
 
 // Gestor: campos ampliados (criado_por REMOVIDO - imutável)
-const gestorPatchSchema = z.object({
-  status: z.enum([...STATUS_OPTIONS]).optional(),
-  quantidade_vidas: z.coerce.number().int().min(0).optional(),
-  valor: z.coerce.number().min(0).optional(),
-  previsao_implantacao: z.string().regex(isoDateRegex).refine(validateFutureOrToday, 'Data não pode ser passada').optional(),
-  operadora: z.enum([...OPERADORAS]).optional(),
-  consultor: z.string().min(1).optional(),
-  consultor_email: z.string().email().optional(),
-  observacoes_cliente: z.string().max(5000).optional(),
-}).strict()
+const gestorPatchSchema = z
+  .object({
+    status: z.enum([...STATUS_OPTIONS]).optional(),
+    quantidade_vidas: z.coerce.number().int().min(0).optional(),
+    valor: z.coerce.number().min(0).optional(),
+    operadora: z.enum([...OPERADORAS]).optional(),
+    consultor: z.string().min(1).optional(),
+    consultor_email: z.string().email().optional(),
+    observacoes_cliente: z.string().max(5000).optional(),
+    observacoes: z.string().max(2000).optional(),
+    cliente_telefone: z.string().min(10).max(20).optional(),
+  })
+  .strict()
 
 export async function OPTIONS(request) {
   const origin = request.headers.get('origin')
@@ -63,17 +59,19 @@ export async function GET(request, { params }) {
     return handleCORS(NextResponse.json({ error: auth.error }, { status: auth.status }), origin)
   }
   const { id } = params
-  const columns = 'id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, previsao_implantacao, cliente_nome, cliente_email, criado_em, observacoes_cliente'
+  const columns =
+    'id, codigo, cnpj, operadora, consultor, consultor_email, criado_por, atendido_por, atendido_em, quantidade_vidas, valor, status, cliente_nome, cliente_email, cliente_telefone, criado_em, observacoes_cliente, observacoes'
   // 1) Tenta por UUID (com um retry curto para mitigar latência de replicação)
   async function fetchById() {
     return await supabase.from('propostas').select(columns).eq('id', id).single()
   }
   let { data: proposal, error } = await fetchById()
-  if ((error || !proposal)) {
+  if (error || !proposal) {
     try {
       await new Promise((r) => setTimeout(r, 120))
       const retry = await fetchById()
-      proposal = retry.data; error = retry.error
+      proposal = retry.data
+      error = retry.error
     } catch {}
   }
   // 2) Fallback: se não achou, tenta por código (PRP0001)
@@ -81,11 +79,15 @@ export async function GET(request, { params }) {
     const code = id.trim()
     if (/^PRP\d+$/i.test(code)) {
       const alt = await supabase.from('propostas').select(columns).eq('codigo', code).single()
-      proposal = alt.data; error = alt.error
+      proposal = alt.data
+      error = alt.error
     }
   }
   if (error || !proposal) {
-    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+    return handleCORS(
+      NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }),
+      origin
+    )
   }
   const user = auth.user
   const isGestor = user.tipo_usuario === 'gestor'
@@ -93,9 +95,15 @@ export async function GET(request, { params }) {
   let allowed = true
   if (!isGestor && !isGerente) {
     if (user.tipo_usuario === 'consultor') {
-      allowed = (String(proposal.criado_por) === String(user.id)) || (proposal.consultor_email && proposal.consultor_email.toLowerCase() === String(user.email || '').toLowerCase())
+      allowed =
+        String(proposal.criado_por) === String(user.id) ||
+        (proposal.consultor_email &&
+          proposal.consultor_email.toLowerCase() === String(user.email || '').toLowerCase())
     } else if (user.tipo_usuario === 'analista_implantacao') {
-      allowed = (String(proposal.criado_por) === String(user.id)) || (String(proposal.atendido_por) === String(user.id)) || !proposal.atendido_por
+      allowed =
+        String(proposal.criado_por) === String(user.id) ||
+        String(proposal.atendido_por) === String(user.id) ||
+        !proposal.atendido_por
     }
   }
   if (!allowed) {
@@ -104,16 +112,27 @@ export async function GET(request, { params }) {
   const ids = [proposal.criado_por, proposal.atendido_por].filter(Boolean)
   let userDataMap = {}
   if (ids.length > 0) {
-    const { data: usuarios } = await supabase.from('usuarios').select('id, nome, tipo_usuario').in('id', ids)
-    if (usuarios) userDataMap = Object.fromEntries(usuarios.map(u => [u.id, { nome: u.nome, tipo: u.tipo_usuario }]))
+    const { data: usuarios } = await supabase
+      .from('usuarios')
+      .select('id, nome, tipo_usuario')
+      .in('id', ids)
+    if (usuarios)
+      userDataMap = Object.fromEntries(
+        usuarios.map((u) => [u.id, { nome: u.nome, tipo: u.tipo_usuario }])
+      )
   }
   const criadoUser = userDataMap[proposal.criado_por]
   const atendenteUser = userDataMap[proposal.atendido_por]
-  const analista_nome = criadoUser?.nome && ['analista_implantacao','analista_movimentacao'].includes(criadoUser?.tipo)
-    ? criadoUser.nome
-  : (String(proposal.criado_por) === String(user.id) && ['analista_implantacao','analista_movimentacao'].includes(user.tipo_usuario) ? user.nome : undefined)
+  const analista_nome =
+    criadoUser?.nome && ['analista_implantacao', 'analista_movimentacao'].includes(criadoUser?.tipo)
+      ? criadoUser.nome
+      : String(proposal.criado_por) === String(user.id) &&
+          ['analista_implantacao', 'analista_movimentacao'].includes(user.tipo_usuario)
+        ? user.nome
+        : undefined
   const atendido_por_nome = proposal.atendido_por
-    ? (atendenteUser?.nome || (String(proposal.atendido_por) === String(user.id) ? user.nome : undefined))
+    ? atendenteUser?.nome ||
+      (String(proposal.atendido_por) === String(user.id) ? user.nome : undefined)
     : null
   const analista_responsavel_nome = atendido_por_nome || analista_nome || null
   const response = {
@@ -159,17 +178,29 @@ export async function PATCH(request, { params }) {
   const rlKey = `patch:proposta:${auth.user.id}`
   const rlOk = checkRateLimit(rlKey)
   if (!rlOk) {
-    return handleCORS(NextResponse.json({ error: 'Muitas requisições, tente novamente mais tarde' }, { status: 429 }), origin)
+    return handleCORS(
+      NextResponse.json(
+        { error: 'Muitas requisições, tente novamente mais tarde' },
+        { status: 429 }
+      ),
+      origin
+    )
   }
 
   // Bloqueia tentativa de mutação de criado_por (mesmo para gestor)
   if (Object.prototype.hasOwnProperty.call(body, 'criado_por')) {
-    return handleCORS(NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }), origin)
+    return handleCORS(
+      NextResponse.json({ error: 'Campo não permitidos: criado_por' }, { status: 400 }),
+      origin
+    )
   }
   const isGestor = auth.user.tipo_usuario === 'gestor'
   const isGerente = auth.user.tipo_usuario === 'gerente'
   // Claim é tratado antes para evitar necessidade de validar status
-  if (body?.claim && ['analista_implantacao', 'analista_movimentacao'].includes(auth.user.tipo_usuario)) {
+  if (
+    body?.claim &&
+    ['analista_implantacao', 'analista_movimentacao'].includes(auth.user.tipo_usuario)
+  ) {
     // Busca proposta para verificar assignment
     const { data: currentProposalPre, error: fetchErrorPre } = await supabase
       .from('propostas')
@@ -177,10 +208,16 @@ export async function PATCH(request, { params }) {
       .eq('id', id)
       .single()
     if (fetchErrorPre || !currentProposalPre) {
-      return handleCORS(NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }), origin)
+      return handleCORS(
+        NextResponse.json({ error: 'Proposta não encontrada' }, { status: 404 }),
+        origin
+      )
     }
     if (currentProposalPre.atendido_por) {
-      return handleCORS(NextResponse.json({ error: 'Proposta já atribuída' }, { status: 400 }), origin)
+      return handleCORS(
+        NextResponse.json({ error: 'Proposta já atribuída' }, { status: 400 }),
+        origin
+      )
     }
     const { data: claimed, error: claimErr } = await supabase
       .from('propostas')
@@ -196,10 +233,15 @@ export async function PATCH(request, { params }) {
       await supabase.from('propostas_auditoria').insert({
         proposta_id: claimed.id,
         alterado_por: auth.user.id,
-        changes: { claim: { before: null, after: { atendido_por: auth.user.id, atendido_em: claimed.atendido_em } } }
+        changes: {
+          claim: {
+            before: null,
+            after: { atendido_por: auth.user.id, atendido_em: claimed.atendido_em },
+          },
+        },
       })
     } catch (_) {}
-    
+
     // Broadcast SSE para feedback visual imediato de claim
     try {
       if (broadcast) {
@@ -209,28 +251,32 @@ export async function PATCH(request, { params }) {
           status: claimed.status,
           atendido_por: claimed.atendido_por,
           atendido_em: claimed.atendido_em,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
       }
     } catch (err) {
-      try { console.warn('[SSE] broadcast claim failed', sanitizeForLog({ message: err?.message })) } catch {}
+      try {
+        console.warn('[SSE] broadcast claim failed', sanitizeForLog({ message: err?.message }))
+      } catch {}
     }
-    
+
     return handleCORS(NextResponse.json(claimed), origin)
   }
 
   // Antes de validar, se analista enviou apenas status (sem claim) e ele é criador e ninguém assumiu, permitiremos claim implícito depois.
-  const parsed = ((isGestor || isGerente) ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
+  const parsed = (isGestor || isGerente ? gestorPatchSchema : analistaPatchSchema).safeParse(body)
   if (!parsed.success) {
-    const payloadErr = process.env.NODE_ENV === 'production'
-      ? { error: 'Dados inválidos' }
-      : { error: 'Dados inválidos', issues: parsed.error.issues }
+    const payloadErr =
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Dados inválidos' }
+        : { error: 'Dados inválidos', issues: parsed.error.issues }
     return handleCORS(NextResponse.json(payloadErr, { status: 400 }), origin)
   }
 
   const updates = { ...parsed.data }
   // Normaliza email de consultor se fornecido
-  if (updates.consultor_email) updates.consultor_email = String(updates.consultor_email).trim().toLowerCase()
+  if (updates.consultor_email)
+    updates.consultor_email = String(updates.consultor_email).trim().toLowerCase()
 
   // Busca a proposta e checa autorização:
   // - Gestor pode alterar qualquer
@@ -241,16 +287,19 @@ export async function PATCH(request, { params }) {
     const attempt = async () => {
       return await supabase
         .from('propostas')
-        .select('id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente')
+        .select(
+          'id, codigo, criado_por, valor, status, cnpj, operadora, consultor, consultor_email, quantidade_vidas, previsao_implantacao, atendido_por, atendido_em, observacoes_cliente'
+        )
         .eq('id', id)
         .single()
     }
     let { data: p, error: e } = await attempt()
     if ((!p || e) && !request.signal?.aborted) {
       // breve espera
-      await new Promise(r => setTimeout(r, 150))
+      await new Promise((r) => setTimeout(r, 150))
       const retry = await attempt()
-      p = retry.data; e = retry.error
+      p = retry.data
+      e = retry.error
       if (!p || e) return { p: null, e }
     }
     return { p, e: null }
@@ -260,8 +309,8 @@ export async function PATCH(request, { params }) {
   if (!currentProposal) {
     // Retry extra rápido (terceira tentativa) antes de desistir
     try {
-      await new Promise(r => setTimeout(r, 120))
-  const third = await supabase
+      await new Promise((r) => setTimeout(r, 120))
+      const third = await supabase
         .from('propostas')
         .select('id, codigo, criado_por, atendido_por')
         .eq('id', id)
@@ -279,20 +328,40 @@ export async function PATCH(request, { params }) {
         fetchError: fetchError?.message,
         user: auth.user.id,
         role: auth.user.tipo_usuario,
-        bodyKeys: Object.keys(body||{}),
+        bodyKeys: Object.keys(body || {}),
       })
     } catch {}
-    return handleCORS(NextResponse.json({ error: 'Proposta não encontrada (pode ter sido removida ou você perdeu acesso). Recarregue a lista.' }, { status: 404 }), origin)
+    return handleCORS(
+      NextResponse.json(
+        {
+          error:
+            'Proposta não encontrada (pode ter sido removida ou você perdeu acesso). Recarregue a lista.',
+        },
+        { status: 404 }
+      ),
+      origin
+    )
   }
   // Claim já tratado no bloco anterior
 
-  if (auth.user.tipo_usuario === 'consultor' || auth.user.tipo_usuario === 'analista_movimentacao') {
-    try { console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id }) } catch {}
-    return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
+  if (
+    auth.user.tipo_usuario === 'consultor' ||
+    auth.user.tipo_usuario === 'analista_movimentacao'
+  ) {
+    try {
+      console.warn('[PROPOSALS] PATCH forbidden for consultor', { id, by: auth.user.id })
+    } catch {}
+    return handleCORS(
+      NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }),
+      origin
+    )
   }
   if (!(isGestor || isGerente)) {
     let isHandler = currentProposal.atendido_por === auth.user.id
-    const canImplicitClaim = auth.user.tipo_usuario === 'analista_implantacao' && !currentProposal.atendido_por && String(currentProposal.criado_por) === String(auth.user.id)
+    const canImplicitClaim =
+      auth.user.tipo_usuario === 'analista_implantacao' &&
+      !currentProposal.atendido_por &&
+      String(currentProposal.criado_por) === String(auth.user.id)
     if (!isHandler && canImplicitClaim) {
       try {
         const { data: claimAuto } = await supabase
@@ -317,8 +386,17 @@ export async function PATCH(request, { params }) {
       }
     }
     if (!isHandler) {
-      try { console.warn('[PROPOSALS] PATCH forbidden', { id, by: auth.user.id, atendido_por: currentProposal.atendido_por }) } catch {}
-      return handleCORS(NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }), origin)
+      try {
+        console.warn('[PROPOSALS] PATCH forbidden', {
+          id,
+          by: auth.user.id,
+          atendido_por: currentProposal.atendido_por,
+        })
+      } catch {}
+      return handleCORS(
+        NextResponse.json({ error: 'Sem permissão para alterar esta proposta' }, { status: 403 }),
+        origin
+      )
     }
   }
 
@@ -326,37 +404,45 @@ export async function PATCH(request, { params }) {
   const updatePayload = {}
   if (typeof updates.status !== 'undefined') updatePayload.status = updates.status
   if (isGestor || isGerente) {
-    if (typeof updates.quantidade_vidas !== 'undefined') updatePayload.quantidade_vidas = updates.quantidade_vidas
+    if (typeof updates.quantidade_vidas !== 'undefined')
+      updatePayload.quantidade_vidas = updates.quantidade_vidas
     if (typeof updates.valor !== 'undefined') updatePayload.valor = updates.valor
-    if (typeof updates.previsao_implantacao !== 'undefined') updatePayload.previsao_implantacao = updates.previsao_implantacao
     if (typeof updates.operadora !== 'undefined') updatePayload.operadora = updates.operadora
     if (typeof updates.consultor !== 'undefined') updatePayload.consultor = updates.consultor
-    if (typeof updates.consultor_email !== 'undefined') updatePayload.consultor_email = updates.consultor_email
-  if (typeof updates.observacoes_cliente !== 'undefined') updatePayload.observacoes_cliente = updates.observacoes_cliente
+    if (typeof updates.consultor_email !== 'undefined')
+      updatePayload.consultor_email = updates.consultor_email
+    if (typeof updates.observacoes_cliente !== 'undefined')
+      updatePayload.observacoes_cliente = updates.observacoes_cliente
+    if (typeof updates.observacoes !== 'undefined') updatePayload.observacoes = updates.observacoes
+    if (typeof updates.cliente_telefone !== 'undefined')
+      updatePayload.cliente_telefone = updates.cliente_telefone
   }
 
-  let updateQuery = supabase
-    .from('propostas')
-    .update(updatePayload)
-    .eq('id', id)
+  let updateQuery = supabase.from('propostas').update(updatePayload).eq('id', id)
 
   // Removido filtro estrito por criado_por: autorização já validada incluindo atendido_por
 
   const { data: updated, error } = await updateQuery.select().single()
 
   if (error) {
-    try { console.error('[PROPOSALS] PATCH update error', { id, error: error?.message }) } catch {}
+    try {
+      console.error('[PROPOSALS] PATCH update error', { id, error: error?.message })
+    } catch {}
     return handleCORS(NextResponse.json({ error: error.message }, { status: 500 }), origin)
   }
   if (!updated) {
-    try { console.error('[PROPOSALS] PATCH no updated row', { id }) } catch {}
+    try {
+      console.error('[PROPOSALS] PATCH no updated row', { id })
+    } catch {}
     return handleCORS(NextResponse.json({ error: 'Acesso negado' }, { status: 403 }), origin)
   }
 
   // Atualização de metas (delta) baseada em transição de status
   try {
     const wasImplantado = String(currentProposal.status) === 'implantado'
-    const willImplantado = String((typeof updates.status !== 'undefined' ? updates.status : currentProposal.status)) === 'implantado'
+    const willImplantado =
+      String(typeof updates.status !== 'undefined' ? updates.status : currentProposal.status) ===
+      'implantado'
 
     // Só aplica delta quando há mudança relevante
     let delta = 0
@@ -380,14 +466,26 @@ export async function PATCH(request, { params }) {
       }
     }
   } catch (err) {
-    try { console.error('[METAS] update error', sanitizeForLog({ message: err?.message })) } catch {}
+    try {
+      console.error('[METAS] update error', sanitizeForLog({ message: err?.message }))
+    } catch {}
     // não bloqueia a resposta ao cliente
   }
 
   // Auditoria: registra alterações (somente campos realmente alterados)
   try {
     const changed = {}
-  const keys = ['status','quantidade_vidas','valor','previsao_implantacao','operadora','consultor','consultor_email']
+    const keys = [
+      'status',
+      'quantidade_vidas',
+      'valor',
+      'operadora',
+      'consultor',
+      'consultor_email',
+      'observacoes',
+      'observacoes_cliente',
+      'cliente_telefone',
+    ]
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(updatePayload, k)) {
         const before = currentProposal[k]
@@ -406,7 +504,9 @@ export async function PATCH(request, { params }) {
       })
     }
   } catch (e) {
-    try { console.warn('[AUDIT] failed to write audit log', sanitizeForLog({ message: e?.message })) } catch {}
+    try {
+      console.warn('[AUDIT] failed to write audit log', sanitizeForLog({ message: e?.message }))
+    } catch {}
   }
 
   // Broadcast SSE para atualização em tempo real (feedback visual imediato)
@@ -418,11 +518,13 @@ export async function PATCH(request, { params }) {
         status: updated.status,
         atendido_por: updated.atendido_por,
         atendido_em: updated.atendido_em,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
     }
   } catch (err) {
-    try { console.warn('[SSE] broadcast failed', sanitizeForLog({ message: err?.message })) } catch {}
+    try {
+      console.warn('[SSE] broadcast failed', sanitizeForLog({ message: err?.message }))
+    } catch {}
   }
 
   // Notificação por e-mail (mesma lógica do PUT)
@@ -432,19 +534,25 @@ export async function PATCH(request, { params }) {
       .select('email, nome')
       .eq('id', updated.criado_por)
       .single()
-  // Monta informações comuns ao e-mail
-  const humanStatus = String(updated.status || currentProposal.status || '').replace(/^./, c => c.toUpperCase())
+    // Monta informações comuns ao e-mail
+    const humanStatus = String(updated.status || currentProposal.status || '').replace(/^./, (c) =>
+      c.toUpperCase()
+    )
     const empresaCNPJ = updated.cnpj ? formatCNPJ(updated.cnpj) : undefined
     let empresaLabel = updated.cnpj ? `CNPJ ${empresaCNPJ || updated.cnpj}` : 'Não informado'
-  const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-  const appUrl = process.env.ERP_APP_URL || process.env.CRM_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://admbelz.vercel.app/'
+    const apiBase = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const appUrl =
+      process.env.ERP_APP_URL ||
+      process.env.CRM_APP_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      'https://admbelz.vercel.app/'
 
     if (updated.cnpj) {
       try {
         const resp = await fetch(`${apiBase}/api/validate-cnpj`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cnpj: updated.cnpj })
+          body: JSON.stringify({ cnpj: updated.cnpj }),
         })
         if (resp.ok) {
           const data = await resp.json()
@@ -456,18 +564,18 @@ export async function PATCH(request, { params }) {
       } catch (_) {}
     }
 
-  const valorFmt = formatCurrency(updated.valor || 0)
-  const operadora = updated.operadora || 'Não informado'
-  const codigo = updated.codigo || currentProposal?.codigo || '—'
+    const valorFmt = formatCurrency(updated.valor || 0)
+    const operadora = updated.operadora || 'Não informado'
+    const codigo = updated.codigo || currentProposal?.codigo || '—'
 
     // Envia para o analista (criado_por)
-  if (!userErr && analyst?.email) {
-  const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
-  const linkCRM = appUrl
-  const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o Sistema de Gestão: ${linkCRM}\n\n— Sistema de Gestão - Belz`
+    if (!userErr && analyst?.email) {
+      const subject = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
+      const linkCRM = appUrl
+      const text = `Olá ${analyst.nome || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\nAcesse o Sistema de Gestão: ${linkCRM}\n\n— Sistema de Gestão - Belz`
       const html = renderBrandedEmail({
         title: 'Atualização de status da proposta',
-  ctaText: 'Abrir ERP',
+        ctaText: 'Abrir ERP',
         ctaUrl: linkCRM,
         preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `
@@ -488,11 +596,11 @@ export async function PATCH(request, { params }) {
 
     // Envia para o consultor (e-mail externo informado na proposta)
     if (updated?.consultor_email) {
-  const subject2 = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
-  const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— Sistema de Gestão - Belz`
+      const subject2 = `[Sistema de Gestão - Belz] Proposta ${codigo} atualizada: ${humanStatus}`
+      const text2 = `Olá ${updated.consultor || ''},\n\nA proposta ${codigo} teve alteração no status.\n\nCódigo: ${codigo}\nEmpresa: ${empresaLabel}\nOperadora: ${operadora}\nValor: ${valorFmt}\nStatus atual: ${humanStatus}\n\n— Sistema de Gestão - Belz`
       const html2 = renderBrandedEmail({
         title: 'Atualização de status da proposta',
-  ctaText: 'Abrir ERP',
+        ctaText: 'Abrir ERP',
         ctaUrl: appUrl,
         preheader: `Proposta ${codigo} atualizada`,
         contentHtml: `
@@ -511,7 +619,9 @@ export async function PATCH(request, { params }) {
       await sendEmail({ to: updated.consultor_email, subject: subject2, text: text2, html: html2 })
     }
   } catch (err) {
-    try { console.error('[PROPOSALS] Email notify error', sanitizeForLog({ message: err?.message })) } catch {}
+    try {
+      console.error('[PROPOSALS] Email notify error', sanitizeForLog({ message: err?.message }))
+    } catch {}
   }
 
   return handleCORS(NextResponse.json(updated), origin)

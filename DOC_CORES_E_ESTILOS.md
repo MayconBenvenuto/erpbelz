@@ -5,6 +5,7 @@
 ### 📍 Localização das Configurações
 
 **Arquivo Principal**: `lib/constants.js`
+
 - Objeto: `STATUS_COLORS`
 - Estrutura: `{ bg: 'cor_fundo', text: 'cor_texto', border: 'cor_borda' }`
 
@@ -12,41 +13,46 @@
 
 ```javascript
 export const STATUS_COLORS = {
-  'recepcionado': {
-    bg: '#E3F2FD',      // Azul muito claro
-    text: '#1565C0',     // Azul escuro  
-    border: '#2196F3'    // Azul médio
+  recepcionado: {
+    bg: '#E3F2FD', // Azul muito claro
+    text: '#1565C0', // Azul escuro
+    border: '#2196F3', // Azul médio
   },
-  'análise': {
-    bg: '#FFF8E1',       // Amarelo muito claro
-    text: '#F57C00',     // Laranja escuro
-    border: '#FF9800'    // Laranja médio
+  'pendente assinatura ds/proposta': {
+    bg: '#F3E5F5', // Roxo muito claro
+    text: '#7B1FA2', // Roxo escuro
+    border: '#9C27B0', // Roxo médio
   },
-  'pendência': {
-    bg: '#FFF3E0',       // Laranja muito claro
-    text: '#E65100',     // Laranja escuro
-    border: '#FF9800'    // Laranja médio
+  análise: {
+    bg: '#FFF8E1', // Amarelo muito claro
+    text: '#F57C00', // Laranja escuro
+    border: '#FF9800', // Laranja médio
+  },
+  pendência: {
+    bg: '#FFF3E0', // Laranja muito claro
+    text: '#E65100', // Laranja escuro
+    border: '#FF9800', // Laranja médio
   },
   'pleito seguradora': {
-    bg: '#E8EAF6',       // Índigo muito claro
-    text: '#3F51B5',     // Índigo escuro
-    border: '#3F51B5'    // Índigo escuro
+    bg: '#E8EAF6', // Índigo muito claro
+    text: '#3F51B5', // Índigo escuro
+    border: '#3F51B5', // Índigo escuro
   },
   'boleto liberado': {
-    bg: '#E8F5E8',       // Verde muito claro
-    text: '#2E7D32',     // Verde escuro
-    border: '#4CAF50'    // Verde médio
+    bg: '#E8F5E8', // Verde muito claro
+    text: '#2E7D32', // Verde escuro
+    border: '#4CAF50', // Verde médio
   },
-  'implantado': {
-    bg: '#E0F2F1',       // Verde água claro
-    text: '#00695C',     // Verde água escuro
-    border: '#009688'    // Verde água médio
+  implantado: {
+    bg: '#E0F2F1', // Verde água claro
+    text: '#00695C', // Verde água escuro
+    border: '#009688', // Verde água médio
   },
   'proposta declinada': {
-    bg: '#FFEBEE',       // Vermelho muito claro
-    text: '#C62828',     // Vermelho escuro
-    border: '#F44336'    // Vermelho médio
-  }
+    bg: '#FFEBEE', // Vermelho muito claro
+    text: '#C62828', // Vermelho escuro
+    border: '#F44336', // Vermelho médio
+  },
 }
 ```
 
@@ -55,6 +61,7 @@ export const STATUS_COLORS = {
 ### 📍 Localização das Configurações
 
 **Arquivo Principal**: `lib/constants.js`
+
 - Objeto: `SOLICITACAO_STATUS_COLORS`
 - Estrutura: `{ bg: 'cor_fundo', text: 'cor_texto', border: 'cor_borda' }`
 
@@ -62,42 +69,43 @@ export const STATUS_COLORS = {
 
 ```javascript
 export const SOLICITACAO_STATUS_COLORS = {
-  'aberta': {
-    bg: '#E3F2FD',       // Azul muito claro (mesmo padrão de 'recepcionado')
-    text: '#1565C0',     // Azul escuro
-    border: '#2196F3'    // Azul médio
+  aberta: {
+    bg: '#E3F2FD', // Azul muito claro (mesmo padrão de 'recepcionado')
+    text: '#1565C0', // Azul escuro
+    border: '#2196F3', // Azul médio
   },
   'em validação': {
-    bg: '#FFF8E1',       // Amarelo muito claro (mesmo padrão de 'análise')
-    text: '#F57C00',     // Laranja escuro
-    border: '#FF9800'    // Laranja médio
+    bg: '#FFF8E1', // Amarelo muito claro (mesmo padrão de 'análise')
+    text: '#F57C00', // Laranja escuro
+    border: '#FF9800', // Laranja médio
   },
   'em execução': {
-    bg: '#E8EAF6',       // Índigo muito claro (mesmo padrão de 'pleito seguradora')
-    text: '#3F51B5',     // Índigo escuro
-    border: '#3F51B5'    // Índigo escuro
+    bg: '#E8EAF6', // Índigo muito claro (mesmo padrão de 'pleito seguradora')
+    text: '#3F51B5', // Índigo escuro
+    border: '#3F51B5', // Índigo escuro
   },
-  'concluída': {
-    bg: '#E0F2F1',       // Verde água claro (mesmo padrão de 'implantado')
-    text: '#00695C',     // Verde água escuro
-    border: '#009688'    // Verde água médio
+  concluída: {
+    bg: '#E0F2F1', // Verde água claro (mesmo padrão de 'implantado')
+    text: '#00695C', // Verde água escuro
+    border: '#009688', // Verde água médio
   },
-  'cancelada': {
-    bg: '#FFEBEE',       // Vermelho muito claro (mesmo padrão de 'proposta declinada')
-    text: '#C62828',     // Vermelho escuro
-    border: '#F44336'    // Vermelho médio
-  }
+  cancelada: {
+    bg: '#FFEBEE', // Vermelho muito claro (mesmo padrão de 'proposta declinada')
+    text: '#C62828', // Vermelho escuro
+    border: '#F44336', // Vermelho médio
+  },
 }
 ```
 
 ## �🎯 Onde as Cores São Aplicadas
 
 ### 1. Cards das Propostas (Kanban)
+
 **Arquivo**: `app/sections/Proposals.jsx`
 **Linha**: ~752-760
 
 ```jsx
-<span 
+<span
   className="font-mono text-[10px] px-1 py-0.5 rounded flex items-center gap-1"
   style={{
     backgroundColor: statusColors.bg,
@@ -110,11 +118,12 @@ export const SOLICITACAO_STATUS_COLORS = {
 ```
 
 ### 2. Cabeçalhos das Colunas Kanban
+
 **Arquivo**: `app/sections/Proposals.jsx`
 **Linha**: ~711-721
 
 ```jsx
-<div 
+<div
   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10"
   style={{
     backgroundColor: statusColors.bg,
@@ -125,12 +134,13 @@ export const SOLICITACAO_STATUS_COLORS = {
 ```
 
 ### 3. Fundo dos Cards das Propostas
+
 **Arquivo**: `app/sections/Proposals.jsx`
 **Linha**: ~740-747
 
 ```jsx
-<div 
-  key={p.id} 
+<div
+  key={p.id}
   className="rounded p-2 backdrop-blur text-xs space-y-1 border relative group transition-colors hover:border-primary/60 hover:shadow-md"
   style={{
     backgroundColor: statusColors.bg,
@@ -141,11 +151,12 @@ export const SOLICITACAO_STATUS_COLORS = {
 ```
 
 ### 4. Modal de Detalhes da Proposta
+
 **Arquivo**: `app/sections/Proposals.jsx`
 **Linha**: ~938-948
 
 ```jsx
-<span 
+<span
   className="font-mono text-xs px-1 py-0.5 rounded ml-2"
   style={{
     backgroundColor: (STATUS_COLORS[detail.status] || { bg: '#f6f6f6' }).bg,
@@ -158,16 +169,17 @@ export const SOLICITACAO_STATUS_COLORS = {
 ```
 
 ### 5. Cabeçalhos das Colunas Kanban (Movimentação)
+
 **Arquivo**: `app/sections/Movimentacao.jsx`
 **Linha**: ~282-292
 
 ```jsx
-<div 
+<div
   className="p-2 border-b flex items-center gap-2 text-sm font-medium capitalize sticky top-0 z-10"
   style={{
     backgroundColor: statusColors.bg,
     color: statusColors.text,
-    borderColor: statusColors.border
+    borderColor: statusColors.border,
   }}
 >
   {statusIcon(status)} {status}
@@ -193,7 +205,7 @@ export const SOLICITACAO_STATUS_COLORS = {
    ```javascript
    'nome_do_status': {
      bg: '#COR_FUNDO',
-     text: '#COR_TEXTO', 
+     text: '#COR_TEXTO',
      border: '#COR_BORDA'
    }
    ```
@@ -203,7 +215,7 @@ export const SOLICITACAO_STATUS_COLORS = {
 **As seções de Propostas e Movimentação seguem o mesmo padrão de cores** para manter a consistência visual do sistema. Cores similares são usadas para estados semanticamente equivalentes:
 
 - **Estados iniciais**: Azul (recepcionado ↔ aberta)
-- **Estados de análise**: Amarelo/Laranja (análise ↔ em validação)  
+- **Estados de análise**: Amarelo/Laranja (análise ↔ em validação)
 - **Estados de execução**: Índigo/Roxo (pleito seguradora ↔ em execução)
 - **Estados finalizados**: Verde (implantado ↔ concluída)
 - **Estados cancelados**: Vermelho (proposta declinada ↔ cancelada)
@@ -211,16 +223,19 @@ export const SOLICITACAO_STATUS_COLORS = {
 ## ⚠️ Regras Importantes
 
 ### Códigos das Propostas
+
 - **SEMPRE usar preto**: `color: '#000000 !important'`
 - **SEMPRE usar negrito**: `fontWeight: 'bold'`
 - **NUNCA remover o !important**: Garante que sobrescreva classes CSS
 
 ### Contraste e Legibilidade
+
 - **Fundos claros**: Para boa legibilidade do texto
 - **Textos escuros**: Para contraste adequado
 - **Bordas definidas**: Para separação visual clara
 
 ### Consistência Visual
+
 - **Família de cores**: Use tons da mesma cor (claro/médio/escuro)
 - **Saturação similar**: Mantenha níveis de saturação parecidos
 - **Harmonia**: Cores devem funcionar bem juntas no Kanban
@@ -228,18 +243,23 @@ export const SOLICITACAO_STATUS_COLORS = {
 ## 🎨 Palette de Cores Recomendadas
 
 ### Azuis
+
 - Claro: `#E3F2FD`, Médio: `#2196F3`, Escuro: `#1565C0`
 
-### Verdes  
+### Verdes
+
 - Claro: `#E8F5E8`, Médio: `#4CAF50`, Escuro: `#2E7D32`
 
 ### Vermelhos
+
 - Claro: `#FFEBEE`, Médio: `#F44336`, Escuro: `#C62828`
 
 ### Laranjas
+
 - Claro: `#FFF3E0`, Médio: `#FF9800`, Escuro: `#E65100`
 
 ### Amarelos
+
 - Claro: `#FFF8E1`, Médio: `#FFD54F`, Escuro: `#F57C00`
 
 ## 🔄 Após Fazer Alterações
@@ -252,5 +272,5 @@ export const SOLICITACAO_STATUS_COLORS = {
 ## 📝 Histórico de Mudanças
 
 - **2025-09-01**: Implementação do sistema de cores HEX personalizado
-- **2025-09-01**: Correção do contraste para melhor legibilidade  
+- **2025-09-01**: Correção do contraste para melhor legibilidade
 - **2025-09-01**: Forçado cor preta nos códigos das propostas com !important

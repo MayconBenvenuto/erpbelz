@@ -20,33 +20,42 @@ Este documento resume a estrutura do banco para o CRM Belz, com base no script `
 
 ### propostas
 
-| Coluna                            | Tipo                      | Notas                                                  |
-| --------------------------------- | ------------------------- | ------------------------------------------------------ |
-| id                                | UUID PK                   |                                                        |
-| codigo                            | VARCHAR                   | sequencial PRP0000 (mostrado na UI / e-mails)          |
-| cnpj                              | VARCHAR(18) NOT NULL      | sanitizado/validado                                    |
-| consultor                         | TEXT NOT NULL             | nome exibido                                           |
-| consultor_email                   | TEXT NOT NULL             | usado em filtros para analista                         |
-| operadora                         | TEXT NOT NULL             | valores definidos (vide constantes)                    |
-| quantidade_vidas                  | INT NOT NULL              |                                                        |
-| valor                             | NUMERIC(12,2) NOT NULL    |                                                        |
-| previsao_implantacao              | DATE                      |                                                        |
-| status                            | TEXT NOT NULL             | ver `lib/constants.js`                                 |
-| criado_por                        | UUID                      | FK usuarios.id                                         |
-| arquivado                         | BOOLEAN DEFAULT false     | soft-hide                                              |
-| atendido_por                      | UUID                      | usuário que assumiu                                    |
-| cliente\_\*                       | diversos                  | metadados do cliente (nome, fantasia, localização etc) |
-| cliente_quantidade_funcionarios   | INT                       |                                                        |
-| cliente_faturamento_anual         | NUMERIC                   |                                                        |
-| observacoes / observacoes_cliente | TEXT                      |                                                        |
-| updated_at                        | TIMESTAMPTZ DEFAULT now() |                                                        |
-| criado_em                         | TIMESTAMPTZ DEFAULT now() |                                                        |
-| atendido_em                       | TIMESTAMPTZ               |                                                        |
+| Coluna                          | Tipo                      | Notas                                                                            |
+| ------------------------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| id                              | UUID PK                   |                                                                                  |
+| codigo                          | VARCHAR                   | sequencial PRP0000 (mostrado na UI / e-mails)                                    |
+| cnpj                            | VARCHAR(18) NOT NULL      | sanitizado/validado                                                              |
+| consultor                       | TEXT NOT NULL             | nome exibido                                                                     |
+| consultor_email                 | TEXT NOT NULL             | usado em filtros para analista                                                   |
+| operadora                       | TEXT NOT NULL             | valores definidos (vide constantes)                                              |
+| quantidade_vidas                | INT NOT NULL              |                                                                                  |
+| valor                           | NUMERIC(12,2) NOT NULL    |                                                                                  |
+| previsao_implantacao            | DATE                      | **DEPRECATED** - mantido por compatibilidade                                     |
+| status                          | TEXT NOT NULL             | ver `lib/constants.js` - incluindo novo status 'pendente assinatura ds/proposta' |
+| criado_por                      | UUID                      | FK usuarios.id                                                                   |
+| arquivado                       | BOOLEAN DEFAULT false     | soft-hide                                                                        |
+| atendido_por                    | UUID                      | usuário que assumiu                                                              |
+| cliente\_\*                     | diversos                  | metadados do cliente (nome, fantasia, localização etc)                           |
+| cliente_quantidade_funcionarios | INT                       |                                                                                  |
+| cliente_faturamento_anual       | NUMERIC                   |                                                                                  |
+| cliente_telefone                | VARCHAR(20)               | telefone do cliente no formato brasileiro (11) 98765-4321                        |
+| observacoes                     | TEXT                      | observações internas (max 2000 chars recomendado)                                |
+| observacoes_cliente             | TEXT                      | observações relacionadas ao cliente                                              |
+| updated_at                      | TIMESTAMPTZ DEFAULT now() |                                                                                  |
+| criado_em                       | TIMESTAMPTZ DEFAULT now() |                                                                                  |
+| atendido_em                     | TIMESTAMPTZ               |                                                                                  |
 
 Observações de acesso:
 
 - Analista: vê linhas onde (criado_por = user.id) OU (consultor_email = user.email)
 - Gestor: vê todas
+
+**Atualização 2025-10-03**:
+
+- Adicionado campo `observacoes` para comentários internos sobre a proposta
+- Adicionado campo `cliente_telefone` para armazenar telefone do cliente no formato brasileiro
+- Adicionado novo status `pendente assinatura ds/proposta` entre `recepcionado` e `análise`
+- Campo `previsao_implantacao` depreciado (mantido por compatibilidade com dados existentes)
 
 Normalização de status: scripts de migração convertem valores legados (`em análise`, `pendencias seguradora`, `negado`) para o conjunto atual (`recepcionado`, `análise`, `pendência`, `pleito seguradora`, `boleto liberado`, `implantado`, `proposta declinada`). Executar `scripts/migrate-proposal-status.js` em bases antigas antes de depender de agregações.
 
