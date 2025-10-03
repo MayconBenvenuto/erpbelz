@@ -86,7 +86,7 @@ const response = await authFetch('/api/endpoint', options)
 
 ### 🔧 Arquivos Modificados
 
-#### 1. `components/components/auth/AuthProvider.jsx`
+#### 1. `components/auth/AuthProvider.jsx`
 
 **Mudanças:**
 

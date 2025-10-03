@@ -73,6 +73,7 @@ logs/
 # Backup files
 *.bak
 *.backup
+components_backup_*
 
 # Runtime data
 pids/
