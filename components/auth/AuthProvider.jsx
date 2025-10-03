@@ -1,8 +1,7 @@
 'use client'
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { hasPermission } from '@/lib/rbac'
-import { registerLogoutCallback } from '@/lib/auth-interceptor'
 
 const AuthContext = createContext(null)
 
@@ -11,7 +10,6 @@ export function AuthProvider({ children }) {
   const [sessionId, setSessionId] = useState(null)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
-  const logoutRef = useRef(null)
 
   const saveSession = (user, sid, tok) => {
     try {
@@ -52,9 +50,6 @@ export function AuthProvider({ children }) {
 
   // bootstrap
   useEffect(() => {
-    // Registra callback de logout para o interceptador 401 usando ref
-    registerLogoutCallback(() => logoutRef.current?.())
-
     const have = loadSession()
     if (!have) {
       ;(async () => {
@@ -74,7 +69,6 @@ export function AuthProvider({ children }) {
     } else {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // renovar token se necessário
@@ -124,9 +118,6 @@ export function AuthProvider({ children }) {
     setSessionId(null)
     setToken(null)
   }
-
-  // Mantém referência atualizada do logout
-  logoutRef.current = logout
 
   const refreshCurrentUser = async () => {
     try {

@@ -39,20 +39,29 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['mongodb'],
   },
-  webpack(config, { dev }) {
+  webpack(config, { dev, isServer }) {
     if (dev) {
       config.watchOptions = {
         poll: 2000,
         aggregateTimeout: 300,
         ignored: ['**/node_modules'],
       }
+      // Melhora estabilidade do Fast Refresh
+      config.optimization = {
+        ...config.optimization,
+        removeAvailableModules: false,
+        removeEmptyChunks: false,
+        splitChunks: false,
+      }
     }
     return config
   },
   onDemandEntries: {
-    maxInactiveAge: 10000,
-    pagesBufferLength: 2,
+    maxInactiveAge: 25000, // Aumenta tempo antes de descarregar páginas inativas
+    pagesBufferLength: 5, // Mantém mais páginas em buffer
   },
+  // Desabilita React Strict Mode se estiver causando problemas
+  reactStrictMode: false,
   async rewrites() {
     return { beforeFiles: [] }
   },
