@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useRef, useDeferredValue, useCallback } f
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
@@ -82,7 +83,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import { formatCurrency, formatCNPJ } from '@/lib/utils'
+import { formatCurrency, formatCNPJ, maskPhone } from '@/lib/utils'
 import { STATUS_COLORS } from '@/lib/constants'
 const ProposalsTimeline = dynamic(
   () => import('@/components/timeline/ProposalsTimelineComponent'),
@@ -154,9 +155,10 @@ function ProposalsInner({
     operadora: '',
     quantidade_vidas: '',
     valor: '',
-    previsao_implantacao: '',
+    observacoes: '',
     consultor: '',
     consultor_email: '',
+    cliente_telefone: '',
     criado_por: '',
   })
   // Futuro: incluir cliente_nome/cliente_email em edição se necessário
@@ -438,11 +440,10 @@ function ProposalsInner({
       operadora: p.operadora || '',
       quantidade_vidas: String(p.quantidade_vidas ?? ''),
       valor: String(p.valor ?? ''),
-      previsao_implantacao: p.previsao_implantacao
-        ? String(p.previsao_implantacao).slice(0, 10)
-        : '',
+      observacoes: p.observacoes || '',
       consultor: p.consultor || '',
       consultor_email: p.consultor_email || '',
+      cliente_telefone: p.cliente_telefone || '',
       criado_por: String(p.criado_por || ''),
     })
   }
@@ -452,9 +453,10 @@ function ProposalsInner({
       operadora: '',
       quantidade_vidas: '',
       valor: '',
-      previsao_implantacao: '',
+      observacoes: '',
       consultor: '',
       consultor_email: '',
+      cliente_telefone: '',
       criado_por: '',
     })
   }
@@ -464,9 +466,10 @@ function ProposalsInner({
       operadora: editForm.operadora,
       quantidade_vidas: Number(editForm.quantidade_vidas || 0),
       valor: Number(editForm.valor || 0),
-      previsao_implantacao: editForm.previsao_implantacao || null,
+      observacoes: editForm.observacoes || null,
       consultor: editForm.consultor,
       consultor_email: editForm.consultor_email,
+      cliente_telefone: editForm.cliente_telefone || null,
       criado_por: editForm.criado_por,
     }
     const res = await onPatchProposal?.(editDialogFor.id, payload)
@@ -1152,16 +1155,22 @@ function ProposalsInner({
                         }
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Início de Vigência</Label>
-                      <Input
-                        type="date"
-                        value={editForm.previsao_implantacao}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({ ...prev, previsao_implantacao: e.target.value }))
-                        }
-                      />
-                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Textarea
+                      value={editForm.observacoes}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({ ...prev, observacoes: e.target.value }))
+                      }
+                      placeholder="Observações internas (máx. 2000 caracteres)"
+                      maxLength={2000}
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {editForm.observacoes?.length || 0}/2000 caracteres
+                    </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1183,6 +1192,21 @@ function ProposalsInner({
                         }
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone do Cliente</Label>
+                    <Input
+                      type="tel"
+                      value={editForm.cliente_telefone}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          cliente_telefone: maskPhone(e.target.value),
+                        }))
+                      }
+                      placeholder="(11) 98765-4321"
+                      maxLength={15}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Analista</Label>
@@ -1261,6 +1285,12 @@ function ProposalsInner({
                     <div>
                       <span className="font-medium">Cliente:</span> {detail.cliente_nome || '—'}
                     </div>
+                    {detail.cliente_telefone && (
+                      <div>
+                        <span className="font-medium">Telefone Cliente:</span>{' '}
+                        {detail.cliente_telefone}
+                      </div>
+                    )}
                     <div>
                       <span className="font-medium">Email Cliente:</span>{' '}
                       {detail.cliente_email || '—'}
@@ -1288,12 +1318,14 @@ function ProposalsInner({
                           <div>
                             <span className="font-medium">Status:</span> {detail.status}
                           </div>
-                          <div>
-                            <span className="font-medium">Previsão Implantação:</span>{' '}
-                            {detail.previsao_implantacao
-                              ? new Date(detail.previsao_implantacao).toLocaleDateString('pt-BR')
-                              : '—'}
-                          </div>
+                          {detail.observacoes && (
+                            <div className="col-span-2 mt-2">
+                              <span className="font-medium">Observações:</span>
+                              <div className="mt-1 p-2 rounded bg-muted/30 text-sm border-l-2 border-primary/30">
+                                {detail.observacoes}
+                              </div>
+                            </div>
+                          )}
                         </>
                       )
                     })()}
