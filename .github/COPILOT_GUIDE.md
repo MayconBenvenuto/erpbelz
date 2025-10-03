@@ -5,14 +5,14 @@ Este guia complementa o COPILOT_INSTRUCTIONS.md com detalhes práticos sobre arq
 ## Visão rápida
 
 - Stack: Next.js 14 (App Router), React 18, shadcn/ui, Supabase (supabase-js v2), Zod, Tailwind, ESLint v8, Vitest.
-- Padrão: UI modular (app/sections/*), rotas de API por recurso (app/api/*), helpers em lib/*.
+- Padrão: UI modular (app/sections/_), rotas de API por recurso (app/api/_), helpers em lib/\*.
 - Auth: JWT no frontend (localStorage) + checagem server-side (requireAuth). RBAC: gestor/analista.
 
 ## Estrutura principal
 
 - app/page.js: Entrypoint da UI. Renderiza Login (quando currentUser=null) e tabs (Propostas, Dashboard, Usuários, Relatórios).
-- app/sections/*: Sidebar, Header, Proposals, Dashboard, Users, Reports.
-- app/api/*: Rotas de recursos
+- app/sections/\*: Sidebar, Header, Proposals, Dashboard, Users, Reports.
+- app/api/\*: Rotas de recursos
   - auth/login (POST)
   - auth/logout (POST)
   - proposals (GET, POST)
@@ -60,13 +60,13 @@ Definir via Vercel (Preview e Production) e .env local (não comitar):
 
 - NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 - JWT_SECRET (>= 32 chars), BCRYPT_ROUNDS=12, SESSION_TIMEOUT=86400000
-- CORS_ORIGINS (separe por vírgula; evite "*" em produção)
+- CORS_ORIGINS (separe por vírgula; evite "\*" em produção)
 - RATE_LIMIT_WINDOW=900000, RATE_LIMIT_MAX_REQUESTS=100
 - CNPJA_API_KEY (opcional, melhora a confiabilidade de validação de CNPJ)
 
 Observações:
 
-- NEXT_PUBLIC_* fica exposto no browser; chaves sensíveis apenas no server.
+- NEXT*PUBLIC*\* fica exposto no browser; chaves sensíveis apenas no server.
 - requireAuth normaliza o token decodificado para { id, email, tipo_usuario }.
 
 ## CORS e segurança
@@ -94,10 +94,10 @@ Observações:
 
 ## Scripts
 
-- dev: `yarn dev`
-- lint: `yarn lint` (ESLint v8)
-- build: `yarn build` (corrigir EINVAL em OneDrive apagando `.next`)
-- test: `yarn test` / `yarn test:watch`
+- dev: `pnpm dev`
+- lint: `pnpm lint` (ESLint v8)
+- build: `pnpm build` (corrigir EINVAL em OneDrive apagando `.next`)
+- test: `pnpm test` / `pnpm test:watch`
 
 ## Deploy
 
@@ -121,4 +121,5 @@ Observações:
 - Feature de filtros/sort no GET /api/propostas.
 
 ---
+
 Este arquivo é complementar. Para instruções iniciais e convenções existentes, veja também `COPILOT_INSTRUCTIONS.md`.

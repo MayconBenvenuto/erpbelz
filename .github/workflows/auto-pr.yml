@@ -68,17 +68,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'yarn'
+          cache: 'pnpm'
 
-      - name: Remover package-lock (padronizar yarn)
-        run: |
-          if [ -f package-lock.json ]; then rm package-lock.json; fi
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
 
-      - name: Instalar dependências (yarn)
-        run: yarn install --frozen-lockfile
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
 
       - name: Rodar testes
-        run: yarn test --reporter=dot
+        run: pnpm test --reporter=dot
 
       - name: Tentativa de auto-resolução de conflitos básicos (dev -> testes)
         id: auto_resolve_conflicts

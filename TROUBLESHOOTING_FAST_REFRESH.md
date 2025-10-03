@@ -17,13 +17,13 @@ Este erro ocorre quando o Next.js não consegue aplicar Hot Module Replacement (
 ```powershell
 # Windows PowerShell
 Remove-Item -Recurse -Force .next
-yarn dev
+pnpm dev
 ```
 
 ```bash
 # Linux/Mac
 rm -rf .next
-yarn dev
+pnpm dev
 ```
 
 ### 2. Usar Script de Diagnóstico
@@ -229,14 +229,14 @@ function FormComponent() {
 
 ```bash
 # Modo verbose
-NEXT_DEBUG=1 yarn dev
+NEXT_DEBUG=1 pnpm dev
 ```
 
 ### Verificar Webpack Bundle
 
 ```bash
 # Analisar o bundle
-yarn build
+pnpm build
 ```
 
 ### Monitorar Memory Leaks
@@ -251,7 +251,7 @@ Abra DevTools → Performance → Memory e grave enquanto navega. Procure por:
 
 ## 📋 Checklist Antes de Commitar
 
-- [ ] `yarn lint` passa sem erros
+- [ ] `pnpm lint` passa sem erros
 - [ ] `yarn debug:fast-refresh` não encontra problemas
 - [ ] Componente usa `useEffect` para side effects
 - [ ] Hooks estão no topo da função, sem condições
@@ -268,8 +268,8 @@ Abra DevTools → Performance → Memory e grave enquanto navega. Procure por:
 
    ```powershell
    Remove-Item -Recurse -Force .next, node_modules
-   yarn install --frozen-lockfile
-   yarn dev
+   pnpm install --frozen-lockfile
+   pnpm dev
    ```
 
 2. **Verificar versões:**
