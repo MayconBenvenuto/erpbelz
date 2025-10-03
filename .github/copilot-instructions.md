@@ -36,9 +36,9 @@
 
 ## Workflows de desenvolvimento
 
-- Node >=20 e Yarn 1.22 são obrigatórios (ver `package.json`).
-- Executar local: `yarn install --frozen-lockfile` seguido de `yarn dev`; API e UI rodam juntas em http://localhost:3000.
-- Testes rápidos: `yarn test` roda Vitest sobre `tests/*.mjs`; `yarn test:full` inclui eslint e build.
+- Node >=20 e PNPM 9.x são obrigatórios (ver `package.json`).
+- Executar local: `pnpm install --frozen-lockfile` seguido de `pnpm dev`; API e UI rodam juntas em http://localhost:3000.
+- Testes rápidos: `pnpm test` roda Vitest sobre `tests/*.mjs`; `pnpm test:full` inclui eslint e build.
 - Scripts auxiliares: `node scripts/supabase-introspect.mjs` atualiza `DOC_SUPABASE.md`; em Windows use `yarn windows:next-cache:*` para preparar/limpar cache.
 
 ## Convenções críticas

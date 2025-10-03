@@ -4,6 +4,7 @@
 
 - **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
 - **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
+- **[Migração para PNPM](MIGRACAO_YARN_TO_PNPM.md)** - ⚡ Guia completo da migração Yarn → PNPM (out/2025)
 - **[Troubleshooting - Instalação](TROUBLESHOOTING_INSTALACAO.md)** - Soluções para problemas comuns de instalação
 - **[Troubleshooting - Fast Refresh](TROUBLESHOOTING_FAST_REFRESH.md)** - Resolver erros de Hot Reload no desenvolvimento
 
@@ -26,7 +27,7 @@ Edite/expanda em `app/openapi.json/route.js`.
 // Pipelines CI (GitHub Actions) usam Yarn. Para gerar cobertura local:
 
 ```powershell
-yarn test --coverage
+pnpm test --coverage
 Start-Process .\coverage\index.html
 ```
 
@@ -93,6 +94,21 @@ Autenticação: cookie de sessão + JWT interno com rate limiting.
 
 ## 🔧 Como rodar
 
+### Pré-requisitos
+
+- **Node.js** >= 20.0.0
+- **PNPM** >= 9.0.0 ([Instalar](https://pnpm.io/installation))
+
+  ```powershell
+  # Windows (via npm)
+  npm install -g pnpm
+
+  # Verificar instalação
+  pnpm --version
+  ```
+
+### Instalação
+
 1. Clone o repositório
 
 ```powershell
@@ -103,7 +119,7 @@ Set-Location emergent-crm-adm
 1. Instale as dependências (Yarn padrão)
 
 ```powershell
-yarn install --frozen-lockfile
+pnpm install --frozen-lockfile
 ```
 
 1. Configure as variáveis de ambiente
@@ -169,7 +185,7 @@ EMAIL_OVERRIDE_TO=
 1. Execute o projeto (Next.js serve frontend + rotas /api)
 
 ```powershell
-yarn dev
+pnpm dev
 ```
 
 Aplicação: <http://localhost:3000>. As rotas de API estão sob /api/\* e são servidas pelo Next.
@@ -272,20 +288,20 @@ Status atuais (fonte da verdade: `lib/constants.js`):
 
 ````powershell
 # Desenvolvimento
-yarn dev
+pnpm dev
 
 # Build para produção
-yarn build
+pnpm build
 
 # Iniciar produção
 yarn start
 
 # Lint e formatação
-yarn lint
+pnpm lint
 yarn format
 
 # Testes utilitários (e.g., validação de CNPJ, e-mails)
-yarn test
+pnpm test
 node .\tests\test_email_api.js
 node .\tests\test_email_send.js
 node .\test_cnpj_validation.js
@@ -488,9 +504,9 @@ Foi removida a dependência de bibliotecas externas de virtualização. A tela d
 ## 🔄 CI / Qualidade
 
 GitHub Actions padronizado em Yarn (--frozen-lockfile). Não adicionar `package-lock.json`. Passos típicos:
-1. Instalação: `yarn install --frozen-lockfile`
-2. Lint/Test: `yarn lint` / `yarn test`
-3. (Futuro) Build: `yarn build`
+1. Instalação: `pnpm install --frozen-lockfile`
+2. Lint/Test: `pnpm lint` / `pnpm test`
+3. (Futuro) Build: `pnpm build`
 
 Falhas comuns:
 - Erro de lock: remover qualquer `package-lock.json` residual.
