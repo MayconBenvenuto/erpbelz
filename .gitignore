@@ -28,12 +28,19 @@ node_modules/
 /node_modules
 /.pnp
 .pnp.js
+
+# Yarn (legado - não mais usado)
 .yarn/install-state.gz
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+yarn.lock
+
+# PNPM
+.pnpm-store/
+.pnpm-debug.log*
 
 # Testing
 /coverage

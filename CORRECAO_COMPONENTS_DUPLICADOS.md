@@ -114,8 +114,8 @@ components/
 
 ### Testes Executados
 
-1. **Lint:** ✅ `yarn lint` - 0 erros (43 warnings não relacionados)
-2. **Build:** ✅ `yarn build` - Build completo bem-sucedido
+1. **Lint:** ✅ `pnpm lint` - 0 erros (43 warnings não relacionados)
+2. **Build:** ✅ `pnpm build` - Build completo bem-sucedido
 3. **Diagnóstico:** ✅ `yarn debug:fast-refresh` - Sem problemas de importação
 
 ### Nenhum Erro de Importação
@@ -197,8 +197,8 @@ Possíveis causas:
 - [x] Pasta duplicada `components/components/` removida
 - [x] Documentação atualizada
 - [x] `.gitignore` atualizado
-- [x] `yarn lint` passa sem erros
-- [x] `yarn build` bem-sucedido
+- [x] `pnpm lint` passa sem erros
+- [x] `pnpm build` bem-sucedido
 - [x] Nenhuma importação quebrada
 - [x] Script de diagnóstico ignora backups
 

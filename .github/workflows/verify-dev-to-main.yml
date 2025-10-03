@@ -25,23 +25,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'yarn'
+          cache: 'pnpm'
 
-      - name: Remover package-lock (padronizar yarn)
-        run: |
-          if [ -f package-lock.json ]; then rm package-lock.json; fi
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
 
-      - name: Instalar dependências (yarn)
-        run: yarn install --frozen-lockfile
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: yarn lint
+        run: pnpm lint
 
       - name: Build
-        run: yarn build
+        run: pnpm build
 
       - name: Testes completos (cobertura)
-        run: yarn test:full
+        run: pnpm test:full
 
       - name: Marcar sucesso
         id: set-pass

@@ -2,21 +2,22 @@
   "name": "sistema-gestao-belz",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=20.0.0",
-    "yarn": ">=1.22.0"
+    "pnpm": ">=9.0.0"
   },
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "dev:front": "next dev --hostname 0.0.0.0 --port 3000",
     "dev:back": "echo 'server-nest removido'",
-    "dev:all": "yarn dev:front",
+    "dev:all": "pnpm dev:front",
     "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
     "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start",
     "test": "vitest run --reporter=dot",
-    "test:full": "yarn lint && next build && vitest run --coverage --reporter=dot",
+    "test:full": "pnpm lint && next build && vitest run --coverage --reporter=dot",
     "test:utils": "node ./scripts/test-utils.mjs",
     "debug:fast-refresh": "node ./scripts/debug-fast-refresh.mjs",
     "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
@@ -127,6 +128,5 @@
     "*.{json,md,css,scss}": [
       "prettier --write"
     ]
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  }
 }

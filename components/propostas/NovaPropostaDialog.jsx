@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectTrigger,
@@ -16,6 +17,7 @@ import { PlusCircle, Loader2, AlertCircle, CheckCircle2, Info, XCircle } from 'l
 import Image from 'next/image'
 import { assertSupabaseBrowser } from '@/lib/supabase-client'
 import { Progress } from '@/components/ui/progress'
+import { maskPhone } from '@/lib/utils'
 
 // Componente de anexos com upload adiado até salvar
 function ProposalUploadDocs({ attached, onChange }) {
@@ -368,12 +370,13 @@ export function NovaPropostaDialog({
     operadora: '',
     quantidade_vidas: '',
     valor: '',
-    previsao_implantacao: '',
+    observacoes: '',
     status: 'recepcionado',
     consultor: '',
     consultor_email: '',
     cliente_nome: '',
     cliente_email: '',
+    cliente_telefone: '',
     _docs: [],
   })
   const [cnpjCache, setCnpjCache] = useState({}) // digits -> { loading, error, nome }
@@ -659,12 +662,13 @@ export function NovaPropostaDialog({
         operadora: '',
         quantidade_vidas: '',
         valor: '',
-        previsao_implantacao: '',
+        observacoes: '',
         status: 'recepcionado',
         consultor: '',
         consultor_email: '',
         cliente_nome: '',
         cliente_email: '',
+        cliente_telefone: '',
         _docs: [],
       })
 
@@ -775,14 +779,22 @@ export function NovaPropostaDialog({
                 required
               />
             </div>
-            <div>
-              <Label>Previsão Implantação</Label>
-              <Input
-                type="date"
-                value={form.previsao_implantacao}
-                onChange={(e) => setForm((f) => ({ ...f, previsao_implantacao: e.target.value }))}
-              />
-            </div>
+          </div>
+          <div>
+            <Label>Observações</Label>
+            <Textarea
+              value={form.observacoes}
+              onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
+              placeholder="Observações internas sobre a proposta (opcional, máx. 2000 caracteres)"
+              maxLength={2000}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {form.observacoes?.length || 0}/2000 caracteres
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {!isConsultor && (
               <div>
                 <Label>Status</Label>
@@ -815,6 +827,19 @@ export function NovaPropostaDialog({
                     type="email"
                     value={form.cliente_email}
                     onChange={(e) => setForm((f) => ({ ...f, cliente_email: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Telefone do Cliente *</Label>
+                  <Input
+                    type="tel"
+                    value={form.cliente_telefone}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cliente_telefone: maskPhone(e.target.value) }))
+                    }
+                    placeholder="(11) 98765-4321"
+                    maxLength={15}
                     required
                   />
                 </div>

@@ -119,13 +119,13 @@ export default function MyComponent() {
 
 ```powershell
 # Limpar cache Next.js (solução mais comum)
-Remove-Item -Recurse -Force .next; yarn dev
+Remove-Item -Recurse -Force .next; pnpm dev
 
 # Verificar erros reais de build
-yarn build
+pnpm build
 
 # Lint code
-yarn lint
+pnpm lint
 ```
 
 ---
