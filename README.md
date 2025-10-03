@@ -5,6 +5,7 @@
 - **[Cores e Estilos](DOC_CORES_E_ESTILOS.md)** - Sistema de cores dos status e como alterar
 - **[Banco de Dados](DOC_SUPABASE.md)** - Estrutura e configurações do Supabase
 - **[Troubleshooting - Instalação](TROUBLESHOOTING_INSTALACAO.md)** - Soluções para problemas comuns de instalação
+- **[Troubleshooting - Fast Refresh](TROUBLESHOOTING_FAST_REFRESH.md)** - Resolver erros de Hot Reload no desenvolvimento
 
 ### 🌐 Documentação Pública da API
 

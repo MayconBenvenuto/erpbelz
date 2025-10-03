@@ -18,6 +18,7 @@
     "test": "vitest run --reporter=dot",
     "test:full": "yarn lint && next build && vitest run --coverage --reporter=dot",
     "test:utils": "node ./scripts/test-utils.mjs",
+    "debug:fast-refresh": "node ./scripts/debug-fast-refresh.mjs",
     "supabase:introspect": "node ./scripts/supabase-introspect.mjs",
     "supabase:introspect:prod": "node ./scripts/supabase-introspect.mjs --prod",
     "supabase:introspect:prod:no-doc": "node ./scripts/supabase-introspect.mjs --prod --no-doc",

@@ -117,7 +117,7 @@ export function ProposalFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                {(Array.isArray(users) ? users : []).map((u) => (
+                {users.map((u) => (
                   <SelectItem key={u.id} value={String(u.id)}>
                     {u.nome}
                   </SelectItem>
